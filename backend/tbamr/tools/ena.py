@@ -55,6 +55,13 @@ class DataTools:
             pass
         return {"query": query, "returned": len(rows), "total_in_ena": total, "runs": rows}
 
+    def ena_run(self, run_accession: str) -> dict[str, Any] | None:
+        """One run's record (same fields as the search)."""
+        r = self.http.get(f"{ENA}/search", params={"result": "read_run", "query": f'run_accession="{run_accession}"', "fields": RUN_FIELDS, "format": "json", "limit": 1})
+        r.raise_for_status()
+        rows = r.json() if r.text.strip() else []
+        return rows[0] if rows else None
+
     def ena_study(self, study_accession: str) -> dict[str, Any]:
         r = self.http.get(
             f"{ENA}/search",

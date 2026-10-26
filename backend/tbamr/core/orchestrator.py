@@ -5,6 +5,8 @@ approve, but every judgment call inside a stage belongs to an agent or a human.
 """
 from __future__ import annotations
 
+import json
+
 import threading
 from collections import Counter
 from typing import Any
@@ -91,11 +93,44 @@ class Orchestrator:
     def raw_view(self, kind: str, key: str, role: str, person: str) -> dict[str, Any]:
         payload = self._assemble_raw(kind, key)
         if payload is None:
-            raise StageError(f"No raw data has been recorded for {kind}/{key} yet.")
+            hint = " The original TB-Profiler file was not saved by the earlier version: import it again in Stage 4." if kind == "tbprofiler" else ""
+            raise StageError(f"No raw data has been recorded for {kind}/{key} yet.{hint}")
+        if '"_note"' in json.dumps(payload.get("data"), default=str):
+            payload["note"] = "This pipeline was started before raw data was saved, so part of this record was filled in afterwards (marked _note in the JSON). It may differ from what the agents saw if the source changed since."
         ts = None if kind == "tool" else self.log.record_view(self.ident(role, person), role, kind, key)
         return {"kind": kind, "key": key, "viewed_at": ts, "viewer": self.ident(role, person), **payload}
 
+    LATE = "This pipeline was started before raw data was saved, so this record was fetched again just now from the same source. It may differ from what the agents saw if the source changed since."
+
+    def _backfill(self, kind: str, key: str) -> None:
+        """Fill raw data missing from pipelines started with an older version."""
+        st, log = self.state, self.log
+        try:
+            if kind == "ena" and log.get_raw("ena", key) is None:
+                rec = self.data.ena_run(key)
+                if rec:
+                    log.put_raw("ena", key, {**rec, "_note": self.LATE})
+            elif kind in ("cohort", "qc"):
+                runs = [s.run for s in st.samples if kind == "cohort" or s.in_cohort]
+                for run in runs:
+                    if log.get_raw("ena", run) is None:
+                        self._backfill("ena", run)
+            elif kind == "scope" and log.get_raw("scope", "guardian") is None and st.scope:
+                log.put_raw("scope", "guardian", {"result": st.scope, "_note": "This pipeline was started before raw data was saved: the Guardian's original input was not recorded, only its stored result."})
+            elif kind in ("tbprofiler", "profiling"):
+                runs = [key] if kind == "tbprofiler" else [s.run for s in st.samples if s.profiling == "Done"]
+                for run in runs:
+                    if log.get_raw("tbprofiler", run) is None and self.demo:
+                        j = demo_tbprofiler_json(run)
+                        if j:
+                            log.put_raw("tbprofiler", run, {**j, "_note": self.LATE})
+            elif kind == "report" and log.get_raw("report", key) is None and st.report and str(st.report.get("version")) == key:
+                log.put_raw("report", key, st.report)
+        except Exception:  # never let a backfill failure hide the real error message
+            pass
+
     def _assemble_raw(self, kind: str, key: str) -> dict[str, Any] | None:
+        self._backfill(kind, key)
         st, raw = self.state, self.log.get_raw
         src = "simulated demo records" if self.demo else "ENA Portal API (read_run)"
         if kind == "scope":

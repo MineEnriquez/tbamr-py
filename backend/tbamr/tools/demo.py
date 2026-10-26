@@ -86,6 +86,9 @@ class DemoDataTools:
         rows = self._match(q)[:limit]
         return {"query": q, "returned": len(rows), "total_in_ena": len(rows), "runs": rows, "demo": True}
 
+    def ena_run(self, run_accession: str) -> dict[str, Any] | None:
+        return next((_row(r) for r in _RUNS if r[0] == run_accession), None)
+
     def ena_study(self, study_accession: str) -> dict[str, Any]:
         return {"study_accession": study_accession, "study_title": _STUDIES.get(study_accession), "demo": True}
 

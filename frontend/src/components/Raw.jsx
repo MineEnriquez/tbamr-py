@@ -59,6 +59,7 @@ export function RawViewer({ req, who, onClose, onViewed }) {
         </div>
         {err && <div className="box esc"><p>{err}</p></div>}
         {data && <>
+          {data.note && <div className="box note"><p style={{ fontSize: '.88rem' }}>⚠ {data.note}</p></div>}
           <dl className="kv"><dt>Source</dt><dd>{data.source}</dd><dt>What this is</dt><dd>{data.explanation}</dd>
             {data.viewed_at && <><dt>Your receipt</dt><dd>Viewed by <b>{data.viewer}</b> at {fmtTime(data.viewed_at)}; this is saved with your decision.</dd></>}</dl>
           <div className="row">

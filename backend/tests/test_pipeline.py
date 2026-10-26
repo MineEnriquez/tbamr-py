@@ -244,3 +244,14 @@ def test_api_flow(tmp_path):
     tool = next(t for t in tr if t["kind"] == "tool_call")
     full = c.get(f"/api/raw/tool/{tool['id']}").json()
     assert "output" in full["data"] and full["data"]["tool"] and full["viewed_at"] is None
+
+
+def test_raw_data_is_backfilled_for_pipelines_started_before_it_was_saved(orch):
+    orch.run_stage(1); orch.raw_view("scope", "guardian", "pi", "Ana"); orch.approve_scope("pi", "Ana"); orch.run_stage(2)
+    with orch.log._lock:  # simulate a database written by the earlier version
+        orch.log.db.execute("DELETE FROM raw"); orch.log.db.commit()
+    rec = orch.raw_view("ena", "DEMO-R15", "pi", "Ana")
+    assert rec["data"]["ena_record"]["run_accession"] == "DEMO-R15" and "note" in rec
+    cohort = orch.raw_view("cohort", "all", "pi", "Ana")
+    assert all(r[0] for r in cohort["table"]["rows"])
+    orch.resolve_hold("pi", "Ana", "DEMO-R15", "verify", "Checked the record")
