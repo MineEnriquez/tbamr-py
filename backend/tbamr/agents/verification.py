@@ -98,6 +98,8 @@ class VerificationTasker(LLMAgent):
                 proposals = {p["run"]: p for p in res["proposals"]}
         for s, why in ambiguous:
             p = proposals.get(s.run)
+            self.log.put_raw("evidence", s.run, {"issue": why, "agent_proposal": p, "brain": self.client.mode,
+                                                  "tool_outputs": getattr(self, "called", {})})
             if p and p["outcome"] == "Exclude" and "BioSample" in why:
                 s.eligibility, s.eligibility_note = "Excluded", f"Repeated isolate: {p['rationale']}"
                 self.decide(s.run, Outcome.EXCLUDE, RULES["elig"], s.eligibility_note, p.get("evidence", ""), stage=2)

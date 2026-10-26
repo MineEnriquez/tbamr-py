@@ -20,7 +20,7 @@ from ..tools.demo import DST as DEMO_DST
 from ..tools.demo import demo_tbprofiler_json
 from ..tools.tbprofiler import parse_result
 from .decisions import Decision, DecisionLog, Outcome
-from .models import GATES, ROLES, RULES, STAGES, PipelineState, Sample
+from .models import GATES, ROLES, RULES, STAGES, THRESHOLDS, PipelineState, Sample
 
 
 class PermissionDenied(Exception):
@@ -29,6 +29,10 @@ class PermissionDenied(Exception):
 
 class StageError(Exception):
     pass
+
+
+class RawNotViewed(StageError):
+    """A human tried to decide without opening the raw data behind the decision."""
 
 
 class Orchestrator:
@@ -67,8 +71,86 @@ class Orchestrator:
         self.log.add(Decision(sample_id=sample, outcome=outcome, rule_version=rule, rationale=text, actor="agent:orchestrator", stage=stage))
         self.log.trace("orchestrator", "handoff", {"text": text})
 
-    def human(self, role: str, person: str, sample: str, outcome: Outcome, rule: str, text: str, stage: int = 0) -> None:
-        self.log.add(Decision(sample_id=sample, outcome=outcome, rule_version=rule, rationale=text, actor=f"human:{role}:{person or 'unnamed'}", stage=stage))
+    def human(self, role: str, person: str, sample: str, outcome: Outcome, rule: str, text: str, stage: int = 0, evidence: str = "") -> None:
+        self.log.add(Decision(sample_id=sample, outcome=outcome, rule_version=rule, rationale=text, actor=f"human:{role}:{person or 'unnamed'}",
+                              stage=stage, evidence=evidence))
+
+    # ------------------------------------------------------------------ raw data before decisions
+    @staticmethod
+    def ident(role: str, person: str) -> str:
+        return (person or "").strip() or ROLES.get(role, role)
+
+    def need_raw(self, role: str, person: str, kind: str, key: str, what: str) -> str:
+        """Every human decision requires that this person opened the raw data behind it."""
+        ts = self.log.viewed_at(self.ident(role, person), kind, key)
+        if not ts:
+            raise RawNotViewed(f"Open the raw data for {what} before deciding — every decision must be made on the source data, not only the agents' summary.")
+        import time as _t
+        return f"Raw data ({kind}/{key}) viewed by {self.ident(role, person)} at {_t.strftime('%Y-%m-%d %H:%M:%S', _t.localtime(ts))}"
+
+    def raw_view(self, kind: str, key: str, role: str, person: str) -> dict[str, Any]:
+        payload = self._assemble_raw(kind, key)
+        if payload is None:
+            raise StageError(f"No raw data has been recorded for {kind}/{key} yet.")
+        ts = None if kind == "tool" else self.log.record_view(self.ident(role, person), role, kind, key)
+        return {"kind": kind, "key": key, "viewed_at": ts, "viewer": self.ident(role, person), **payload}
+
+    def _assemble_raw(self, kind: str, key: str) -> dict[str, Any] | None:
+        st, raw = self.state, self.log.get_raw
+        src = "simulated demo records" if self.demo else "ENA Portal API (read_run)"
+        if kind == "scope":
+            d = raw("scope", "guardian")
+            return d and {"title": "Scope Guardian: input and result", "source": f"Scope Guardian ({d.get('brain')})",
+                          "explanation": "Exactly what the Guardian received and what it returned, before you approve the scope.", "data": d}
+        if kind == "ena":
+            d = raw("ena", key)
+            if d is None:
+                return None
+            s = st.sample(key)
+            derived = {"base_count": d.get("base_count"), "genome_length_bp": THRESHOLDS["genome_bp"],
+                       "estimated_coverage": round(int(d["base_count"]) / THRESHOLDS["genome_bp"], 1) if str(d.get("base_count", "")).isdigit() else None}
+            return {"title": f"Source record for {key}", "source": src,
+                    "explanation": "The run's record exactly as the archive returned it, the evidence an agent gathered (if any), and how coverage was derived.",
+                    "data": {"ena_record": d, "agent_evidence": raw("evidence", key), "derived": derived,
+                             "current_status": {"eligibility": s.eligibility, "qc": s.qc} if s else None}}
+        if kind == "cohort":
+            rows = [raw("ena", s.run) or {} for s in st.samples]
+            cols = ["run_accession", "sample_accession", "study_accession", "country", "library_strategy", "instrument_platform", "base_count", "fastq_md5"]
+            stat = {s.run: s.eligibility for s in st.samples}
+            return {"title": "All candidate runs (raw archive records)", "source": src,
+                    "explanation": "Every candidate run as returned by the archive, with the eligibility the agents assigned. Check locations, studies and duplicates yourself before approving.",
+                    "table": {"columns": cols + ["eligibility"], "rows": [[r.get(c, "") for c in cols] + [stat.get(r.get("run_accession"))] for r in rows]},
+                    "data": {"records": rows, "cohort_checks": st.cohort_checks}}
+        if kind == "qc":
+            rows = []
+            for s in st.samples:
+                if s.in_cohort:
+                    r = raw("ena", s.run) or {}
+                    rows.append([s.run, r.get("base_count"), THRESHOLDS["genome_bp"], s.coverage, r.get("fastq_md5", ""), s.qc])
+            return {"title": "QC inputs: base counts and checksums", "source": src,
+                    "explanation": f"Estimated coverage = base_count ÷ {THRESHOLDS['genome_bp']:,} bp. Thresholds: ≥{THRESHOLDS['min_cov']:g}× pass, {THRESHOLDS['border_cov']:g}–{THRESHOLDS['min_cov']:g}× escalate, below {THRESHOLDS['border_cov']:g}× exclude.",
+                    "table": {"columns": ["run", "base_count", "genome_bp", "est_coverage", "fastq_md5", "qc"], "rows": rows}, "data": {"rows": rows, "thresholds": THRESHOLDS}}
+        if kind == "profiling":
+            rows = []
+            for s in st.samples:
+                if s.qc == "Pass":
+                    m = s.profile_meta or {}
+                    rows.append([s.run, s.profiling, m.get("tool"), m.get("db"), len(m.get("mutations", [])), m.get("median_depth"), m.get("file")])
+            return {"title": "TB-Profiler results in this batch", "source": "TB-Profiler result files",
+                    "explanation": "One row per QC-passed run. Open any run to see its full TB-Profiler JSON.",
+                    "table": {"columns": ["run", "status", "tool", "database", "resistance annotations", "median depth", "file"], "rows": rows}, "data": {"rows": rows}}
+        if kind == "tbprofiler":
+            d = raw("tbprofiler", key)
+            return d and {"title": f"TB-Profiler result for {key}", "source": "TB-Profiler JSON, verbatim",
+                          "explanation": "The full result file. Resistance calls are under dr_variants; the Evidence Analyst's findings are derived from it.", "data": d}
+        if kind == "report":
+            d = raw("report", key)
+            return d and {"title": f"Report v{key}: underlying data", "source": "Reporting Orchestrator", "explanation": "Every number shown in the report, as computed.", "data": d}
+        if kind == "tool":
+            d = raw("tool", key)
+            return d and {"title": f"Full tool response: {d.get('tool')}", "source": f"{d.get('agent')} agent tool call", "explanation": "Exactly what the tool returned to the agent.", "data": d}
+        return None
+
 
     @staticmethod
     def require(role: str, allowed: list[str]) -> None:
@@ -144,6 +226,7 @@ class Orchestrator:
                        md5=bool(r.get("fastq_md5")))
             if self.demo:
                 s.dst = dict(DEMO_DST.get(s.run, {}))
+            self.log.put_raw("ena", s.run, r)
             self.state.samples.append(s)
             new.append(s)
             known.add(s.run)
@@ -164,7 +247,7 @@ class Orchestrator:
             for s in self.state.samples:
                 j = demo_tbprofiler_json(s.run) if s.profiling == "Awaiting results" else None
                 if j:
-                    self.agents["profiling"].apply_result(s, parse_result(j, f"{s.run}.results.json"), "simulated demo result")
+                    self.agents["profiling"].apply_result(s, parse_result(j, f"{s.run}.results.json"), "simulated demo result", j)
         self._set(4, "wait")
         return {"queued": n}
 
@@ -176,6 +259,7 @@ class Orchestrator:
     def _s6(self):
         prev = self.state.report["version"] if self.state.report else 0
         self.state.report = self.agents["reporting"].build(self.state, prev + 1)
+        self.log.put_raw("report", str(prev + 1), self.state.report)
         self._set(6, "wait")
         return self.state.report
 
@@ -187,8 +271,9 @@ class Orchestrator:
                 raise StageError("The scope has not been reviewed yet.")
             if self.state.scope.get("blocking"):
                 raise StageError("Fix the blocking gaps first.")
+            ev = self.need_raw(role, person, "scope", "guardian", "the Scope Guardian's result")
             self.state.gates["scope"] = {"by": person, "role": role}
-            self.human(role, person, "—", Outcome.APPROVE, RULES["scope"], "Scope approved; proposed definitions accepted.", 1)
+            self.human(role, person, "—", Outcome.APPROVE, RULES["scope"], "Scope approved; proposed definitions accepted.", 1, ev)
             self._complete(1)
             self.save()
 
@@ -200,14 +285,15 @@ class Orchestrator:
                 raise StageError(f"{run} is not on hold.")
             if not rationale.strip():
                 raise StageError("A rationale is required.")
+            ev = self.need_raw(role, person, "ena", run, run)
             if decision == "verify":
                 s.eligibility, s.eligibility_note = "Verified", f"Human decision: {rationale}"
-                self.human(role, person, run, Outcome.PROCEED, RULES["elig"], rationale, 2)
+                self.human(role, person, run, Outcome.PROCEED, RULES["elig"], rationale, 2, ev)
             elif decision == "exclude":
                 s.eligibility, s.eligibility_note = "Excluded", f"Human decision: {rationale}"
-                self.human(role, person, run, Outcome.EXCLUDE, RULES["elig"], rationale, 2)
+                self.human(role, person, run, Outcome.EXCLUDE, RULES["elig"], rationale, 2, ev)
             else:
-                self.human(role, person, run, Outcome.HOLD, RULES["elig"], rationale, 2)
+                self.human(role, person, run, Outcome.HOLD, RULES["elig"], rationale, 2, ev)
             if self._status(2) == "done" and s.eligibility == "Verified":
                 s.in_cohort = True
                 self._revalidate(s)
@@ -218,12 +304,13 @@ class Orchestrator:
             self.require(role, GATES["cohort"])
             if self._status(2) != "wait":
                 raise StageError("Discovery and verification have not run yet.")
+            ev = self.need_raw(role, person, "cohort", "all", "the candidate runs")
             n = 0
             for s in self.state.samples:
                 if s.eligibility == "Verified":
                     s.in_cohort, n = True, n + 1
             self.state.gates["cohort"] = {"by": person, "role": role, "n": n, "accepted_checks": [c["text"] for c in self.state.cohort_checks]}
-            self.human(role, person, "—", Outcome.APPROVE, RULES["elig"], f"Cohort approved: {n} verified run(s); cohort checks accepted as limitations.", 2)
+            self.human(role, person, "—", Outcome.APPROVE, RULES["elig"], f"Cohort approved: {n} verified run(s); cohort checks accepted as limitations.", 2, ev)
             self._complete(2)
             self.save()
 
@@ -232,7 +319,8 @@ class Orchestrator:
             self.require(role, ["analyst"])
             if self._status(3) != "wait":
                 raise StageError("QC has not run yet.")
-            self.human(role, person, "—", Outcome.APPROVE, RULES["qc"], "QC decisions confirmed.", 3)
+            ev = self.need_raw(role, person, "qc", "all", "the QC inputs")
+            self.human(role, person, "—", Outcome.APPROVE, RULES["qc"], "QC decisions confirmed.", 3, ev)
             self._complete(3)
             self.save()
 
@@ -242,8 +330,9 @@ class Orchestrator:
             s = self._sample(run)
             if s.qc != "Escalated" or not rationale.strip():
                 raise StageError("Only escalated QC results can be resolved, with a rationale.")
+            ev = self.need_raw(role, person, "ena", run, run)
             s.qc, s.qc_note = ("Pass", f"Analyst exception: {rationale}") if decision == "proceed" else ("Excluded", f"Excluded by analyst: {rationale}")
-            self.human(role, person, run, Outcome.PROCEED if decision == "proceed" else Outcome.EXCLUDE, RULES["qc"], rationale, 3)
+            self.human(role, person, run, Outcome.PROCEED if decision == "proceed" else Outcome.EXCLUDE, RULES["qc"], rationale, 3, ev)
             self._revalidate(s)
             self.save()
 
@@ -260,7 +349,7 @@ class Orchestrator:
                 if s.qc != "Pass":
                     skipped.append(f"{fname}: {s.run} did not pass QC")
                     continue
-                self.agents["profiling"].apply_result(s, p, f"imported by {person or ROLES[role]}")
+                self.agents["profiling"].apply_result(s, p, f"imported by {person or ROLES[role]}", data)
                 ok.append(s.run)
             if ok and self._status(5) == "done":
                 self.agents["evidence"].evaluate(self.state.samples)
@@ -293,7 +382,8 @@ class Orchestrator:
             done = sum(s.profiling == "Done" for s in self.state.samples)
             if not done:
                 raise StageError("Import or run at least one TB-Profiler result first.")
-            self.human(role, person, "—", Outcome.APPROVE, RULES["prof"], f"Profiling batch closed with {done} result(s).", 4)
+            ev = self.need_raw(role, person, "profiling", "all", "the TB-Profiler results")
+            self.human(role, person, "—", Outcome.APPROVE, RULES["prof"], f"Profiling batch closed with {done} result(s).", 4, ev)
             self._complete(4)
             self.save()
 
@@ -305,9 +395,10 @@ class Orchestrator:
                 raise StageError("That finding is not pending review.")
             if decision not in ("Reviewed", "Not supported", "Needs more data") or not rationale.strip():
                 raise StageError("Choose a review decision and give a rationale.")
+            ev = self.need_raw(role, person, "tbprofiler", f.sample_id, f"{f.sample_id}'s TB-Profiler result")
             f.review, f.reviewer, f.rationale = decision, f"{ROLES[role]} ({person})" if person else ROLES[role], rationale
             self.human(role, person, f.sample_id, {"Reviewed": Outcome.PROCEED, "Needs more data": Outcome.HOLD}.get(decision, Outcome.EXCLUDE),
-                       RULES["evid"], f"Review of {f.gene} {f.change}: {decision} — {rationale}", 5)
+                       RULES["evid"], f"Review of {f.gene} {f.change}: {decision} — {rationale}", 5, ev)
             if self.state.report:
                 self.state.report["superseded"] = True
             self.save()
@@ -321,8 +412,9 @@ class Orchestrator:
             pending = len(rep.get("unresolved", []))
             if kind == "final" and (pending or rep.get("superseded")):
                 raise StageError("Final release is blocked while findings are pending or the report is superseded.")
+            ev = self.need_raw(role, person, "report", str(rep["version"]), f"report v{rep['version']}")
             self.state.gates["release"] = {"by": person, "role": role, "kind": kind, "version": rep["version"]}
-            self.human(role, person, "—", Outcome.APPROVE, RULES["rpt"], f"{'Final release' if kind == 'final' else 'Exploratory draft shared'}: report v{rep['version']}.", 6)
+            self.human(role, person, "—", Outcome.APPROVE, RULES["rpt"], f"{'Final release' if kind == 'final' else 'Exploratory draft shared'}: report v{rep['version']}.", 6, ev)
             if kind == "final":
                 self._set(6, "done")
             self.save()
@@ -346,6 +438,7 @@ class Orchestrator:
             frm = getattr(s, field)
             if not rationale.strip() or frm == to:
                 raise StageError("Give a rationale and a different status.")
+            self.need_raw(role, person, "ena", run, run)
             if self.ORDER[field].get(to, 9) > self.ORDER[field].get(frm, 0):  # more cautious → immediate
                 self._apply_override(s, field, frm, to, rationale, [f"{ROLES[role]} ({person})"])
                 return {"applied": True}
@@ -366,6 +459,7 @@ class Orchestrator:
                 raise PermissionDenied("The second sign-off must come from a different, named person.")
             if role not in ROLES:
                 raise PermissionDenied("Unknown role.")
+            self.need_raw(role, person, "ena", p["run"], p["run"])
             self.pending_overrides.remove(p)
             self._apply_override(self._sample(p["run"]), p["field"], p["from"], p["to"], p["rationale"],
                                  [f"{ROLES[p['role']]} ({p['person']})", f"{ROLES[role]} ({person})"])

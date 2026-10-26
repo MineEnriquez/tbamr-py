@@ -125,4 +125,5 @@ class TBProfilerRunner:
         result = out / "results" / f"{run_accession}.results.json"
         if not result.exists():
             return {"ok": False, "error": f"Expected {result} was not produced."}
-        return {"ok": True, "result": parse_file(result)}
+        data = json.loads(result.read_text())
+        return {"ok": True, "result": parse_result(data, result.name), "raw": data}

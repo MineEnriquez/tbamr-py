@@ -7,6 +7,7 @@ import Samples, { Drawer } from './components/Samples.jsx'
 import Review from './components/Review.jsx'
 import Report from './components/Report.jsx'
 import Insights from './components/Insights.jsx'
+import { RawCtx, RawViewer } from './components/Raw.jsx'
 
 const load = k => { try { return localStorage.getItem(k) || '' } catch { return '' } }
 const save = (k, v) => { try { localStorage.setItem(k, v) } catch { /* storage unavailable */ } }
@@ -24,6 +25,8 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const [error, setError] = useState(null)
   const [version, setVersion] = useState(0)
+  const [receipts, setReceipts] = useState({})
+  const [rawReq, setRawReq] = useState(null)
   const timer = useRef(null)
 
   const refresh = useCallback(async () => {
@@ -35,12 +38,16 @@ export default function App() {
   }, [])
 
   useEffect(() => { refresh() }, [refresh])
+  const loadReceipts = useCallback(() => api.receipts({ role, person })
+    .then(rs => setReceipts(Object.fromEntries(rs.map(r => [r.kind + '/' + r.key, r.ts])))).catch(() => {}), [role, person])
+  useEffect(() => { loadReceipts() }, [loadReceipts, version])
+  const raw = { seen: (kind, key) => receipts[kind + '/' + key] || null, open: (kind, key) => setRawReq({ kind, key: String(key) }) }
   useEffect(() => { // poll while the backend is busy (e.g. TB-Profiler running)
     clearInterval(timer.current)
     if (snap?.busy) timer.current = setInterval(refresh, 1500)
     return () => clearInterval(timer.current)
   }, [snap?.busy, refresh])
-  useEffect(() => { const k = e => e.key === 'Escape' && setSel(null); window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [])
+  useEffect(() => { const k = e => e.key === 'Escape' && !rawReq && setSel(null); window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [rawReq])
   useEffect(() => { save('tbamr.role', role) }, [role])
   useEffect(() => { save('tbamr.person', person) }, [person])
 
@@ -62,6 +69,7 @@ export default function App() {
   const tabs = [['team', 'Agent team'], ['pipeline', 'Pipeline'], ['samples', 'Samples'], ['review', 'Review queue'], ['report', 'Report'], ['insights', 'Decisions & metrics']]
 
   return (
+    <RawCtx.Provider value={raw}>
     <div className="wrap">
       <div className="top">
         <div><span className="eyebrow">A.G.E.N.T. Playbook · Python agents v0.2</span><h1>TB-AMR Agent Team</h1>
@@ -75,7 +83,7 @@ export default function App() {
       <div className="banner">
         <span className={'tag ' + snap.mode.data}>{snap.mode.data === 'demo' ? 'DEMO DATA (simulated)' : 'LIVE DATA · ENA'}</span>
         <span className={'tag ' + snap.mode.brain}>{snap.mode.brain === 'claude' ? 'Claude agents (live reasoning)' : 'Replay agents (scripted, no API key)'}</span>
-        <span className="muted">Names are recorded with every human decision; the two-person rule needs two different names.</span>
+        <span className="muted">Names are recorded with every human decision; the two-person rule needs two different names. Before any decision you must open its raw data: the receipt is saved with your decision.</span>
       </div>
       <nav className="tabs" role="tablist">{tabs.map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}{k === 'review' && pending ? <span className="count">{pending}</span> : null}</button>)}</nav>
       <main>
@@ -87,8 +95,10 @@ export default function App() {
         {tab === 'insights' && <Insights m={metrics} decisions={decisions} />}
       </main>
       {sel && <Drawer run={sel} st={st} pending={snap.pending_overrides} act={act} who={who} close={() => setSel(null)} version={version} />}
+      {rawReq && <RawViewer key={rawReq.kind + rawReq.key} req={rawReq} who={who} onClose={() => setRawReq(null)} onViewed={loadReceipts} />}
       {toast && <div className={'toast' + (toast.err ? ' err' : '')} role="status">{toast.text}</div>}
       <footer>{snap.mode.data === 'demo' ? 'Demo data: every accession starting DEMO/PRJDEMO is simulated. ' : 'Live data from the ENA Portal API. '}Genomic predictions are not laboratory-confirmed susceptibility and cannot estimate national prevalence.</footer>
     </div>
+    </RawCtx.Provider>
   )
 }

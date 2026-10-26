@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .core.decisions import DecisionLog, GuardrailViolation
-from .core.orchestrator import Orchestrator, PermissionDenied, StageError
+from .core.orchestrator import Orchestrator, PermissionDenied, RawNotViewed, StageError
 from .llm.client import make_client
 from .tools.demo import DemoDataTools
 from .tools.ena import DataTools
@@ -86,6 +86,8 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
             return fn(*a, **k)
         except PermissionDenied as e:
             raise HTTPException(403, str(e))
+        except RawNotViewed as e:
+            raise HTTPException(428, str(e))
         except (StageError, GuardrailViolation) as e:
             raise HTTPException(409, str(e))
 
@@ -108,6 +110,17 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
     @app.get("/api/metrics")
     def metrics():
         return O().metrics()
+
+    @app.get("/api/raw/receipts")
+    def raw_receipts(role: str = "pi", person: str = ""):
+        return O().log.receipts(O().ident(role, person))
+
+    @app.get("/api/raw/{kind}/{key}")
+    def raw_view(kind: str, key: str, role: str = "pi", person: str = ""):
+        try:
+            return O().raw_view(kind, key, role, person)
+        except StageError as e:
+            raise HTTPException(404, str(e))
 
     @app.post("/api/scope")
     def set_scope(s: Scope):

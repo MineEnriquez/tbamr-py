@@ -112,7 +112,8 @@ class LLMAgent(BaseAgent):
                     except Exception as e:  # tool failures are data for the agent, not crashes
                         out = {"error": f"{type(e).__name__}: {e}"}
                 self.called.setdefault(u["name"], []).append(out)
-                self.log.trace(self.name, "tool_call", {"tool": u["name"], "input": u["input"], "output_preview": _preview(out)})
+                tid = self.log.trace(self.name, "tool_call", {"tool": u["name"], "input": u["input"], "output_preview": _preview(out)})
+                self.log.put_raw("tool", str(tid), {"agent": self.name, "tool": u["name"], "input": u["input"], "output": out})
                 results.append({"type": "tool_result", "tool_use_id": u["id"], "content": json.dumps(out, default=str)[:60000]})
             messages.append({"role": "assistant", "content": [b for b in blocks if b["type"] != "text" or b["text"].strip()]})
             messages.append({"role": "user", "content": results})

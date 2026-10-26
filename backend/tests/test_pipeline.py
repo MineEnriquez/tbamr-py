@@ -10,7 +10,7 @@ from tbamr.agents.scope_guardian import ScopeGuardian
 from tbamr.api import build_orchestrator, create_app
 from tbamr.core.decisions import Decision, DecisionLog, GuardrailViolation, Outcome
 from tbamr.core.models import Finding, Sample
-from tbamr.core.orchestrator import PermissionDenied, StageError
+from tbamr.core.orchestrator import PermissionDenied, RawNotViewed, StageError
 from tbamr.llm.client import ReplayClient
 from tbamr.tools.demo import DemoDataTools
 from tbamr.tools.ena import DataTools
@@ -23,10 +23,10 @@ def orch(tmp_path):
 
 
 def run_to_report(o):
-    o.run_stage(1); o.approve_scope("pi", "Ana")
-    o.run_stage(2); o.approve_cohort("pi", "Ana")
-    o.run_stage(3); o.confirm_qc("analyst", "Budi")
-    o.run_stage(4); o.close_profiling("analyst", "Budi")
+    o.run_stage(1); o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.run_stage(2); o.raw_view("cohort", "all", "pi", "Ana"); o.approve_cohort("pi", "Ana")
+    o.run_stage(3); o.raw_view("qc", "all", "analyst", "Budi"); o.confirm_qc("analyst", "Budi")
+    o.run_stage(4); o.raw_view("profiling", "all", "analyst", "Budi"); o.close_profiling("analyst", "Budi")
     o.run_stage(5); return o.run_stage(6)
 
 
@@ -56,6 +56,7 @@ def test_full_demo_flow(orch):
     assert ("DEMO-R12", "Rv0678 c.192dupG") in pending  # uncertain grading
     with pytest.raises(StageError):
         orch.release("pi", "Ana", "final")  # blocked while findings pending
+    orch.raw_view("report", str(rep["version"]), "pi", "Ana")
     orch.release("pi", "Ana", "draft")
 
 
@@ -65,13 +66,37 @@ def test_roles_are_enforced(orch):
         orch.approve_scope("analyst", "Budi")
 
 
+def test_raw_data_must_be_viewed_before_any_decision(orch):
+    orch.run_stage(1)
+    with pytest.raises(RawNotViewed):
+        orch.approve_scope("pi", "Ana")
+    orch.raw_view("scope", "guardian", "pi", "Citra")  # someone else looking does not count
+    with pytest.raises(RawNotViewed):
+        orch.approve_scope("pi", "Ana")
+    raw = orch.raw_view("scope", "guardian", "pi", "Ana")
+    assert raw["title"] and raw["data"]["result"]["gaps"]
+    orch.approve_scope("pi", "Ana")
+    d = [d for d in orch.log.all() if d["outcome"] == "Approve"][-1]
+    assert "Raw data" in d["evidence"] and "Ana" in d["evidence"]
+    orch.run_stage(2)
+    ena = orch.raw_view("ena", "DEMO-R15", "pi", "Ana")
+    assert ena["data"]["ena_record"]["run_accession"] == "DEMO-R15"
+    cohort = orch.raw_view("cohort", "all", "pi", "Ana")
+    assert cohort["table"]["rows"] and cohort["table"]["columns"]
+
+
 def test_gates_block_skipping(orch):
     with pytest.raises(StageError):
         orch.run_stage(3)
 
 
 def test_two_person_override(orch):
-    orch.run_stage(1); orch.approve_scope("pi", "Ana"); orch.run_stage(2)
+    orch.run_stage(1); orch.raw_view("scope", "guardian", "pi", "Ana"); orch.approve_scope("pi", "Ana"); orch.run_stage(2)
+    with pytest.raises(RawNotViewed):
+        orch.override("pi", "Ana", "DEMO-R15", "eligibility", "Verified", "x")
+    for who in [("pi", "Ana"), ("deputy", "ana"), ("deputy", "Citra")]:
+        orch.raw_view("ena", "DEMO-R15", *who)
+    orch.raw_view("ena", "DEMO-R01", "pi", "Ana")
     r = orch.override("pi", "Ana", "DEMO-R15", "eligibility", "Verified", "Origin confirmed in methods section")
     assert r["applied"] is False
     with pytest.raises(PermissionDenied):
@@ -87,6 +112,10 @@ def test_import_and_review(orch):
     f = next(f for f in orch.state.findings() if f.review == "Pending")
     with pytest.raises(PermissionDenied):
         orch.review("pi", "Ana", f.fid, "Reviewed", "x")
+    with pytest.raises(RawNotViewed):
+        orch.review("tbexpert", "Dewi", f.fid, "Reviewed", "x")
+    raw = orch.raw_view("tbprofiler", f.sample_id, "tbexpert", "Dewi")
+    assert "dr_variants" in raw["data"]
     orch.review("tbexpert", "Dewi", f.fid, "Needs more data", "Request deeper sequencing")
     assert orch.state.report["superseded"] is True
 
@@ -107,7 +136,7 @@ def test_orchestrator_replans_when_cohort_cannot_answer(tmp_path):
     o.state.question = "Are there differences in resistance across regions of Indonesia?"
     o.run_stage(1)
     assert o.state.scope["asks_comparison_across_places"] is True
-    o.approve_scope("pi", "Ana")
+    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
     o.run_stage(2)
     outs = [d for d in o.log.all() if d["actor"] == "agent:orchestrator" and d["outcome"] == "Retry"]
     assert outs, "orchestrator should re-plan"
@@ -192,9 +221,17 @@ def test_api_flow(tmp_path):
     c = TestClient(app)
     assert c.post("/api/stages/1/run").status_code == 200
     assert c.post("/api/gates/scope", json={"role": "analyst"}).status_code == 403
+    r = c.post("/api/gates/scope", json={"role": "pi", "person": "Ana"})
+    assert r.status_code == 428 and "raw data" in r.json()["detail"].lower()
+    raw = c.get("/api/raw/scope/guardian", params={"role": "pi", "person": "Ana"}).json()
+    assert raw["viewer"] == "Ana" and raw["viewed_at"]
+    assert {"kind": "scope", "key": "guardian"}.items() <= c.get("/api/raw/receipts", params={"person": "Ana"}).json()[0].items()
     assert c.post("/api/gates/scope", json={"role": "pi", "person": "Ana"}).status_code == 200
-    c.post("/api/stages/2/run"); c.post("/api/gates/cohort", json={"role": "pi", "person": "Ana"})
-    c.post("/api/stages/3/run"); c.post("/api/gates/qc", json={"role": "analyst", "person": "Budi"})
+    assert c.get("/api/raw/nothing/here").status_code == 404
+    c.post("/api/stages/2/run"); c.get("/api/raw/cohort/all", params={"role": "pi", "person": "Ana"})
+    assert c.post("/api/gates/cohort", json={"role": "pi", "person": "Ana"}).status_code == 200
+    c.post("/api/stages/3/run"); c.get("/api/raw/qc/all", params={"role": "analyst", "person": "Budi"})
+    assert c.post("/api/gates/qc", json={"role": "analyst", "person": "Budi"}).status_code == 200
     c.post("/api/stages/4/run")
     files = [("files", ("DEMO-R99.results.json", json.dumps({"id": "DEMO-R99", "dr_variants": []}), "application/json"))]
     r = c.post("/api/profiling/import", params={"role": "analyst", "person": "Budi"}, files=files)
@@ -203,4 +240,7 @@ def test_api_flow(tmp_path):
     assert {t["name"] for t in team} >= {"orchestrator", "scope_guardian", "discovery", "verification", "qc", "profiling", "evidence", "reporting"}
     m = c.get("/api/metrics").json()
     assert m["completeness_pct"] == 100 and m["tool_calls"].get("discovery", 0) >= 1
-    assert c.get("/api/trace", params={"agent": "discovery"}).json()
+    tr = c.get("/api/trace", params={"agent": "discovery"}).json()
+    tool = next(t for t in tr if t["kind"] == "tool_call")
+    full = c.get(f"/api/raw/tool/{tool['id']}").json()
+    assert "output" in full["data"] and full["data"]["tool"] and full["viewed_at"] is None

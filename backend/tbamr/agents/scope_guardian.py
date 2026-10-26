@@ -66,6 +66,7 @@ class ScopeGuardian(LLMAgent):
         if not res.get("ok"):
             res = {"blocking": [], "gaps": [{"key": k, "gap": g, "proposal": p} for k, g, p in REQUIRED_GAPS],
                    "warnings": ["The Guardian could not complete its review; a human should check the scope."], "asks_comparison_across_places": False}
+        self.log.put_raw("scope", "guardian", {"input": ctx, "result": res, "brain": self.client.mode})
         outcome = Outcome.HOLD if res["blocking"] else Outcome.ESCALATE
         self.decide("SCOPE", outcome, RULES["scope"],
                     f"{len(res['blocking'])} blocking gap(s); {len(res['gaps'])} definitions proposed; {len(res['warnings'])} warning(s). Researcher approval needed.",
