@@ -82,6 +82,10 @@ class DecisionLog:
             "CREATE TABLE IF NOT EXISTS trace (id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, agent TEXT, kind TEXT, payload TEXT)"
         )
         self.db.execute("CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)")
+        # raw source data (ENA records, TB-Profiler JSON, agent tool outputs) kept verbatim for human inspection
+        self.db.execute("CREATE TABLE IF NOT EXISTS raw (kind TEXT, key TEXT, ts REAL, data TEXT, PRIMARY KEY (kind, key))")
+        # receipts: who opened which raw data, and when (gates require them)
+        self.db.execute("CREATE TABLE IF NOT EXISTS views (person TEXT, role TEXT, kind TEXT, key TEXT, ts REAL)")
         self.db.commit()
 
     # decisions -------------------------------------------------------------
@@ -108,13 +112,14 @@ class DecisionLog:
         return [d for d in self.all() if d["sample_id"] == sample_id]
 
     # agent trace ------------------------------------------------------------
-    def trace(self, agent: str, kind: str, payload: Any) -> None:
+    def trace(self, agent: str, kind: str, payload: Any) -> int:
+        text = json.dumps(payload, default=str)
+        if len(text) > 20000:  # never store invalid (cut) JSON; the full value lives in the raw table
+            text = json.dumps({"truncated": True, "preview": text[:4000]})
         with self._lock:
-            self.db.execute(
-                "INSERT INTO trace (ts, agent, kind, payload) VALUES (?,?,?,?)",
-                (time.time(), agent, kind, json.dumps(payload, default=str)[:20000]),
-            )
+            cur = self.db.execute("INSERT INTO trace (ts, agent, kind, payload) VALUES (?,?,?,?)", (time.time(), agent, kind, text))
             self.db.commit()
+            return int(cur.lastrowid)
 
     def traces(self, agent: str | None = None, limit: int = 500) -> list[dict[str, Any]]:
         with self._lock:
@@ -139,3 +144,31 @@ class DecisionLog:
         with self._lock:
             r = self.db.execute("SELECT v FROM kv WHERE k = ?", (k,)).fetchone()
             return json.loads(r[0]) if r else default
+
+    # raw data + view receipts ---------------------------------------------------
+    def put_raw(self, kind: str, key: str, data: Any) -> None:
+        with self._lock:
+            self.db.execute("INSERT OR REPLACE INTO raw VALUES (?,?,?,?)", (kind, key, time.time(), json.dumps(data, default=str)))
+            self.db.commit()
+
+    def get_raw(self, kind: str, key: str) -> Any:
+        with self._lock:
+            r = self.db.execute("SELECT data FROM raw WHERE kind = ? AND key = ?", (kind, key)).fetchone()
+            return json.loads(r[0]) if r else None
+
+    def record_view(self, person: str, role: str, kind: str, key: str) -> float:
+        ts = time.time()
+        with self._lock:
+            self.db.execute("INSERT INTO views VALUES (?,?,?,?,?)", (person, role, kind, key, ts))
+            self.db.commit()
+        return ts
+
+    def viewed_at(self, person: str, kind: str, key: str) -> float | None:
+        with self._lock:
+            r = self.db.execute("SELECT MAX(ts) FROM views WHERE person = ? AND kind = ? AND key = ?", (person, kind, key)).fetchone()
+            return r[0] if r and r[0] else None
+
+    def receipts(self, person: str) -> list[dict[str, Any]]:
+        with self._lock:
+            cur = self.db.execute("SELECT kind, key, MAX(ts) FROM views WHERE person = ? GROUP BY kind, key", (person,))
+            return [{"kind": k, "key": key, "ts": ts} for k, key, ts in cur.fetchall()]

@@ -31,7 +31,9 @@ class ProfilingTasker(RuleAgent):
         self.decide("—", Outcome.INFO, RULES["prof"], f"{n} QC-passed run(s) queued for TB-Profiler. Tools on this machine: {self.runner.available()}.", stage=4)
         return n
 
-    def apply_result(self, s: Sample, parsed: dict[str, Any], source: str) -> None:
+    def apply_result(self, s: Sample, parsed: dict[str, Any], source: str, raw: dict[str, Any] | None = None) -> None:
+        if raw is not None:
+            self.log.put_raw("tbprofiler", s.run, raw)
         s.profiling = "Done"
         s.lineage, s.drtype, s.profile_meta = parsed.get("lineage"), parsed.get("drtype"), parsed.get("meta", {})
         s.profile_meta["mutations"] = parsed.get("mutations", [])
@@ -45,7 +47,7 @@ class ProfilingTasker(RuleAgent):
     def run_one(self, s: Sample) -> dict[str, Any]:
         res = self.runner.run(s.run)
         if res.get("ok"):
-            self.apply_result(s, res["result"], "run locally")
+            self.apply_result(s, res["result"], "run locally", res.get("raw"))
         else:
             s.profiling, s.profiling_note = "Failed", res.get("error", "")
             self.decide(s.run, Outcome.ESCALATE, RULES["prof"], "TB-Profiler did not complete: " + s.profiling_note, stage=4)

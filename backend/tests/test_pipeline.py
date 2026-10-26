@@ -23,10 +23,10 @@ def orch(tmp_path):
 
 
 def run_to_report(o):
-    o.run_stage(1); o.approve_scope("pi", "Ana")
-    o.run_stage(2); o.approve_cohort("pi", "Ana")
-    o.run_stage(3); o.confirm_qc("analyst", "Budi")
-    o.run_stage(4); o.close_profiling("analyst", "Budi")
+    o.run_stage(1); o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.run_stage(2); o.raw_view("cohort", "all", "pi", "Ana"); o.approve_cohort("pi", "Ana")
+    o.run_stage(3); o.raw_view("qc", "all", "analyst", "Budi"); o.confirm_qc("analyst", "Budi")
+    o.run_stage(4); o.raw_view("profiling", "all", "analyst", "Budi"); o.close_profiling("analyst", "Budi")
     o.run_stage(5); return o.run_stage(6)
 
 
@@ -56,6 +56,7 @@ def test_full_demo_flow(orch):
     assert ("DEMO-R12", "Rv0678 c.192dupG") in pending  # uncertain grading
     with pytest.raises(StageError):
         orch.release("pi", "Ana", "final")  # blocked while findings pending
+    orch.raw_view("report", str(rep["version"]), "pi", "Ana")
     orch.release("pi", "Ana", "draft")
 
 
@@ -65,13 +66,32 @@ def test_roles_are_enforced(orch):
         orch.approve_scope("analyst", "Budi")
 
 
+def test_raw_data_view_is_recorded_but_not_required(orch):
+    orch.run_stage(1)
+    # Deciding without opening the raw data is allowed; the evidence notes it wasn't opened.
+    orch.approve_scope("pi", "Ana")
+    d = [d for d in orch.log.all() if d["outcome"] == "Approve"][0]
+    assert "not opened" in d["evidence"]
+    # When someone does open the raw data, the receipt is captured and tied to their later decisions.
+    orch.run_stage(2)
+    raw = orch.raw_view("scope", "guardian", "pi", "Ana")
+    assert raw["title"] and raw["data"]["result"]["gaps"]
+    ena = orch.raw_view("ena", "DEMO-R15", "pi", "Ana")
+    assert ena["data"]["ena_record"]["run_accession"] == "DEMO-R15"
+    cohort = orch.raw_view("cohort", "all", "pi", "Ana")
+    assert cohort["table"]["rows"] and cohort["table"]["columns"]
+    orch.approve_cohort("pi", "Ana")
+    d = [d for d in orch.log.all() if d["outcome"] == "Approve"][0]
+    assert "Raw data" in d["evidence"] and "Ana" in d["evidence"]
+
+
 def test_gates_block_skipping(orch):
     with pytest.raises(StageError):
         orch.run_stage(3)
 
 
 def test_two_person_override(orch):
-    orch.run_stage(1); orch.approve_scope("pi", "Ana"); orch.run_stage(2)
+    orch.run_stage(1); orch.raw_view("scope", "guardian", "pi", "Ana"); orch.approve_scope("pi", "Ana"); orch.run_stage(2)
     r = orch.override("pi", "Ana", "DEMO-R15", "eligibility", "Verified", "Origin confirmed in methods section")
     assert r["applied"] is False
     with pytest.raises(PermissionDenied):
@@ -87,6 +107,8 @@ def test_import_and_review(orch):
     f = next(f for f in orch.state.findings() if f.review == "Pending")
     with pytest.raises(PermissionDenied):
         orch.review("pi", "Ana", f.fid, "Reviewed", "x")
+    raw = orch.raw_view("tbprofiler", f.sample_id, "tbexpert", "Dewi")
+    assert "dr_variants" in raw["data"]
     orch.review("tbexpert", "Dewi", f.fid, "Needs more data", "Request deeper sequencing")
     assert orch.state.report["superseded"] is True
 
@@ -107,7 +129,7 @@ def test_orchestrator_replans_when_cohort_cannot_answer(tmp_path):
     o.state.question = "Are there differences in resistance across regions of Indonesia?"
     o.run_stage(1)
     assert o.state.scope["asks_comparison_across_places"] is True
-    o.approve_scope("pi", "Ana")
+    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
     o.run_stage(2)
     outs = [d for d in o.log.all() if d["actor"] == "agent:orchestrator" and d["outcome"] == "Retry"]
     assert outs, "orchestrator should re-plan"
@@ -192,9 +214,15 @@ def test_api_flow(tmp_path):
     c = TestClient(app)
     assert c.post("/api/stages/1/run").status_code == 200
     assert c.post("/api/gates/scope", json={"role": "analyst"}).status_code == 403
+    raw = c.get("/api/raw/scope/guardian", params={"role": "pi", "person": "Ana"}).json()
+    assert raw["viewer"] == "Ana" and raw["viewed_at"]
+    assert {"kind": "scope", "key": "guardian"}.items() <= c.get("/api/raw/receipts", params={"person": "Ana"}).json()[0].items()
     assert c.post("/api/gates/scope", json={"role": "pi", "person": "Ana"}).status_code == 200
-    c.post("/api/stages/2/run"); c.post("/api/gates/cohort", json={"role": "pi", "person": "Ana"})
-    c.post("/api/stages/3/run"); c.post("/api/gates/qc", json={"role": "analyst", "person": "Budi"})
+    assert c.get("/api/raw/nothing/here").status_code == 404
+    c.post("/api/stages/2/run"); c.get("/api/raw/cohort/all", params={"role": "pi", "person": "Ana"})
+    assert c.post("/api/gates/cohort", json={"role": "pi", "person": "Ana"}).status_code == 200
+    c.post("/api/stages/3/run"); c.get("/api/raw/qc/all", params={"role": "analyst", "person": "Budi"})
+    assert c.post("/api/gates/qc", json={"role": "analyst", "person": "Budi"}).status_code == 200
     c.post("/api/stages/4/run")
     files = [("files", ("DEMO-R99.results.json", json.dumps({"id": "DEMO-R99", "dr_variants": []}), "application/json"))]
     r = c.post("/api/profiling/import", params={"role": "analyst", "person": "Budi"}, files=files)
@@ -203,4 +231,18 @@ def test_api_flow(tmp_path):
     assert {t["name"] for t in team} >= {"orchestrator", "scope_guardian", "discovery", "verification", "qc", "profiling", "evidence", "reporting"}
     m = c.get("/api/metrics").json()
     assert m["completeness_pct"] == 100 and m["tool_calls"].get("discovery", 0) >= 1
-    assert c.get("/api/trace", params={"agent": "discovery"}).json()
+    tr = c.get("/api/trace", params={"agent": "discovery"}).json()
+    tool = next(t for t in tr if t["kind"] == "tool_call")
+    full = c.get(f"/api/raw/tool/{tool['id']}").json()
+    assert "output" in full["data"] and full["data"]["tool"] and full["viewed_at"] is None
+
+
+def test_raw_data_is_backfilled_for_pipelines_started_before_it_was_saved(orch):
+    orch.run_stage(1); orch.raw_view("scope", "guardian", "pi", "Ana"); orch.approve_scope("pi", "Ana"); orch.run_stage(2)
+    with orch.log._lock:  # simulate a database written by the earlier version
+        orch.log.db.execute("DELETE FROM raw"); orch.log.db.commit()
+    rec = orch.raw_view("ena", "DEMO-R15", "pi", "Ana")
+    assert rec["data"]["ena_record"]["run_accession"] == "DEMO-R15" and "note" in rec
+    cohort = orch.raw_view("cohort", "all", "pi", "Ana")
+    assert all(r[0] for r in cohort["table"]["rows"])
+    orch.resolve_hold("pi", "Ana", "DEMO-R15", "verify", "Checked the record")

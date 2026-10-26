@@ -1,6 +1,7 @@
 import React from 'react'
 import { api } from '../api.js'
 import { Chip, Rationale } from './common.jsx'
+import { RawLink } from './Raw.jsx'
 
 const GRADE = { 0: 'Grading not reported', 1: 'Group 1 · Assoc. w/ R', 2: 'Group 2 · Assoc. w/ R (interim)', 3: 'Group 3 · Uncertain', 5: 'Group 5 · Not assoc. w/ R' }
 
@@ -18,6 +19,7 @@ export default function Review({ st, act, who, openSample }) {
           {f.interpretation && <div className="box note"><span className="eyebrow">Evidence Analyst note · AI draft</span><p style={{ fontSize: '.88rem' }}>{f.interpretation}</p></div>}
           {f.review === 'Pending'
             ? <Rationale id={'r-' + f.fid} placeholder="e.g. Borderline rpoB mutation; DST can miss it." buttons={[['Reviewed', 'Supports resistance', true], ['Not supported', 'Not supported'], ['Needs more data', 'Needs more data']]}
+              extra={<RawLink kind="tbprofiler" k={f.sample_id} />}
               onSubmit={(d, r) => act(() => api.review({ ...who, fid: f.fid, decision: d, rationale: r }), 'Review recorded')} />
             : <p style={{ fontSize: '.86rem' }}><b>{f.reviewer}:</b> {f.rationale}</p>}
         </div>))}</div>

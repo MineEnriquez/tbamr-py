@@ -29,14 +29,14 @@ export function Bars({ rows, color = () => 'var(--blue)' }) {
   )
 }
 
-export function Rationale({ id, placeholder, onSubmit, buttons }) {
+export function Rationale({ id, placeholder, onSubmit, buttons, extra }) {
   const [text, setText] = useState('')
   return (
     <>
       <label className="muted" htmlFor={id} style={{ fontSize: '.8rem' }}>Rationale (recorded with your decision)</label>
       <textarea id={id} value={text} onChange={e => setText(e.target.value)} placeholder={placeholder} />
       <div className="row">{buttons.map(([value, label, primary]) =>
-        <button key={value} className={'btn small' + (primary ? ' primary' : '')} onClick={() => onSubmit(value, text)}>{label}</button>)}</div>
+        <button key={value} className={'btn small' + (primary ? ' primary' : '')} onClick={() => onSubmit(value, text)}>{label}</button>)}{extra}</div>
     </>
   )
 }

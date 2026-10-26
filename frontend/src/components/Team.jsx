@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { fmtTime } from './common.jsx'
+import { RawLink } from './Raw.jsx'
 
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
 const initials = t => t.split(/[\s&]+/).filter(w => /^[A-Z]/.test(w)).slice(0, 2).map(w => w[0]).join('')
@@ -53,6 +54,6 @@ function Body({ t }) {
   if (t.kind === 'thought') return <p>{p.text}</p>
   if (t.kind === 'task') return <p>{p.task}</p>
   if (t.kind === 'handoff') return <p>{p.text}</p>
-  if (t.kind === 'tool_call') return <><p><span className="mono">{p.tool}</span>({Object.entries(p.input || {}).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')})</p><pre>{JSON.stringify(p.output_preview, null, 1)}</pre></>
+  if (t.kind === 'tool_call') return <><p><span className="mono">{p.tool}</span>({Object.entries(p.input || {}).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')})</p><pre>{JSON.stringify(p.output_preview, null, 1)}</pre><div><RawLink kind="tool" k={t.id} label="View full raw response" /></div></>
   return <pre>{JSON.stringify(p, null, 1).slice(0, 1500)}</pre>
 }

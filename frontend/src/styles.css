@@ -7,11 +7,16 @@
   --f-display:"Schibsted Grotesk","Segoe UI",system-ui,sans-serif; --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
   color-scheme:light;
 }
-@media (prefers-color-scheme: dark){:root{
+@media (prefers-color-scheme: dark){:root:not([data-theme=light]){
   --bg:#0e1420; --surface:#151d2a; --surface-2:#1c2636; --ink:#e5ebf3; --muted:#98a6b9; --line:#2a3548;
   --accent:#e2589c; --accent-ink:#1a0b13; --accent-soft:#3a1a2b; --blue:#7fa8e0;
   --ok:#5fcf94; --ok-bg:#163326; --hold:#e8b450; --hold-bg:#3a2d12; --ex:#a3adbb; --ex-bg:#262e3a;
   --retry:#83aaf0; --retry-bg:#1a2944; --esc:#ff8a5c; --esc-bg:#3d2016; --pend:#c3a0f0; --pend-bg:#2c2140; color-scheme:dark}}
+:root[data-theme=dark]{
+  --bg:#0e1420; --surface:#151d2a; --surface-2:#1c2636; --ink:#e5ebf3; --muted:#98a6b9; --line:#2a3548;
+  --accent:#e2589c; --accent-ink:#1a0b13; --accent-soft:#3a1a2b; --blue:#7fa8e0;
+  --ok:#5fcf94; --ok-bg:#163326; --hold:#e8b450; --hold-bg:#3a2d12; --ex:#a3adbb; --ex-bg:#262e3a;
+  --retry:#83aaf0; --retry-bg:#1a2944; --esc:#ff8a5c; --esc-bg:#3d2016; --pend:#c3a0f0; --pend-bg:#2c2140; color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
 [hidden]{display:none!important}
@@ -29,7 +34,7 @@ textarea{width:100%;min-height:56px;resize:vertical}
 .top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
 .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
 .ctl{display:flex;flex-direction:column;gap:3px}
-.ctl label{font-size:.72rem;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.ctl label,.ctl .lbl{font-size:.72rem;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:6px 12px;font-weight:600;font-size:.9rem;cursor:pointer}
 .btn:hover{border-color:var(--muted)} .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -101,3 +106,44 @@ tbody tr.click{cursor:pointer} tbody tr.click:hover td{background:var(--surface-
 .busy{animation:pulse 1.2s ease-in-out infinite} @keyframes pulse{50%{opacity:.45}}
 @media (prefers-reduced-motion:reduce){.busy{animation:none}}
 footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+
+/* raw data viewer */
+.modal{position:fixed;z-index:31;top:4vh;left:50%;transform:translateX(-50%);width:min(1000px,calc(100% - 32px));max-height:92vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 50px rgb(0 0 0/.3)}
+.modal h2{font-size:1.15rem;margin:0}
+.rawjson{background:var(--surface-2);padding:12px;border-radius:6px;font-family:var(--f-mono);font-size:.78rem;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;margin:0}
+.rawtable{max-height:60vh;overflow:auto}.rawtable td{font-size:.76rem;white-space:nowrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{background:var(--surface);color:var(--ink);border:0;padding:5px 12px;cursor:pointer;font:inherit;font-size:.84rem}
+.seg button[aria-selected=true]{background:var(--blue);color:#fff}
+
+/* workflow diagram */
+.flow{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.flowrow{display:flex;align-items:stretch;gap:4px;overflow-x:auto;padding-bottom:4px}
+.farrow{align-self:center;color:var(--muted);font-size:1.1rem;flex:none}
+.fnode{flex:none;align-self:center;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.76rem;color:var(--muted);text-align:center;width:72px}
+.fnode .fic{font-size:1.1rem;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);color:var(--ink);font-weight:700}
+.fnode.end.done .fic{background:var(--ok-bg)}
+.fstage{flex:1 0 132px;min-width:132px;display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-top:4px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;font:inherit}
+.fstage:hover{border-color:var(--blue)}
+.fstage.done{border-top-color:var(--ok)}.fstage.wait{border-top-color:var(--esc);background:var(--esc-bg)}
+.fstage.ready{border-top-color:var(--retry)}.fstage.locked{opacity:.62}
+.fstage.cur{box-shadow:0 0 0 2px var(--accent)}
+.fstage.busy{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 3px var(--retry)}}
+.fhead{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.fn{font-family:var(--f-mono);font-size:.72rem;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);font-weight:700}
+.fst{font-size:.7rem;font-weight:700}
+.done .fst{color:var(--ok)}.wait .fst{color:var(--esc)}.ready .fst{color:var(--retry)}.locked .fst{color:var(--muted)}
+.fname{font-family:var(--f-display);font-weight:600;font-size:.84rem;line-height:1.2}
+.fagents{display:flex;flex-direction:column;gap:3px}
+.fagent{font-size:.7rem;padding:2px 6px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fagent.llm{background:var(--pend-bg);color:var(--pend)}.fagent.rule{background:var(--surface-2);color:var(--muted)}.fagent.coordinator{background:var(--surface-2)}
+.fgate{margin-top:auto;font-size:.72rem;font-weight:600;padding:3px 6px;border-radius:4px;border:1px dashed var(--hold);color:var(--hold);background:var(--hold-bg);display:flex;align-items:center;gap:4px}
+.fgate.now{border-style:solid;border-color:var(--esc);color:var(--esc);background:var(--surface)}
+.fgate .count{margin-left:auto}
+.flegend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.74rem;color:var(--muted)}
+.flegend .fgate{display:inline-flex;padding:0 4px}
+.flegend .sw i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 8px;vertical-align:-1px}
+.s-done{background:var(--ok)}.s-wait{background:var(--esc)}.s-ready{background:var(--retry)}.s-locked{background:var(--line)}
+
+.seg.theme button{padding:5px 10px}
