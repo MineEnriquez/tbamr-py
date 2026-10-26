@@ -89,6 +89,21 @@ cd backend && python -m pytest -q
 
 14 tests cover the decision contract, the full demo flow, role enforcement, gates, the two-person rule, Orchestrator re-planning, every agent guardrail, the TB-Profiler parser (v4 and v6 shapes), ENA paging (mocked HTTP), the Claude request format (mocked SDK) and the HTTP API.
 
+## Branches and releases
+
+Every change goes through three branches, and a person accepts it at each step:
+
+```
+feature/<name>  ──accept──▶  release  ──ship──▶  main
+```
+
+1. **Start** – each feature request gets its own branch off `release`: `./workflow.sh start <name>`
+2. **Review** – read the commits, changed files and raw diff before deciding: `./workflow.sh review <name>`
+3. **Accept** – tests run on the feature branch; if they pass it is merged into `release`: `./workflow.sh accept <name>`. To reject, don't accept, and delete the branch with `git branch -D feature/<name>`.
+4. **Ship** – lists what is on `release` but not on `main`, asks for confirmation, runs the tests, then merges `release` into `main`: `./workflow.sh ship`
+
+Run these from the main checkout (not a worktree), with no uncommitted changes. Merges use `--no-ff`, so each accepted feature is one merge commit you can revert. Nothing is pushed; run `git push origin release main` when you're ready.
+
 ## Layout
 
 ```
