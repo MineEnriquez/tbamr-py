@@ -113,3 +113,33 @@ footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);paddi
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .seg button{background:var(--surface);color:var(--ink);border:0;padding:5px 12px;cursor:pointer;font:inherit;font-size:.84rem}
 .seg button[aria-selected=true]{background:var(--blue);color:#fff}
+
+/* workflow diagram */
+.flow{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.flowrow{display:flex;align-items:stretch;gap:4px;overflow-x:auto;padding-bottom:4px}
+.farrow{align-self:center;color:var(--muted);font-size:1.1rem;flex:none}
+.fnode{flex:none;align-self:center;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.76rem;color:var(--muted);text-align:center;width:72px}
+.fnode .fic{font-size:1.1rem;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);color:var(--ink);font-weight:700}
+.fnode.end.done .fic{background:var(--ok-bg)}
+.fstage{flex:1 0 132px;min-width:132px;display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-top:4px solid var(--line);border-radius:8px;padding:8px;cursor:pointer;font:inherit}
+.fstage:hover{border-color:var(--blue)}
+.fstage.done{border-top-color:var(--ok)}.fstage.wait{border-top-color:var(--esc);background:var(--esc-bg)}
+.fstage.ready{border-top-color:var(--retry)}.fstage.locked{opacity:.62}
+.fstage.cur{box-shadow:0 0 0 2px var(--accent)}
+.fstage.busy{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 3px var(--retry)}}
+.fhead{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.fn{font-family:var(--f-mono);font-size:.72rem;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);font-weight:700}
+.fst{font-size:.7rem;font-weight:700}
+.done .fst{color:var(--ok)}.wait .fst{color:var(--esc)}.ready .fst{color:var(--retry)}.locked .fst{color:var(--muted)}
+.fname{font-family:var(--f-display);font-weight:600;font-size:.84rem;line-height:1.2}
+.fagents{display:flex;flex-direction:column;gap:3px}
+.fagent{font-size:.7rem;padding:2px 6px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fagent.llm{background:var(--pend-bg);color:var(--pend)}.fagent.rule{background:var(--surface-2);color:var(--muted)}.fagent.coordinator{background:var(--surface-2)}
+.fgate{margin-top:auto;font-size:.72rem;font-weight:600;padding:3px 6px;border-radius:4px;border:1px dashed var(--hold);color:var(--hold);background:var(--hold-bg);display:flex;align-items:center;gap:4px}
+.fgate.now{border-style:solid;border-color:var(--esc);color:var(--esc);background:var(--surface)}
+.fgate .count{margin-left:auto}
+.flegend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.74rem;color:var(--muted)}
+.flegend .fgate{display:inline-flex;padding:0 4px}
+.flegend .sw i{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 8px;vertical-align:-1px}
+.s-done{background:var(--ok)}.s-wait{background:var(--esc)}.s-ready{background:var(--retry)}.s-locked{background:var(--line)}

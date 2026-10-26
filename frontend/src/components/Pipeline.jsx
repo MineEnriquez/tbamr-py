@@ -9,14 +9,6 @@ export default function Pipeline({ snap, decisions, view, setView, act, who, bus
   const st = snap.state
   return (
     <>
-      <div className="stepper">
-        {snap.stages.map(s => {
-          const status = st.stage_status[String(s.n)]
-          return <button key={s.n} className="step" aria-current={view === s.n} onClick={() => setView(s.n)}>
-            <span className="n">STAGE {s.n}</span><span className="nm">{s.name}</span>
-            <span className={'st ' + status + (busy && status === 'ready' ? ' busy' : '')}>{STATUS[status]}</span></button>
-        })}
-      </div>
       <div className="grid2">
         <Stage n={view} snap={snap} act={act} who={who} busy={busy} openSample={openSample} />
         <Feed decisions={decisions} />

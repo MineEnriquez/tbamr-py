@@ -8,6 +8,7 @@ import Review from './components/Review.jsx'
 import Report from './components/Report.jsx'
 import Insights from './components/Insights.jsx'
 import { RawCtx, RawViewer } from './components/Raw.jsx'
+import Flow from './components/Flow.jsx'
 
 const load = k => { try { return localStorage.getItem(k) || '' } catch { return '' } }
 const save = (k, v) => { try { localStorage.setItem(k, v) } catch { /* storage unavailable */ } }
@@ -17,7 +18,7 @@ export default function App() {
   const [team, setTeam] = useState([])
   const [decisions, setDecisions] = useState([])
   const [metrics, setMetrics] = useState(null)
-  const [tab, setTab] = useState('team')
+  const [tab, setTab] = useState('pipeline')
   const [view, setView] = useState(1)
   const [role, setRole] = useState(load('tbamr.role') || 'pi')
   const [person, setPerson] = useState(load('tbamr.person'))
@@ -66,7 +67,7 @@ export default function App() {
   if (!snap) return <div className="wrap"><p className="muted">Loading…</p></div>
   const st = snap.state
   const pending = st.samples.flatMap(s => s.findings).filter(f => f.review === 'Pending').length
-  const tabs = [['team', 'Agent team'], ['pipeline', 'Pipeline'], ['samples', 'Samples'], ['review', 'Review queue'], ['report', 'Report'], ['insights', 'Decisions & metrics']]
+  const tabs = [['pipeline', 'Pipeline'], ['review', 'Review queue'], ['samples', 'Samples'], ['report', 'Report'], ['team', 'Agent team'], ['insights', 'Decisions & metrics']]
 
   return (
     <RawCtx.Provider value={raw}>
@@ -85,6 +86,7 @@ export default function App() {
         <span className={'tag ' + snap.mode.brain}>{snap.mode.brain === 'claude' ? 'Claude agents (live reasoning)' : 'Replay agents (scripted, no API key)'}</span>
         <span className="muted">Names are recorded with every human decision; the two-person rule needs two different names. Before any decision you must open its raw data: the receipt is saved with your decision.</span>
       </div>
+      <Flow snap={snap} team={team} view={tab === 'pipeline' ? view : null} pending={pending} onPick={n => { setView(n); setTab(n === 5 && pending ? 'review' : 'pipeline') }} />
       <nav className="tabs" role="tablist">{tabs.map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}{k === 'review' && pending ? <span className="count">{pending}</span> : null}</button>)}</nav>
       <main>
         {tab === 'team' && <Team team={team} version={version} />}
