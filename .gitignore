@@ -1,0 +1,7 @@
+node_modules/
+__pycache__/
+*.db
+.venv/
+.pytest_cache/
+tbprofiler_runs/
+.DS_Store

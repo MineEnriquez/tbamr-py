@@ -42,6 +42,23 @@ flowchart LR
 
 Shared contract for everyone: five outcomes (**Proceed · Hold · Exclude · Retry · Escalate**), every decision logged with sample, rule version, rationale and time; humans-only outcomes (**Approve**, **Override**); overrides never erase history; relaxing a safeguard needs **two different named people**. Every agent step (task, reasoning, tool call, submission, guardrail rejection) is stored in an **agent trace** you can read in the UI.
 
+## Raw data alongside every decision
+
+Every decision box offers a **"View raw data"** button for the source behind that decision. Opening it records a receipt (who, what and when), which is saved with the decision — for example `Raw data (ena/DEMO-R15) viewed by Minnie at 2026-10-26 12:20:45`. If the person decides without opening the raw data, the evidence line says so instead; the decision is not blocked.
+
+| Decision | Raw data available |
+|---|---|
+| Approve scope | What the Scope Guardian received and returned |
+| Resolve a hold, resolve a QC escalation, override, co-sign | The run's archive record, the agent's evidence and tool outputs, and how coverage was derived |
+| Approve cohort | Every candidate run's archive record, as a table (click a run to drill in) |
+| Confirm QC | Base counts, genome size, estimated coverage and checksums |
+| Close profiling batch | Every TB-Profiler result (click a run for its full JSON) |
+| Review a finding | The run's full TB-Profiler JSON |
+| Release / share draft | Every number in that report version |
+
+Each person's receipts are tracked separately, so the audit trail shows exactly who looked at what. Tool calls in the Agent team trace also have a **"View full raw response"** button. Every viewer can download the JSON.
+Endpoints: `GET /api/raw/{kind}/{key}?role=&person=`, `GET /api/raw/receipts?role=&person=`.
+
 ## Run it on a Mac
 
 You need Python 3.10+ (`python3 --version`). Node is only needed if you want to change the screen.
@@ -87,7 +104,22 @@ If `tb-profiler` and `fasterq-dump` are on the PATH where the backend runs, Stag
 cd backend && python -m pytest -q
 ```
 
-14 tests cover the decision contract, the full demo flow, role enforcement, gates, the two-person rule, Orchestrator re-planning, every agent guardrail, the TB-Profiler parser (v4 and v6 shapes), ENA paging (mocked HTTP), the Claude request format (mocked SDK) and the HTTP API.
+15 tests cover the decision contract, the raw-data-before-decision rule, the full demo flow, role enforcement, gates, the two-person rule, Orchestrator re-planning, every agent guardrail, the TB-Profiler parser (v4 and v6 shapes), ENA paging (mocked HTTP), the Claude request format (mocked SDK) and the HTTP API.
+
+## Branches and releases
+
+Every change goes through three branches, and a person accepts it at each step:
+
+```
+feature/<name>  ──accept──▶  release  ──ship──▶  main
+```
+
+1. **Start** – each feature request gets its own branch off `release`: `./workflow.sh start <name>`
+2. **Review** – read the commits, changed files and raw diff before deciding: `./workflow.sh review <name>`
+3. **Accept** – tests run on the feature branch; if they pass it is merged into `release`: `./workflow.sh accept <name>`. To reject, don't accept, and delete the branch with `git branch -D feature/<name>`.
+4. **Ship** – lists what is on `release` but not on `main`, asks for confirmation, runs the tests, then merges `release` into `main`: `./workflow.sh ship`
+
+Run these from the main checkout (not a worktree), with no uncommitted changes. Merges use `--no-ff`, so each accepted feature is one merge commit you can revert. Nothing is pushed; run `git push origin release main` when you're ready.
 
 ## Layout
 

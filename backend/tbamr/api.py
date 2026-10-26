@@ -109,6 +109,17 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
     def metrics():
         return O().metrics()
 
+    @app.get("/api/raw/receipts")
+    def raw_receipts(role: str = "pi", person: str = ""):
+        return O().log.receipts(O().ident(role, person))
+
+    @app.get("/api/raw/{kind}/{key}")
+    def raw_view(kind: str, key: str, role: str = "pi", person: str = ""):
+        try:
+            return O().raw_view(kind, key, role, person)
+        except StageError as e:
+            raise HTTPException(404, str(e))
+
     @app.post("/api/scope")
     def set_scope(s: Scope):
         st = O().state

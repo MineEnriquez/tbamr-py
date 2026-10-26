@@ -1,6 +1,7 @@
 import React from 'react'
 import { api } from '../api.js'
 import { Chip } from './common.jsx'
+import { RawLink } from './Raw.jsx'
 
 export default function Report({ st, act, brain }) {
   const r = st.report
@@ -13,7 +14,7 @@ export default function Report({ st, act, brain }) {
   return (
     <section className="panel">
       <div className="row between"><div><span className="eyebrow">Report v{r.version} · {r.rule_version}</span><h2>Genomic resistance evidence</h2></div>
-        <Chip label={released ? 'Released · final' : 'Exploratory · not scientifically approved'} kind={released ? 'Proceed' : 'Pending'} /></div>
+        <div className="row"><RawLink kind="report" k={String(r.version)} label="View underlying data" /><Chip label={released ? 'Released · final' : 'Exploratory · not scientifically approved'} kind={released ? 'Proceed' : 'Pending'} /></div></div>
       {r.superseded && <div className="box esc"><p><b>Superseded.</b> Something changed after this version; regenerate it in Stage 6.</p></div>}
       <div className="box note"><p>Computational predictions from public genomes: not laboratory-confirmed susceptibility, not a national prevalence estimate.</p></div>
       <div className="box"><div className="row between"><h3>Plain-language summary</h3><button className="btn small" onClick={() => act(() => api.summary(), 'Summary drafted')}>✦ Draft summary{brain === 'replay' ? ' (replay)' : ''}</button></div>
