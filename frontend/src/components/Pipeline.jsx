@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { api } from '../api.js'
 import { Chip, Rationale, actorLabel, ROLE_LABEL } from './common.jsx'
-import { RawCheck, RawLink, useRaw } from './Raw.jsx'
+import { RawLink } from './Raw.jsx'
 
 const STATUS = { locked: 'Locked', ready: 'Ready to run', wait: 'Waiting for human', done: 'Done' }
 
@@ -50,7 +50,6 @@ function Stage({ n, snap, act, who, busy, openSample }) {
 }
 
 function S1({ st, status, act, who }) {
-  const { seen } = useRaw()
   const [q, setQ] = useState(st.question)
   const sc = st.scope || {}
   if (status === 'ready') return (
@@ -66,15 +65,14 @@ function S1({ st, status, act, who }) {
         <ul className="clean">{(sc.gaps || []).map(g => <li key={g.gap}>{g.gap} <i>Proposed:</i> {g.proposal}{g.added_by === 'guardrail' && <span className="muted"> (added by guardrail)</span>}</li>)}</ul>
         {sc.warnings?.length > 0 && <><h3>Warnings</h3><ul className="clean">{sc.warnings.map(w => <li key={w}>{w}</li>)}</ul></>}</div>
       {status === 'wait' && <div className="box gate"><h3>Gate · Researcher approval</h3><p>Approving accepts the proposed definitions.</p>
-        <RawCheck kind="scope" k="guardian" what="the Scope Guardian's review (exactly what it received and returned)" />
-        <div className="row"><button className="btn primary" disabled={!seen('scope', 'guardian')} onClick={() => act(() => api.gate('scope', who), 'Scope approved')}>Approve scope</button></div></div>}
+        <div className="row"><button className="btn primary" onClick={() => act(() => api.gate('scope', who), 'Scope approved')}>Approve scope</button>
+          <RawLink kind="scope" k="guardian" /></div></div>}
       {status === 'done' && <p className="okmsg">Scope approved by {st.gates.scope?.person || ROLE_LABEL[st.gates.scope?.role] || 'researcher'}</p>}
     </>
   )
 }
 
 function S2({ st, status, act, who, openSample }) {
-  const { seen } = useRaw()
   const v = st.samples.filter(s => s.eligibility === 'Verified'), h = st.samples.filter(s => s.eligibility === 'Hold'), x = st.samples.filter(s => s.eligibility === 'Excluded')
   return (
     <>
@@ -90,18 +88,17 @@ function S2({ st, status, act, who, openSample }) {
       {h.map(s => <div className="box esc" key={s.run}>
         <div className="row between"><button className="btn small ghost mono" onClick={() => openSample(s.run)}>{s.run}</button><Chip label="Escalate" /></div>
         <p>{s.eligibility_note}</p>
-        <RawCheck kind="ena" k={s.run} what={`${s.run} (archive record + the agent's evidence)`} />
-        <Rationale id={'h-' + s.run} disabled={!seen('ena', s.run)} placeholder="e.g. Origin confirmed in the study's methods" buttons={[['verify', 'Verify', true], ['exclude', 'Exclude'], ['hold', 'Keep on hold']]}
+        <Rationale id={'h-' + s.run} placeholder="e.g. Origin confirmed in the study's methods" buttons={[['verify', 'Verify', true], ['exclude', 'Exclude'], ['hold', 'Keep on hold']]}
+          extra={<RawLink kind="ena" k={s.run} />}
           onSubmit={(d, r) => act(() => api.resolveHold({ ...who, run: s.run, decision: d, rationale: r }), 'Decision recorded')} /></div>)}
       {status === 'wait' && <div className="box gate"><h3>Gate · Cohort approval</h3><p>{v.length} verified runs enter the primary cohort; approving accepts the cohort checks as limitations.</p>
-        <RawCheck kind="cohort" k="all" what="all candidate runs as the archive returned them" />
-        <div className="row"><button className="btn primary" disabled={!seen('cohort', 'all')} onClick={() => act(() => api.gate('cohort', who), 'Cohort approved')}>Approve cohort ({v.length})</button></div></div>}
+        <div className="row"><button className="btn primary" onClick={() => act(() => api.gate('cohort', who), 'Cohort approved')}>Approve cohort ({v.length})</button>
+          <RawLink kind="cohort" k="all" /></div></div>}
     </>
   )
 }
 
 function S3({ st, status, act, who, openSample }) {
-  const { seen } = useRaw()
   const c = st.samples.filter(s => s.in_cohort)
   return (
     <>
@@ -109,18 +106,17 @@ function S3({ st, status, act, who, openSample }) {
         {c.map(s => <tr className="click" key={s.run} onClick={() => openSample(s.run)}><td className="mono">{s.run}</td><td className="num">{s.coverage ?? '—'}×</td><td>{s.md5 ? 'MD5 listed' : '—'}</td><td><Chip label={s.qc || '—'} /></td></tr>)}
       </tbody></table></div>
       {c.filter(s => s.qc === 'Escalated').map(s => <div className="box esc" key={s.run}><div className="row between"><span className="mono">{s.run}</span><Chip label="Escalate" /></div><p>{s.qc_note}</p>
-        <RawCheck kind="ena" k={s.run} what={`${s.run} (base count and how coverage was computed)`} />
-        <Rationale id={'q-' + s.run} disabled={!seen('ena', s.run)} placeholder="e.g. Coverage at target regions >40× in BAM" buttons={[['proceed', 'Proceed with justification', true], ['exclude', 'Exclude']]}
+        <Rationale id={'q-' + s.run} placeholder="e.g. Coverage at target regions >40× in BAM" buttons={[['proceed', 'Proceed with justification', true], ['exclude', 'Exclude']]}
+          extra={<RawLink kind="ena" k={s.run} />}
           onSubmit={(d, r) => act(() => api.resolveQc({ ...who, run: s.run, decision: d, rationale: r }), 'QC decision recorded')} /></div>)}
       {status === 'wait' && <div className="box gate"><h3>Gate · Confirm QC decisions</h3>
-        <RawCheck kind="qc" k="all" what="the QC inputs (base counts, genome size, checksums)" />
-        <div className="row"><button className="btn primary" disabled={!seen('qc', 'all')} onClick={() => act(() => api.gate('qc', who), 'QC confirmed')}>Confirm and advance</button></div></div>}
+        <div className="row"><button className="btn primary" onClick={() => act(() => api.gate('qc', who), 'QC confirmed')}>Confirm and advance</button>
+          <RawLink kind="qc" k="all" /></div></div>}
     </>
   )
 }
 
 function S4({ snap, status, act, who, openSample }) {
-  const { seen } = useRaw()
   const st = snap.state, q = st.samples.filter(s => s.qc === 'Pass'), done = q.filter(s => s.profiling === 'Done')
   const [over, setOver] = useState(false)
   const input = useRef(null)
@@ -144,8 +140,8 @@ function S4({ snap, status, act, who, openSample }) {
       {done.length > 0 && <div className="tw"><table><thead><tr><th>Run</th><th>Lineage</th><th>TB-Profiler type</th><th>Source</th><th></th></tr></thead><tbody>
         {done.map(s => <tr className="click" key={s.run} onClick={() => openSample(s.run)}><td className="mono">{s.run}</td><td className="mono">{s.lineage || '—'}</td><td>{s.drtype || '—'}</td><td className="muted" style={{ fontSize: '.82rem' }}>{s.profiling_note}</td><td><RawLink kind="tbprofiler" k={s.run} label="Raw JSON" /></td></tr>)}</tbody></table></div>}
       {status === 'wait' && <div className="box gate"><h3>Gate · Close profiling batch</h3><p>Results imported later are evaluated automatically.</p>
-        {done.length > 0 && <RawCheck kind="profiling" k="all" what="the TB-Profiler results in this batch" />}
-        <div className="row"><button className="btn primary" disabled={!done.length || !seen('profiling', 'all')} onClick={() => act(() => api.gate('profiling', who), 'Batch closed')}>Close batch ({done.length})</button></div></div>}
+        <div className="row"><button className="btn primary" disabled={!done.length} onClick={() => act(() => api.gate('profiling', who), 'Batch closed')}>Close batch ({done.length})</button>
+          {done.length > 0 && <RawLink kind="profiling" k="all" />}</div></div>}
     </>
   )
 }
@@ -159,7 +155,6 @@ function S5({ st, act }) {
 }
 
 function S6({ st, act, who }) {
-  const { seen } = useRaw()
   const r = st.report
   if (!r) return null
   const pending = r.unresolved.length
@@ -167,8 +162,8 @@ function S6({ st, act, who }) {
     {st.gates.release && <p className="okmsg">{st.gates.release.kind === 'final' ? 'Final release' : 'Exploratory draft shared'} · v{st.gates.release.version} · {st.gates.release.person || ROLE_LABEL[st.gates.release.role]}</p>}
     {r.superseded && <p className="msg">Report superseded — click Regenerate before release.</p>}
     <p>{pending ? `${pending} finding(s) pending review: final release is blocked.` : 'No pending findings.'}</p>
-    {!r.superseded && <RawCheck kind="report" k={String(r.version)} what={`every number in report v${r.version}`} />}
-    <div className="row"><button className="btn primary" disabled={!!pending || r.superseded || !seen('report', String(r.version))} onClick={() => act(() => api.release({ ...who, kind: 'final' }), 'Released')}>Approve final release</button>
-      <button className="btn" disabled={r.superseded || !seen('report', String(r.version))} onClick={() => act(() => api.release({ ...who, kind: 'draft' }), 'Draft shared')}>Share exploratory draft</button>
-      <button className="btn" onClick={() => act(() => api.run(6), 'Report regenerated')}>Regenerate report</button></div></div>
+    <div className="row"><button className="btn primary" disabled={!!pending || r.superseded} onClick={() => act(() => api.release({ ...who, kind: 'final' }), 'Released')}>Approve final release</button>
+      <button className="btn" disabled={r.superseded} onClick={() => act(() => api.release({ ...who, kind: 'draft' }), 'Draft shared')}>Share exploratory draft</button>
+      <button className="btn" onClick={() => act(() => api.run(6), 'Report regenerated')}>Regenerate report</button>
+      {!r.superseded && <RawLink kind="report" k={String(r.version)} />}</div></div>
 }

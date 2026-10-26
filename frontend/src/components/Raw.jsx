@@ -2,26 +2,18 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { fmtTime } from './common.jsx'
 
-/* Raw data before every decision.
+/* Raw-data viewer: optional, inline with each decision's button row.
    - useRaw() gives every component: seen(kind, key) → timestamp | null, and open(kind, key).
-   - <RawCheck> is the visual step "1. look at the raw data" shown above every decision button.
-   - Decision buttons stay disabled until the current person has opened that raw data. */
+   - <RawLink> is the small ghost button to open it; shows a ✓ once this person has viewed it. */
 
 export const RawCtx = createContext({ seen: () => null, open: () => {} })
 export const useRaw = () => useContext(RawCtx)
 
-export function RawCheck({ kind, k, what }) {
+export function RawLink({ kind, k, label = 'View raw data' }) {
   const { seen, open } = useRaw()
   const ts = seen(kind, k)
-  return ts
-    ? <div className="rawcheck ok"><span>✓ Raw data reviewed at {fmtTime(ts)}</span><button className="btn small ghost" onClick={() => open(kind, k)}>View again</button></div>
-    : <div className="rawcheck todo"><span><b>Step 1:</b> look at the raw data for {what}. The decision buttons unlock after you open it.</span>
-      <button className="btn small primary" onClick={() => open(kind, k)}>View raw data</button></div>
-}
-
-export function RawLink({ kind, k, label = 'View raw data' }) {
-  const { open } = useRaw()
-  return <button className="btn small ghost" onClick={e => { e.stopPropagation(); open(kind, k) }}>{label}</button>
+  return <button className="btn small ghost" title={ts ? `Viewed at ${fmtTime(ts)}; the receipt will be saved with your decision.` : 'Optional. Opening it saves a receipt with your decision.'}
+    onClick={e => { e.stopPropagation(); open(kind, k) }}>{ts ? '✓ ' : ''}{label}</button>
 }
 
 // Clicking a run in a raw table drills down to that run's own raw record

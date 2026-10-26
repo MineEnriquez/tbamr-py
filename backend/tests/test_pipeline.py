@@ -10,7 +10,7 @@ from tbamr.agents.scope_guardian import ScopeGuardian
 from tbamr.api import build_orchestrator, create_app
 from tbamr.core.decisions import Decision, DecisionLog, GuardrailViolation, Outcome
 from tbamr.core.models import Finding, Sample
-from tbamr.core.orchestrator import PermissionDenied, RawNotViewed, StageError
+from tbamr.core.orchestrator import PermissionDenied, StageError
 from tbamr.llm.client import ReplayClient
 from tbamr.tools.demo import DemoDataTools
 from tbamr.tools.ena import DataTools
@@ -66,23 +66,23 @@ def test_roles_are_enforced(orch):
         orch.approve_scope("analyst", "Budi")
 
 
-def test_raw_data_must_be_viewed_before_any_decision(orch):
+def test_raw_data_view_is_recorded_but_not_required(orch):
     orch.run_stage(1)
-    with pytest.raises(RawNotViewed):
-        orch.approve_scope("pi", "Ana")
-    orch.raw_view("scope", "guardian", "pi", "Citra")  # someone else looking does not count
-    with pytest.raises(RawNotViewed):
-        orch.approve_scope("pi", "Ana")
+    # Deciding without opening the raw data is allowed; the evidence notes it wasn't opened.
+    orch.approve_scope("pi", "Ana")
+    d = [d for d in orch.log.all() if d["outcome"] == "Approve"][0]
+    assert "not opened" in d["evidence"]
+    # When someone does open the raw data, the receipt is captured and tied to their later decisions.
+    orch.run_stage(2)
     raw = orch.raw_view("scope", "guardian", "pi", "Ana")
     assert raw["title"] and raw["data"]["result"]["gaps"]
-    orch.approve_scope("pi", "Ana")
-    d = [d for d in orch.log.all() if d["outcome"] == "Approve"][-1]
-    assert "Raw data" in d["evidence"] and "Ana" in d["evidence"]
-    orch.run_stage(2)
     ena = orch.raw_view("ena", "DEMO-R15", "pi", "Ana")
     assert ena["data"]["ena_record"]["run_accession"] == "DEMO-R15"
     cohort = orch.raw_view("cohort", "all", "pi", "Ana")
     assert cohort["table"]["rows"] and cohort["table"]["columns"]
+    orch.approve_cohort("pi", "Ana")
+    d = [d for d in orch.log.all() if d["outcome"] == "Approve"][0]
+    assert "Raw data" in d["evidence"] and "Ana" in d["evidence"]
 
 
 def test_gates_block_skipping(orch):
@@ -92,11 +92,6 @@ def test_gates_block_skipping(orch):
 
 def test_two_person_override(orch):
     orch.run_stage(1); orch.raw_view("scope", "guardian", "pi", "Ana"); orch.approve_scope("pi", "Ana"); orch.run_stage(2)
-    with pytest.raises(RawNotViewed):
-        orch.override("pi", "Ana", "DEMO-R15", "eligibility", "Verified", "x")
-    for who in [("pi", "Ana"), ("deputy", "ana"), ("deputy", "Citra")]:
-        orch.raw_view("ena", "DEMO-R15", *who)
-    orch.raw_view("ena", "DEMO-R01", "pi", "Ana")
     r = orch.override("pi", "Ana", "DEMO-R15", "eligibility", "Verified", "Origin confirmed in methods section")
     assert r["applied"] is False
     with pytest.raises(PermissionDenied):
@@ -112,8 +107,6 @@ def test_import_and_review(orch):
     f = next(f for f in orch.state.findings() if f.review == "Pending")
     with pytest.raises(PermissionDenied):
         orch.review("pi", "Ana", f.fid, "Reviewed", "x")
-    with pytest.raises(RawNotViewed):
-        orch.review("tbexpert", "Dewi", f.fid, "Reviewed", "x")
     raw = orch.raw_view("tbprofiler", f.sample_id, "tbexpert", "Dewi")
     assert "dr_variants" in raw["data"]
     orch.review("tbexpert", "Dewi", f.fid, "Needs more data", "Request deeper sequencing")
@@ -221,8 +214,6 @@ def test_api_flow(tmp_path):
     c = TestClient(app)
     assert c.post("/api/stages/1/run").status_code == 200
     assert c.post("/api/gates/scope", json={"role": "analyst"}).status_code == 403
-    r = c.post("/api/gates/scope", json={"role": "pi", "person": "Ana"})
-    assert r.status_code == 428 and "raw data" in r.json()["detail"].lower()
     raw = c.get("/api/raw/scope/guardian", params={"role": "pi", "person": "Ana"}).json()
     assert raw["viewer"] == "Ana" and raw["viewed_at"]
     assert {"kind": "scope", "key": "guardian"}.items() <= c.get("/api/raw/receipts", params={"person": "Ana"}).json()[0].items()

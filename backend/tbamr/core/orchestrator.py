@@ -33,10 +33,6 @@ class StageError(Exception):
     pass
 
 
-class RawNotViewed(StageError):
-    """A human tried to decide without opening the raw data behind the decision."""
-
-
 class Orchestrator:
     name = "orchestrator"
     title = "Orchestrator"
@@ -82,11 +78,11 @@ class Orchestrator:
     def ident(role: str, person: str) -> str:
         return (person or "").strip() or ROLES.get(role, role)
 
-    def need_raw(self, role: str, person: str, kind: str, key: str, what: str) -> str:
-        """Every human decision requires that this person opened the raw data behind it."""
+    def note_raw(self, role: str, person: str, kind: str, key: str, what: str) -> str:
+        """Note whether this person opened the raw data behind their decision. Not required, but recorded."""
         ts = self.log.viewed_at(self.ident(role, person), kind, key)
         if not ts:
-            raise RawNotViewed(f"Open the raw data for {what} before deciding — every decision must be made on the source data, not only the agents' summary.")
+            return f"Raw data ({kind}/{key}) for {what} was not opened before this decision."
         import time as _t
         return f"Raw data ({kind}/{key}) viewed by {self.ident(role, person)} at {_t.strftime('%Y-%m-%d %H:%M:%S', _t.localtime(ts))}"
 
@@ -306,7 +302,7 @@ class Orchestrator:
                 raise StageError("The scope has not been reviewed yet.")
             if self.state.scope.get("blocking"):
                 raise StageError("Fix the blocking gaps first.")
-            ev = self.need_raw(role, person, "scope", "guardian", "the Scope Guardian's result")
+            ev = self.note_raw(role, person, "scope", "guardian", "the Scope Guardian's result")
             self.state.gates["scope"] = {"by": person, "role": role}
             self.human(role, person, "—", Outcome.APPROVE, RULES["scope"], "Scope approved; proposed definitions accepted.", 1, ev)
             self._complete(1)
@@ -320,7 +316,7 @@ class Orchestrator:
                 raise StageError(f"{run} is not on hold.")
             if not rationale.strip():
                 raise StageError("A rationale is required.")
-            ev = self.need_raw(role, person, "ena", run, run)
+            ev = self.note_raw(role, person, "ena", run, run)
             if decision == "verify":
                 s.eligibility, s.eligibility_note = "Verified", f"Human decision: {rationale}"
                 self.human(role, person, run, Outcome.PROCEED, RULES["elig"], rationale, 2, ev)
@@ -339,7 +335,7 @@ class Orchestrator:
             self.require(role, GATES["cohort"])
             if self._status(2) != "wait":
                 raise StageError("Discovery and verification have not run yet.")
-            ev = self.need_raw(role, person, "cohort", "all", "the candidate runs")
+            ev = self.note_raw(role, person, "cohort", "all", "the candidate runs")
             n = 0
             for s in self.state.samples:
                 if s.eligibility == "Verified":
@@ -354,7 +350,7 @@ class Orchestrator:
             self.require(role, ["analyst"])
             if self._status(3) != "wait":
                 raise StageError("QC has not run yet.")
-            ev = self.need_raw(role, person, "qc", "all", "the QC inputs")
+            ev = self.note_raw(role, person, "qc", "all", "the QC inputs")
             self.human(role, person, "—", Outcome.APPROVE, RULES["qc"], "QC decisions confirmed.", 3, ev)
             self._complete(3)
             self.save()
@@ -365,7 +361,7 @@ class Orchestrator:
             s = self._sample(run)
             if s.qc != "Escalated" or not rationale.strip():
                 raise StageError("Only escalated QC results can be resolved, with a rationale.")
-            ev = self.need_raw(role, person, "ena", run, run)
+            ev = self.note_raw(role, person, "ena", run, run)
             s.qc, s.qc_note = ("Pass", f"Analyst exception: {rationale}") if decision == "proceed" else ("Excluded", f"Excluded by analyst: {rationale}")
             self.human(role, person, run, Outcome.PROCEED if decision == "proceed" else Outcome.EXCLUDE, RULES["qc"], rationale, 3, ev)
             self._revalidate(s)
@@ -417,7 +413,7 @@ class Orchestrator:
             done = sum(s.profiling == "Done" for s in self.state.samples)
             if not done:
                 raise StageError("Import or run at least one TB-Profiler result first.")
-            ev = self.need_raw(role, person, "profiling", "all", "the TB-Profiler results")
+            ev = self.note_raw(role, person, "profiling", "all", "the TB-Profiler results")
             self.human(role, person, "—", Outcome.APPROVE, RULES["prof"], f"Profiling batch closed with {done} result(s).", 4, ev)
             self._complete(4)
             self.save()
@@ -430,7 +426,7 @@ class Orchestrator:
                 raise StageError("That finding is not pending review.")
             if decision not in ("Reviewed", "Not supported", "Needs more data") or not rationale.strip():
                 raise StageError("Choose a review decision and give a rationale.")
-            ev = self.need_raw(role, person, "tbprofiler", f.sample_id, f"{f.sample_id}'s TB-Profiler result")
+            ev = self.note_raw(role, person, "tbprofiler", f.sample_id, f"{f.sample_id}'s TB-Profiler result")
             f.review, f.reviewer, f.rationale = decision, f"{ROLES[role]} ({person})" if person else ROLES[role], rationale
             self.human(role, person, f.sample_id, {"Reviewed": Outcome.PROCEED, "Needs more data": Outcome.HOLD}.get(decision, Outcome.EXCLUDE),
                        RULES["evid"], f"Review of {f.gene} {f.change}: {decision} — {rationale}", 5, ev)
@@ -447,7 +443,7 @@ class Orchestrator:
             pending = len(rep.get("unresolved", []))
             if kind == "final" and (pending or rep.get("superseded")):
                 raise StageError("Final release is blocked while findings are pending or the report is superseded.")
-            ev = self.need_raw(role, person, "report", str(rep["version"]), f"report v{rep['version']}")
+            ev = self.note_raw(role, person, "report", str(rep["version"]), f"report v{rep['version']}")
             self.state.gates["release"] = {"by": person, "role": role, "kind": kind, "version": rep["version"]}
             self.human(role, person, "—", Outcome.APPROVE, RULES["rpt"], f"{'Final release' if kind == 'final' else 'Exploratory draft shared'}: report v{rep['version']}.", 6, ev)
             if kind == "final":
@@ -473,7 +469,6 @@ class Orchestrator:
             frm = getattr(s, field)
             if not rationale.strip() or frm == to:
                 raise StageError("Give a rationale and a different status.")
-            self.need_raw(role, person, "ena", run, run)
             if self.ORDER[field].get(to, 9) > self.ORDER[field].get(frm, 0):  # more cautious → immediate
                 self._apply_override(s, field, frm, to, rationale, [f"{ROLES[role]} ({person})"])
                 return {"applied": True}
@@ -494,7 +489,6 @@ class Orchestrator:
                 raise PermissionDenied("The second sign-off must come from a different, named person.")
             if role not in ROLES:
                 raise PermissionDenied("Unknown role.")
-            self.need_raw(role, person, "ena", p["run"], p["run"])
             self.pending_overrides.remove(p)
             self._apply_override(self._sample(p["run"]), p["field"], p["from"], p["to"], p["rationale"],
                                  [f"{ROLES[p['role']]} ({p['person']})", f"{ROLES[role]} ({person})"])

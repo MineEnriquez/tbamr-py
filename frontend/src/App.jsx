@@ -93,7 +93,7 @@ export default function App() {
       <div className="banner">
         <span className={'tag ' + snap.mode.data}>{snap.mode.data === 'demo' ? 'DEMO DATA (simulated)' : 'LIVE DATA · ENA'}</span>
         <span className={'tag ' + snap.mode.brain}>{snap.mode.brain === 'claude' ? 'Claude agents (live reasoning)' : 'Replay agents (scripted, no API key)'}</span>
-        <span className="muted">Names are recorded with every human decision; the two-person rule needs two different names. Before any decision you must open its raw data: the receipt is saved with your decision.</span>
+        <span className="muted">Names are recorded with every human decision; the two-person rule needs two different names. Each decision row has an optional <b>View raw data</b> link; if you open it, the receipt is saved with your decision.</span>
       </div>
       <Flow snap={snap} team={team} view={tab === 'pipeline' ? view : null} pending={pending} onPick={n => { setView(n); setTab(n === 5 && pending ? 'review' : 'pipeline') }} />
       <nav className="tabs" role="tablist">{tabs.map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}{k === 'review' && pending ? <span className="count">{pending}</span> : null}</button>)}</nav>

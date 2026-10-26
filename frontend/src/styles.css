@@ -107,10 +107,7 @@ tbody tr.click{cursor:pointer} tbody tr.click:hover td{background:var(--surface-
 @media (prefers-reduced-motion:reduce){.busy{animation:none}}
 footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
 
-/* raw data before decisions */
-.rawcheck{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 10px;border-radius:6px;font-size:.86rem}
-.rawcheck.todo{background:var(--retry-bg);color:var(--ink);border:1px dashed var(--retry)}
-.rawcheck.ok{background:var(--ok-bg);color:var(--ok)}
+/* raw data viewer */
 .modal{position:fixed;z-index:31;top:4vh;left:50%;transform:translateX(-50%);width:min(1000px,calc(100% - 32px));max-height:92vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 50px rgb(0 0 0/.3)}
 .modal h2{font-size:1.15rem;margin:0}
 .rawjson{background:var(--surface-2);padding:12px;border-radius:6px;font-family:var(--f-mono);font-size:.78rem;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;margin:0}

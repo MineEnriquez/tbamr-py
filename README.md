@@ -42,11 +42,11 @@ flowchart LR
 
 Shared contract for everyone: five outcomes (**Proceed · Hold · Exclude · Retry · Escalate**), every decision logged with sample, rule version, rationale and time; humans-only outcomes (**Approve**, **Override**); overrides never erase history; relaxing a safeguard needs **two different named people**. Every agent step (task, reasoning, tool call, submission, guardrail rejection) is stored in an **agent trace** you can read in the UI.
 
-## Raw data before every decision
+## Raw data alongside every decision
 
-A person can't accept or reject anything until they've opened the raw data behind it. Every decision box shows a blue **"Step 1: View raw data"** bar, and its buttons stay greyed out until that person opens the data. Opening it records a receipt (who, what and when). The receipt is saved with the decision, for example `Raw data (ena/DEMO-R15) viewed by Minnie at 2026-10-26 12:20:45`.
+Every decision box offers a **"View raw data"** button for the source behind that decision. Opening it records a receipt (who, what and when), which is saved with the decision — for example `Raw data (ena/DEMO-R15) viewed by Minnie at 2026-10-26 12:20:45`. If the person decides without opening the raw data, the evidence line says so instead; the decision is not blocked.
 
-| Decision | Raw data the person must open |
+| Decision | Raw data available |
 |---|---|
 | Approve scope | What the Scope Guardian received and returned |
 | Resolve a hold, resolve a QC escalation, override, co-sign | The run's archive record, the agent's evidence and tool outputs, and how coverage was derived |
@@ -54,10 +54,9 @@ A person can't accept or reject anything until they've opened the raw data behin
 | Confirm QC | Base counts, genome size, estimated coverage and checksums |
 | Close profiling batch | Every TB-Profiler result (click a run for its full JSON) |
 | Review a finding | The run's full TB-Profiler JSON |
-| Release / share draft | Every number in that report version (a new version needs a new look) |
+| Release / share draft | Every number in that report version |
 
-Someone else's receipt does not count, so each person must open the data themselves. Tool calls in the Agent team trace also have a **"View full raw response"** button. Every viewer can download the JSON.
-The API returns `428` when a decision is attempted without a receipt.
+Each person's receipts are tracked separately, so the audit trail shows exactly who looked at what. Tool calls in the Agent team trace also have a **"View full raw response"** button. Every viewer can download the JSON.
 Endpoints: `GET /api/raw/{kind}/{key}?role=&person=`, `GET /api/raw/receipts?role=&person=`.
 
 ## Run it on a Mac
