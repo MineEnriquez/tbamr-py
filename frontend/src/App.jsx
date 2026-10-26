@@ -28,6 +28,7 @@ export default function App() {
   const [version, setVersion] = useState(0)
   const [receipts, setReceipts] = useState({})
   const [rawReq, setRawReq] = useState(null)
+  const [theme, setTheme] = useState(load('tbamr.theme') || 'auto')
   const timer = useRef(null)
 
   const refresh = useCallback(async () => {
@@ -51,6 +52,11 @@ export default function App() {
   useEffect(() => { const k = e => e.key === 'Escape' && !rawReq && setSel(null); window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [rawReq])
   useEffect(() => { save('tbamr.role', role) }, [role])
   useEffect(() => { save('tbamr.person', person) }, [person])
+  useEffect(() => { // 'auto' follows the computer's light/dark setting
+    if (theme === 'auto') document.documentElement.removeAttribute('data-theme')
+    else document.documentElement.setAttribute('data-theme', theme)
+    save('tbamr.theme', theme)
+  }, [theme])
 
   const flash = (text, err) => { setToast({ text, err }); setTimeout(() => setToast(null), err ? 6000 : 2500) }
   const act = async (fn, ok) => {
@@ -78,6 +84,9 @@ export default function App() {
         <div className="controls">
           <div className="ctl"><label htmlFor="role">Acting as</label><select id="role" value={role} onChange={e => setRole(e.target.value)}>{Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
           <div className="ctl"><label htmlFor="person">Your name</label><input id="person" value={person} onChange={e => setPerson(e.target.value)} placeholder="e.g. Minnie" /></div>
+          <div className="ctl"><span className="lbl" id="theme-l">Colors</span>
+            <div className="seg theme" role="radiogroup" aria-labelledby="theme-l">{[['light', '☀ Light'], ['dark', '☾ Dark'], ['auto', 'Auto']].map(([k, l]) =>
+              <button key={k} role="radio" aria-checked={theme === k} aria-selected={theme === k} title={k === 'auto' ? "Follow this computer's setting" : undefined} onClick={() => setTheme(k)}>{l}</button>)}</div></div>
           <button className="btn ghost" onClick={() => act(() => api.reset(snap.mode.data), 'Pipeline reset')}>Reset</button>
         </div>
       </div>
