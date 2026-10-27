@@ -101,8 +101,13 @@ def parse_file(path: str | Path) -> dict[str, Any]:
 class TBProfilerRunner:
     """Runs TB-Profiler on a run accession when the command-line tools are installed."""
 
-    def __init__(self, workdir: str | Path = "tbprofiler_runs"):
+    def __init__(self, workdir: str | Path = "tbprofiler_runs", threads: int | None = None, db: str | None = None):
         self.workdir = Path(workdir)
+        # Threads per sample: envvar override, else default 4. Pass to fasterq-dump (-e) and tb-profiler (--threads).
+        import os
+        self.threads = threads if threads is not None else int(os.environ.get("TBAMR_PROFILER_THREADS", "4"))
+        # Which TB-Profiler library to use. v6.x defaults to who_v2+ which may not be loaded locally — fall back to tbdb.
+        self.db = db if db is not None else os.environ.get("TBAMR_PROFILER_DB", "tbdb")
 
     @staticmethod
     def available() -> dict[str, bool]:
@@ -115,15 +120,27 @@ class TBProfilerRunner:
             return {"ok": False, "error": f"Not installed: {', '.join(missing)}. Run TB-Profiler yourself and import the JSON instead."}
         out = self.workdir / run_accession
         out.mkdir(parents=True, exist_ok=True)
-        try:
-            subprocess.run(["fasterq-dump", "--split-files", run_accession, "-O", str(out)], check=True, timeout=timeout, capture_output=True)
-            r1, r2 = out / f"{run_accession}_1.fastq", out / f"{run_accession}_2.fastq"
-            subprocess.run(["tb-profiler", "profile", "-1", str(r1), "-2", str(r2), "-p", run_accession, "--dir", str(out)],
-                           check=True, timeout=timeout, capture_output=True)
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-            return {"ok": False, "error": f"{type(e).__name__}: {getattr(e, 'stderr', b'')[-500:]!r}"}
         result = out / "results" / f"{run_accession}.results.json"
+        # Resume: if a prior run already produced the JSON, reuse it instead of re-downloading and re-mapping.
+        if result.exists():
+            try:
+                data = json.loads(result.read_text())
+                return {"ok": True, "cached": True, "result": parse_result(data, result.name), "raw": data}
+            except (ValueError, OSError):
+                pass  # corrupted → fall through and rerun
+        t = str(max(1, int(self.threads)))
+        r1, r2 = out / f"{run_accession}_1.fastq", out / f"{run_accession}_2.fastq"
+        try:
+            # Resume: skip fasterq-dump when both FASTQs are already on disk (saves gigabytes of re-download on retry).
+            if not (r1.exists() and r2.exists() and r1.stat().st_size > 0 and r2.stat().st_size > 0):
+                subprocess.run(["fasterq-dump", "--split-files", "-e", t, run_accession, "-O", str(out)], check=True, timeout=timeout, capture_output=True)
+            cmd = ["tb-profiler", "profile", "-1", str(r1), "-2", str(r2), "-p", run_accession, "--dir", str(out), "--threads", t, "--db", self.db]
+            p = subprocess.run(cmd, check=True, timeout=timeout, capture_output=True)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            return {"ok": False, "error": f"{type(e).__name__}: {getattr(e, 'stderr', b'')[-800:]!r}"}
         if not result.exists():
-            return {"ok": False, "error": f"Expected {result} was not produced."}
+            # TB-Profiler sometimes logs an error and still exits 0 (e.g. missing DB) — surface stderr so the UI isn't misleading.
+            tail = (p.stderr or b"")[-800:].decode(errors="replace")
+            return {"ok": False, "error": f"TB-Profiler exited 0 but produced no result file. stderr tail: {tail}"}
         data = json.loads(result.read_text())
         return {"ok": True, "result": parse_result(data, result.name), "raw": data}

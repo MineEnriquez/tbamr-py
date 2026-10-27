@@ -133,15 +133,41 @@ function S4({ snap, status, act, who, openSample }) {
   const tools = snap.mode.tbprofiler
   const canRun = tools['tb-profiler'] && tools['fasterq-dump']
   const waiting = q.filter(s => s.profiling !== 'Done').map(s => s.run)
+  const [selected, setSelected] = useState(() => new Set())
+  const [n, setN] = useState(5)
+  const toggle = (r) => setSelected(prev => { const s = new Set(prev); s.has(r) ? s.delete(r) : s.add(r); return s })
+  const chosen = waiting.filter(r => selected.has(r))  // keep selection in waiting-order and drop stale ones
   return (
     <>
       <div className="metrics"><div className="metric"><span className="v">{q.length}</span><span className="l">QC-passed runs</span></div>
         <div className="metric"><span className="v" style={{ color: 'var(--ok)' }}>{done.length}</span><span className="l">TB-Profiler results</span></div>
         <div className="metric"><span className="v" style={{ color: 'var(--hold)' }}>{q.length - done.length}</span><span className="l">Awaiting results</span></div></div>
       <div className="box"><h3>Run TB-Profiler</h3>
-        {canRun ? <div className="row"><button className="btn small primary" onClick={() => act(() => api.runProfiler({ ...who, runs: waiting }), 'TB-Profiler started')} disabled={!waiting.length}>Run TB-Profiler on {waiting.length} run(s)</button><span className="muted" style={{ fontSize: '.82rem' }}>Runs on this computer; can take minutes per sample.</span></div>
+        {canRun ? <>
+          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <span className="muted" style={{ fontSize: '.82rem' }}>Pick which runs to profile — one sample can take 15–30 min.</span>
+          </div>
+          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <button className="btn small" onClick={() => setSelected(new Set(waiting.slice(0, Math.max(1, n))))}>Select first</button>
+            <input type="number" min="1" max={waiting.length || 1} value={n} onChange={e => setN(Math.max(1, Number(e.target.value) || 1))} style={{ width: 70 }} aria-label="How many" />
+            <button className="btn small" onClick={() => setSelected(new Set(waiting))}>Select all ({waiting.length})</button>
+            <button className="btn small ghost" onClick={() => setSelected(new Set())}>Clear</button>
+          </div>
+          {waiting.length > 0 && <div className="tw" style={{ maxHeight: 220, overflow: 'auto' }}>
+            <table><tbody>
+              {waiting.map(r => (
+                <tr key={r} className="click" onClick={() => toggle(r)}>
+                  <td style={{ width: 32 }}><input type="checkbox" checked={selected.has(r)} onChange={() => toggle(r)} onClick={e => e.stopPropagation()} aria-label={`Select ${r}`} /></td>
+                  <td className="mono">{r}</td>
+                </tr>
+              ))}
+            </tbody></table>
+          </div>}
+          <div className="row"><button className="btn primary" disabled={!chosen.length} onClick={() => act(() => api.runProfiler({ ...who, runs: chosen }), `TB-Profiler started on ${chosen.length} run(s)`)}>Run TB-Profiler on {chosen.length} selected</button>
+            <span className="muted" style={{ fontSize: '.82rem' }}>Runs on this computer, up to {snap.profiler_concurrency || '?'} at a time (set TBAMR_PROFILER_CONCURRENCY to tune).</span></div>
+        </>
           : <p className="muted" style={{ fontSize: '.88rem' }}>TB-Profiler isn't installed where the backend runs ({Object.entries(tools).map(([k, v]) => `${k}: ${v ? 'yes' : 'no'}`).join(', ')}). Run it yourself and import the <span className="mono">results/&lt;RUN&gt;.results.json</span> files below.</p>}
-        <details><summary className="muted" style={{ cursor: 'pointer' }}>Run list ({waiting.length})</summary><pre className="mono" style={{ whiteSpace: 'pre-wrap' }}>{waiting.join('\n')}</pre></details></div>
+      </div>
       <div className={'drop' + (over ? ' over' : '')} tabIndex={0} onClick={() => input.current.click()} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && input.current.click()}
         onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}>
         <p><b>Drop TB-Profiler result files here</b> (.results.json) or click to choose</p></div>
