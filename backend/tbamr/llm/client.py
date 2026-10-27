@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 from typing import Any, Callable, Protocol
 
-DEFAULT_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-5")
+DEFAULT_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5-5")
 
 
 class LLMClient(Protocol):

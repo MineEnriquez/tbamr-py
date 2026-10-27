@@ -29,7 +29,9 @@ export default function App() {
   const [receipts, setReceipts] = useState({})
   const [rawReq, setRawReq] = useState(null)
   const [theme, setTheme] = useState(load('tbamr.theme') || 'auto')
+  const [liveTraces, setLiveTraces] = useState([])
   const timer = useRef(null)
+  const traceTimer = useRef(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -49,6 +51,14 @@ export default function App() {
     if (snap?.busy) timer.current = setInterval(refresh, 1500)
     return () => clearInterval(timer.current)
   }, [snap?.busy, refresh])
+  useEffect(() => { // stream the latest agent-trace entries while busy
+    clearInterval(traceTimer.current)
+    if (!snap?.busy) { setLiveTraces([]); return }
+    const pull = () => api.trace().then(ts => setLiveTraces(ts.slice(0, 8))).catch(() => {})
+    pull()
+    traceTimer.current = setInterval(pull, 1200)
+    return () => clearInterval(traceTimer.current)
+  }, [snap?.busy])
   useEffect(() => { const k = e => e.key === 'Escape' && !rawReq && setSel(null); window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [rawReq])
   useEffect(() => { save('tbamr.role', role) }, [role])
   useEffect(() => { save('tbamr.person', person) }, [person])
@@ -57,6 +67,9 @@ export default function App() {
     else document.documentElement.setAttribute('data-theme', theme)
     save('tbamr.theme', theme)
   }, [theme])
+  useEffect(() => { // flag work-in-progress in the browser tab title
+    document.title = snap?.busy ? `⏳ ${snap.busy} — TB-AMR Agent Team` : 'TB-AMR Agent Team'
+  }, [snap?.busy])
 
   const flash = (text, err) => { setToast({ text, err }); setTimeout(() => setToast(null), err ? 6000 : 2500) }
   const act = async (fn, ok) => {
@@ -77,6 +90,7 @@ export default function App() {
 
   return (
     <RawCtx.Provider value={raw}>
+    {snap.busy && <BusyBar busy={snap.busy} traces={liveTraces} />}
     <div className="wrap">
       <div className="top">
         <div><span className="eyebrow">A.G.E.N.T. Playbook · Python agents v0.2</span><h1>TB-AMR Agent Team</h1>
@@ -111,5 +125,39 @@ export default function App() {
       <footer>{snap.mode.data === 'demo' ? 'Demo data: every accession starting DEMO/PRJDEMO is simulated. ' : 'Live data from the ENA Portal API. '}Genomic predictions are not laboratory-confirmed susceptibility and cannot estimate national prevalence.</footer>
     </div>
     </RawCtx.Provider>
+  )
+}
+
+function BusyBar({ busy, traces }) {
+  const kindLabel = { tool_call: 'tool', thought: 'thought', submit: 'submit', handoff: 'handoff', guardrail: 'guardrail' }
+  const kindDetail = (t) => {
+    const p = t.payload || {}
+    if (t.kind === 'tool_call') return `${p.tool || p.name || '?'}(${Object.keys(p.input || {}).join(', ')})`
+    if (t.kind === 'thought') return String(p.text || '').slice(0, 160)
+    if (t.kind === 'submit') return `${Object.keys(p).slice(0, 4).join(', ')}`
+    if (t.kind === 'handoff') return String(p.text || '').slice(0, 160)
+    if (t.kind === 'guardrail') return String(p.text || p.reason || '').slice(0, 160)
+    return ''
+  }
+  const latest = traces[0]
+  return (
+    <div className="running" role="status" aria-live="polite" aria-label={`Working: ${busy}`}>
+      <span className="runbar" aria-hidden="true" />
+      <div className="runrow">
+        <span className="rundot" aria-hidden="true" />
+        <span>Working on <b>{busy}</b>…</span>
+        {latest && <span className="runsub">· {latest.agent?.replace(/_/g, ' ')} <code>{kindLabel[latest.kind] || latest.kind}</code> {kindDetail(latest)}</span>}
+      </div>
+      {traces.length > 1 && <ul className="runlog">
+        {traces.slice(0, 5).map(t => (
+          <li key={t.id} className={'rl-' + t.kind}>
+            <span className="rltime">{new Date(t.ts * 1000).toLocaleTimeString(undefined, { hour12: false })}</span>
+            <span className="rlagent">{t.agent?.replace(/_/g, ' ')}</span>
+            <span className="rlkind">{kindLabel[t.kind] || t.kind}</span>
+            <span className="rldetail">{kindDetail(t)}</span>
+          </li>
+        ))}
+      </ul>}
+    </div>
   )
 }

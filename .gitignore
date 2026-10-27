@@ -5,3 +5,6 @@ __pycache__/
 .pytest_cache/
 tbprofiler_runs/
 .DS_Store
+.claude/settings.local.json
+backend/tbdb/
+fasterq.tmp.*
