@@ -186,6 +186,13 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
     def summary():
         return {"text": guard(O().draft_summary)}
 
+    class SummaryEdit(BaseModel):
+        text: str
+
+    @app.put("/api/report/summary")
+    def save_summary(s: SummaryEdit):
+        return {"text": guard(O().save_summary, s.text)}
+
     @app.post("/api/profiling/import")
     async def import_results(role: str, person: str = "", files: list[UploadFile] = File(...)):
         parsed = []
