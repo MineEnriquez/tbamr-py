@@ -126,6 +126,37 @@ tbody tr.click{cursor:pointer} tbody tr.click:hover td{background:var(--surface-
 .toast.err{background:var(--esc);color:#fff}
 .busy{animation:pulse 1.2s ease-in-out infinite} @keyframes pulse{50%{opacity:.45}}
 @media (prefers-reduced-motion:reduce){.busy{animation:none}}
+
+/* in-panel work-in-progress badge */
+.working{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:color-mix(in srgb,var(--retry-bg) 65%,var(--surface));border:1px solid color-mix(in srgb,var(--blue) 35%,var(--line));font-size:.9rem;color:var(--ink);box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--blue) 25%,transparent);position:relative;overflow:hidden}
+.working::after{content:"";position:absolute;bottom:0;left:-30%;height:2px;width:30%;background:linear-gradient(90deg,transparent,var(--blue),transparent);animation:fsweep 1.4s linear infinite}
+.spinner{width:16px;height:16px;border-radius:50%;border:2px solid color-mix(in srgb,var(--blue) 25%,var(--line));border-top-color:var(--blue);animation:spin .9s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation:none}.working::after{animation:none}}
+
+/* global work-in-progress indicator pinned to the top of the viewport */
+.running{position:fixed;top:0;left:0;right:0;z-index:40;background:color-mix(in srgb,var(--retry-bg) 80%,var(--surface));border-bottom:1px solid color-mix(in srgb,var(--retry) 35%,var(--line));box-shadow:var(--shadow-md);font-size:.85rem;color:var(--ink)}
+.runbar{display:block;height:3px;width:100%;background:linear-gradient(90deg,transparent,var(--blue),transparent);background-size:30% 100%;background-repeat:no-repeat;animation:runslide 1.4s linear infinite}
+@keyframes runslide{from{background-position:-30% 0}to{background-position:130% 0}}
+.runrow{padding:6px 16px;display:flex;align-items:center;gap:8px;max-width:1280px;margin:0 auto}
+.rundot{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 30%,transparent);animation:pulse 1.2s ease-in-out infinite;flex:none}
+.runsub{color:var(--muted);font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (prefers-reduced-motion:reduce){.runbar{animation:none;background:var(--blue)}.rundot{animation:none}}
+body:has(.running) .wrap{padding-top:150px}
+.runlog{list-style:none;margin:0;padding:0 16px 8px;max-width:1280px;margin:0 auto;max-height:120px;overflow:auto;font-size:.74rem;font-family:var(--f-mono);color:var(--muted);border-top:1px dashed color-mix(in srgb,var(--blue) 25%,var(--line))}
+.runlog li{display:grid;grid-template-columns:70px 110px 60px minmax(0,1fr);gap:8px;padding:3px 0;align-items:baseline;animation:slidein .25s ease-out;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent)}
+.runlog li:last-child{border-bottom:0}
+.runlog .rltime{color:var(--muted);opacity:.7}
+.runlog .rlagent{color:var(--ink);font-family:var(--f-body);font-weight:600}
+.runlog .rlkind{color:var(--blue);text-transform:uppercase;font-weight:700;letter-spacing:.03em}
+.runlog .rl-tool_call .rlkind{color:var(--blue)}
+.runlog .rl-thought .rlkind{color:var(--pend)}
+.runlog .rl-submit .rlkind{color:var(--ok)}
+.runlog .rl-guardrail .rlkind{color:var(--esc)}
+.runlog .rl-handoff .rlkind{color:var(--muted)}
+.runlog .rldetail{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);opacity:.78}
+@keyframes slidein{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.runlog li{animation:none}}
 footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
 
 /* raw data viewer */
@@ -155,7 +186,12 @@ footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);paddi
 .fstage{position:relative;flex:1 0 180px;min-width:180px;max-width:220px;display:grid;grid-template-rows:auto auto auto;gap:8px;text-align:left;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px;cursor:pointer;font:inherit;box-shadow:var(--shadow-md);transition:transform .12s, box-shadow .15s, border-color .15s}
 .fstage:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg);border-color:color-mix(in srgb,var(--muted) 45%,var(--line))}
 .fstage.cur{border-color:var(--blue);box-shadow:0 0 0 2px color-mix(in srgb,var(--blue) 45%,transparent), var(--shadow-md)}
-.fstage.busy{animation:pulse 1.2s ease-in-out infinite}
+.fstage.busy{animation:fstageglow 1.6s ease-in-out infinite;position:relative;overflow:hidden}
+.fstage.busy::before{content:"";position:absolute;top:0;left:-30%;height:3px;width:30%;background:linear-gradient(90deg,transparent,var(--blue),transparent);animation:fsweep 1.4s linear infinite;z-index:2}
+.fstage.busy .fitile{animation:pulse 1.2s ease-in-out infinite}
+@keyframes fstageglow{0%,100%{box-shadow:var(--shadow-md), 0 0 0 1px color-mix(in srgb,var(--blue) 25%,transparent)}50%{box-shadow:var(--shadow-lg), 0 0 0 3px color-mix(in srgb,var(--blue) 55%,transparent)}}
+@keyframes fsweep{from{left:-30%}to{left:100%}}
+@media (prefers-reduced-motion:reduce){.fstage.busy{animation:none}.fstage.busy::before{animation:none}.fstage.busy .fitile{animation:none}}
 .fstage.s-wait{border-color:color-mix(in srgb,var(--esc) 55%,var(--line));background:color-mix(in srgb,var(--esc-bg) 60%,var(--surface))}
 .fstage.s-ready{border-color:color-mix(in srgb,var(--retry) 50%,var(--line));background:color-mix(in srgb,var(--retry-bg) 55%,var(--surface))}
 .fstage.s-done{border-color:color-mix(in srgb,var(--ok) 45%,var(--line));background:color-mix(in srgb,var(--ok-bg) 55%,var(--surface))}

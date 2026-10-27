@@ -2,10 +2,12 @@
 
 1. Deterministic pre-checks (ELIG-v1.0) classify every run: clear passes and clear failures are
    decided by rule, so they are reproducible.
-2. Ambiguous runs (missing country, repeated BioSample, unusual platform) go to the Claude agent,
-   which gathers evidence with its tools (study lookups, publication search) and proposes an outcome.
-3. Guardrails: the agent can never mark a run Verified when the ENA country field does not name
-   the study country — that becomes Hold + Escalate with the agent's evidence attached.
+2. Ambiguous runs (missing country when scoped by country, repeated BioSample, unusual platform)
+   go to the Claude agent, which gathers evidence with its tools (study lookups, publication
+   search) and proposes an outcome.
+3. Guardrails: when the researcher scopes to a country, the agent can never mark a run Verified
+   when the ENA country field does not name it — that becomes Hold + Escalate with the agent's
+   evidence attached. Worldwide searches do not gate on country match.
 4. Cohort-level checks (ELIG-v1.1) look at the verified set as a whole.
 """
 from __future__ import annotations
@@ -24,8 +26,9 @@ class VerificationTasker(LLMAgent):
     description = "Applies eligibility rules to every run, investigates ambiguous provenance with its tools, and checks whether the cohort can answer the question."
     system_prompt = (
         "Some runs could not be decided by the eligibility rules. For each one, gather evidence with your tools and propose "
-        "Hold, Exclude or Escalate with a short rationale and the evidence you found. Verified origin requires the ENA country "
-        "field; a publication alone can support a human decision but cannot verify a run."
+        "Hold, Exclude or Escalate with a short rationale and the evidence you found. When the researcher scoped by country, "
+        "Verified origin requires the ENA country field; a publication alone can support a human decision but cannot verify a "
+        "run. For worldwide searches, origin is informational and does not block verification."
     )
     max_steps = 8
     submit_schema = {
@@ -53,24 +56,29 @@ class VerificationTasker(LLMAgent):
 
     # 1. rule pre-checks -----------------------------------------------------------
     def precheck(self, samples: list[Sample], country: str) -> list[tuple[Sample, str]]:
+        """Classify each run. If `country` is non-empty, the research is scoped to that country and
+        runs whose ENA country field names a different place are excluded; missing-country goes to
+        the agent. If `country` is empty (worldwide search), origin is informational only."""
+        scoped = bool(country.strip())
         seen: dict[str, str] = {}
         ambiguous: list[tuple[Sample, str]] = []
         for s in samples:
             c = s.country.strip()
+            country_note = f'Country "{c}".' if c else 'Country not recorded in ENA.'
             if s.library_strategy.upper() != "WGS":
                 s.eligibility, s.eligibility_note = "Excluded", f"library_strategy is {s.library_strategy or 'missing'}, not WGS."
                 self.decide(s.run, Outcome.EXCLUDE, RULES["elig"], s.eligibility_note, f"ENA run {s.run}", stage=2)
-            elif c and country.lower() not in c.lower():
-                s.eligibility, s.eligibility_note = "Excluded", f'Country "{c}" is outside the approved scope.'
+            elif scoped and c and country.lower() not in c.lower():
+                s.eligibility, s.eligibility_note = "Excluded", f'Country "{c}" is outside the approved scope ({country}).'
                 self.decide(s.run, Outcome.EXCLUDE, RULES["elig"], s.eligibility_note, f"ENA run {s.run}", stage=2)
-            elif not c:
+            elif scoped and not c:
                 ambiguous.append((s, "country field missing in ENA"))
             elif s.biosample and s.biosample in seen:
                 ambiguous.append((s, f"BioSample {s.biosample} already used by {seen[s.biosample]} (possible repeated isolate)"))
             elif s.platform.upper() != "ILLUMINA":
                 ambiguous.append((s, f"platform {s.platform or 'missing'} is not the approved ILLUMINA"))
             else:
-                s.eligibility, s.eligibility_note = "Verified", f'Country "{c}"; WGS; Illumina; BioSample not shared.'
+                s.eligibility, s.eligibility_note = "Verified", f"{country_note} WGS; Illumina; BioSample not shared."
                 self.decide(s.run, Outcome.PROCEED, RULES["elig"], s.eligibility_note, f"ENA run {s.run}, BioSample {s.biosample}", stage=2)
             if s.biosample and s.biosample not in seen:
                 seen[s.biosample] = s.run

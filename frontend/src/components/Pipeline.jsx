@@ -37,7 +37,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
     <section className="panel">
       <div className="row between"><div><span className="eyebrow">Stage {n} · owner: {ROLE_LABEL[meta.owner]}</span><h2>{meta.name}</h2></div>{runBtn}</div>
       <div className="tools">{agents.map(a => <span className="tool" key={a}>{a.replace(/_/g, ' ')}</span>)}</div>
-      {busy && <p className="busy muted">Working: {busy}…</p>}
+      {busy && <div className="working" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span>Working on <b>{busy}</b>… agents are reasoning and calling tools; watch the Agent team tab for live traces.</span></div>}
       {status === 'locked' && <div className="box note"><p className="muted">This stage unlocks when the previous stage's human gate is passed.</p></div>}
       {n === 1 && <S1 st={st} status={status} act={act} who={who} />}
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
@@ -51,15 +51,24 @@ function Stage({ n, snap, act, who, busy, openSample }) {
 
 function S1({ st, status, act, who }) {
   const [q, setQ] = useState(st.question)
+  const [country, setCountry] = useState(st.country || '')
+  const [target, setTarget] = useState(st.cohort_target ?? 8)
   const sc = st.scope || {}
   if (status === 'ready') return (
     <div className="box"><span className="eyebrow">Research question</span>
       <textarea value={q} onChange={e => setQ(e.target.value)} aria-label="Research question" />
-      <div className="row"><button className="btn small" onClick={() => act(() => api.setScope({ question: q, country: st.country, target_drugs: st.target_drugs, cohort_target: st.cohort_target }), 'Question saved')}>Save question</button>
+      <div className="row" style={{ gap: 14, alignItems: 'flex-end' }}>
+        <div className="ctl"><label htmlFor="scope-country">Country (optional)</label>
+          <input id="scope-country" value={country} onChange={e => setCountry(e.target.value)} placeholder="e.g. Indonesia · leave blank for worldwide" style={{ minWidth: 280 }} /></div>
+        <div className="ctl"><label htmlFor="scope-target">Cohort target</label>
+          <input id="scope-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
+      </div>
+      <div className="row"><button className="btn small" onClick={() => act(() => api.setScope({ question: q, country, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')}>Save scope</button>
         <span className="muted" style={{ fontSize: '.82rem' }}>Save, then click Run agents. The Scope Guardian reviews it.</span></div></div>)
   return (
     <>
-      <div className="box"><span className="eyebrow">Research question</span><p>{st.question}</p></div>
+      <div className="box"><span className="eyebrow">Research question</span><p>{st.question}</p>
+        <p className="muted" style={{ fontSize: '.82rem' }}>Scope: {st.country ? <>country <b>{st.country}</b></> : <>worldwide</>} · cohort target {st.cohort_target} · drugs {st.target_drugs.join(', ')}</p></div>
       {sc.blocking?.length > 0 && <div className="box esc"><h3>Blocking gaps</h3><ul className="clean">{sc.blocking.map(b => <li key={b}>{b}</li>)}</ul></div>}
       <div className="box esc"><h3>Gaps the Guardian found, with proposed definitions</h3>
         <ul className="clean">{(sc.gaps || []).map(g => <li key={g.gap}>{g.gap} <i>Proposed:</i> {g.proposal}{g.added_by === 'guardrail' && <span className="muted"> (added by guardrail)</span>}</li>)}</ul>

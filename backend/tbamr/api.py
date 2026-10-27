@@ -64,7 +64,7 @@ class Release(Who):
 
 class Scope(BaseModel):
     question: str
-    country: str = "Indonesia"
+    country: str = ""  # empty = worldwide search
     target_drugs: list[str] = ["Rifampicin", "Isoniazid"]
     cohort_target: int = 8
 

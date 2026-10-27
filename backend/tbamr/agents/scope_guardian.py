@@ -13,14 +13,14 @@ from ..core.models import RULES
 from .base import LLMAgent
 
 REQUIRED_GAPS = [
-    ("verified_origin", '"Verified Indonesian origin" is not defined.',
-     "Verified only if the ENA/BioSample country field names the study country. Origin stated only in a publication → Hold for human confirmation."),
+    ("verified_origin", '"Verified geographic origin" is not defined.',
+     "If the researcher scoped the search to a country or region, Verified only when the ENA/BioSample country field names it. Worldwide searches: origin is informational, not a verification gate. Origin stated only in a publication → Hold for human confirmation."),
     ("missing_dst", "No policy for samples without matched phenotypic DST.",
      'Keep them in the cohort; record DST as "unavailable". Never count missing DST as agreement or disagreement.'),
     ("duplicates", "No rule for repeated isolates (several runs from one sample).",
      "Runs that share a BioSample accession → Hold + Escalate as possible duplicates; one run per isolate in the primary cohort."),
     ("out_of_bounds", "Out-of-bounds conclusions are not stated.",
-     "No national prevalence estimates, no clinical treatment advice, no new-mutation claims. Reports stay exploratory until reviewed."),
+     "No prevalence estimates, no clinical treatment advice, no new-mutation claims. Reports stay exploratory until reviewed."),
 ]
 
 
@@ -29,9 +29,10 @@ class ScopeGuardian(LLMAgent):
     title = "Research Scope & Scientific Integrity Guardian"
     description = "Checks the research question, proposes definitions for the playbook's gaps and flags what the data may not support."
     system_prompt = (
-        "Review the researcher's scope. Identify blocking gaps (missing question, drugs, country or numbers), "
-        "propose concrete definitions for the playbook's policy gaps, and warn about parts of the question that public genomes "
-        "may not support (prevalence, clinical use, comparisons across places). You propose; the researcher approves."
+        "Review the researcher's scope. Identify blocking gaps (missing question, drugs or numbers; country is OPTIONAL — "
+        "an empty country means a worldwide search and is valid). Propose concrete definitions for the playbook's policy gaps, "
+        "and warn about parts of the question that public genomes may not support (prevalence, clinical use, comparisons across "
+        "places). You propose; the researcher approves."
     )
     max_steps = 3
     submit_schema = {
