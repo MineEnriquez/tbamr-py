@@ -26,6 +26,7 @@ export const api = {
   cosign: (b) => call('POST', '/overrides/cosign', b),
   release: (b) => call('POST', '/release', b),
   summary: () => call('POST', '/report/summary'),
+  saveSummary: (text) => call('PUT', '/report/summary', { text }),
   importFiles: (who, files) => { const fd = new FormData(); [...files].forEach(f => fd.append('files', f)); return call('POST', '/profiling/import', fd, who) },
   runProfiler: (b) => call('POST', '/profiling/run', b),
   reset: (data) => call('POST', '/reset', undefined, { data }),
