@@ -8,3 +8,5 @@ tbprofiler_runs/
 .claude/settings.local.json
 backend/tbdb/
 fasterq.tmp.*
+*.errlog.txt
+tbamr-live.db.broken-*
