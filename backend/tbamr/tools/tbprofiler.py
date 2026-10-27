@@ -99,47 +99,86 @@ def parse_file(path: str | Path) -> dict[str, Any]:
 
 
 class TBProfilerRunner:
-    """Runs TB-Profiler on a run accession when the command-line tools are installed."""
+    """Runs TB-Profiler via Docker (staphb/tbprofiler image) when available, else the local tb-profiler
+    binary. Docker is the recommended path on macOS: the image bundles snpEff and the WHO database at
+    compatible versions, avoiding the host dependency hell."""
+
+    DOCKER_IMAGE = "staphb/tbprofiler"
 
     def __init__(self, workdir: str | Path = "tbprofiler_runs", threads: int | None = None, db: str | None = None):
-        self.workdir = Path(workdir)
-        # Threads per sample: envvar override, else default 4. Pass to fasterq-dump (-e) and tb-profiler (--threads).
+        self.workdir = Path(workdir).resolve()
         import os
         self.threads = threads if threads is not None else int(os.environ.get("TBAMR_PROFILER_THREADS", "4"))
-        # Which TB-Profiler library to use. v6.x defaults to who_v2+ which may not be loaded locally — fall back to tbdb.
+        # Only used when running tb-profiler locally; the docker image uses its bundled DB.
         self.db = db if db is not None else os.environ.get("TBAMR_PROFILER_DB", "tbdb")
+        # Backend selection: auto (docker if the image is pulled, else local), docker, local.
+        self.backend = os.environ.get("TBAMR_PROFILER_BACKEND", "auto").lower()
 
     @staticmethod
-    def available() -> dict[str, bool]:
-        return {"tb-profiler": shutil.which("tb-profiler") is not None, "fasterq-dump": shutil.which("fasterq-dump") is not None}
+    def _docker_ok() -> bool:
+        """Docker daemon reachable AND the staphb/tbprofiler image is pulled."""
+        if shutil.which("docker") is None:
+            return False
+        try:
+            r = subprocess.run(["docker", "image", "inspect", TBProfilerRunner.DOCKER_IMAGE], capture_output=True, timeout=10)
+            return r.returncode == 0
+        except (subprocess.TimeoutExpired, OSError):
+            return False
+
+    def using_docker(self) -> bool:
+        if self.backend == "docker":
+            return True
+        if self.backend == "local":
+            return False
+        return self._docker_ok()
+
+    def available(self) -> dict[str, bool]:
+        """Report what's usable. The UI's 'tb-profiler' row is true if either Docker or the local binary works."""
+        return {
+            "tb-profiler": self._docker_ok() or shutil.which("tb-profiler") is not None,
+            "fasterq-dump": shutil.which("fasterq-dump") is not None,
+            "docker": self._docker_ok(),
+        }
 
     def run(self, run_accession: str, timeout: int = 7200) -> dict[str, Any]:
         avail = self.available()
-        if not all(avail.values()):
-            missing = [k for k, ok in avail.items() if not ok]
-            return {"ok": False, "error": f"Not installed: {', '.join(missing)}. Run TB-Profiler yourself and import the JSON instead."}
+        if not avail["fasterq-dump"]:
+            return {"ok": False, "error": "Not installed: fasterq-dump (brew install sratoolkit)."}
+        if not avail["tb-profiler"]:
+            return {"ok": False, "error": f"Not available: tb-profiler. Either `docker pull {self.DOCKER_IMAGE}` or install tb-profiler locally."}
         out = self.workdir / run_accession
         out.mkdir(parents=True, exist_ok=True)
         result = out / "results" / f"{run_accession}.results.json"
-        # Resume: if a prior run already produced the JSON, reuse it instead of re-downloading and re-mapping.
-        if result.exists():
+        if result.exists():  # resume: finished sample already has its JSON
             try:
                 data = json.loads(result.read_text())
                 return {"ok": True, "cached": True, "result": parse_result(data, result.name), "raw": data}
             except (ValueError, OSError):
-                pass  # corrupted → fall through and rerun
+                pass
         t = str(max(1, int(self.threads)))
         r1, r2 = out / f"{run_accession}_1.fastq", out / f"{run_accession}_2.fastq"
         try:
-            # Resume: skip fasterq-dump when both FASTQs are already on disk (saves gigabytes of re-download on retry).
+            # resume: skip the multi-GB fasterq-dump re-download when both FASTQs are already on disk
             if not (r1.exists() and r2.exists() and r1.stat().st_size > 0 and r2.stat().st_size > 0):
                 subprocess.run(["fasterq-dump", "--split-files", "-e", t, run_accession, "-O", str(out)], check=True, timeout=timeout, capture_output=True)
-            cmd = ["tb-profiler", "profile", "-1", str(r1), "-2", str(r2), "-p", run_accession, "--dir", str(out), "--threads", t, "--db", self.db]
+            if self.using_docker():
+                # mount workdir as /data; paths inside the container become /data/<run>/...
+                # --platform linux/amd64 so this works under Rosetta on Apple Silicon (the staphb image is amd64-only).
+                cmd = ["docker", "run", "--rm", "--platform", "linux/amd64",
+                       "-v", f"{self.workdir}:/data",
+                       "-w", f"/data/{run_accession}",
+                       self.DOCKER_IMAGE,
+                       "tb-profiler", "profile",
+                       "-1", f"/data/{run_accession}/{run_accession}_1.fastq",
+                       "-2", f"/data/{run_accession}/{run_accession}_2.fastq",
+                       "-p", run_accession, "--dir", f"/data/{run_accession}", "--threads", t]
+            else:
+                cmd = ["tb-profiler", "profile", "-1", str(r1), "-2", str(r2),
+                       "-p", run_accession, "--dir", str(out), "--threads", t, "--db", self.db]
             p = subprocess.run(cmd, check=True, timeout=timeout, capture_output=True)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             return {"ok": False, "error": f"{type(e).__name__}: {getattr(e, 'stderr', b'')[-800:]!r}"}
         if not result.exists():
-            # TB-Profiler sometimes logs an error and still exits 0 (e.g. missing DB) — surface stderr so the UI isn't misleading.
             tail = (p.stderr or b"")[-800:].decode(errors="replace")
             return {"ok": False, "error": f"TB-Profiler exited 0 but produced no result file. stderr tail: {tail}"}
         data = json.loads(result.read_text())
