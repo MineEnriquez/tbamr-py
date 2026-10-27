@@ -83,6 +83,18 @@ function S1({ st, status, act, who }) {
 
 function S2({ st, status, act, who, openSample }) {
   const v = st.samples.filter(s => s.eligibility === 'Verified'), h = st.samples.filter(s => s.eligibility === 'Hold'), x = st.samples.filter(s => s.eligibility === 'Excluded')
+  const [bulk, setBulk] = useState(() => new Set())
+  const [bulkWhy, setBulkWhy] = useState('')
+  const bulkToggle = (r) => setBulk(prev => { const s = new Set(prev); s.has(r) ? s.delete(r) : s.add(r); return s })
+  const bulkRuns = h.map(s => s.run).filter(r => bulk.has(r))
+  const bulkResolve = (decision) => act(async () => {
+    if (!bulkWhy.trim()) throw new Error('A rationale is required.')
+    const results = await Promise.allSettled(bulkRuns.map(run => api.resolveHold({ ...who, run, decision, rationale: bulkWhy })))
+    const failed = results.filter(r => r.status === 'rejected').length
+    if (failed) throw new Error(`${results.length - failed} applied, ${failed} failed`)
+    setBulk(new Set()); setBulkWhy('')
+  }, `${bulkRuns.length} hold(s) resolved as ${decision}`)
+  const SHOW_BULK = h.length >= 10
   return (
     <>
       <div className="metrics">
@@ -94,8 +106,25 @@ function S2({ st, status, act, who, openSample }) {
       {st.cohort_checks.length > 0 && <div className={'box ' + (st.cohort_checks.some(c => c.outcome === 'Escalate') ? 'esc' : 'note')}>
         <h3>Cohort checks{st.replans ? ` · Orchestrator re-planned ${st.replans}×` : ''}</h3>
         <ul className="clean" style={{ listStyle: 'none', padding: 0 }}>{st.cohort_checks.map(c => <li key={c.text}><Chip label={c.outcome === 'Proceed' ? 'Note' : c.outcome} kind={c.outcome === 'Proceed' ? 'none' : c.outcome} /> {c.text}</li>)}</ul></div>}
+      {SHOW_BULK && <div className="box gate" style={{ gap: 6 }}>
+        <div className="row between"><h3>Bulk resolve · {h.length} holds</h3>
+          <div className="row" style={{ gap: 6 }}>
+            <button className="btn small" onClick={() => setBulk(new Set(h.map(s => s.run)))}>Select all</button>
+            <button className="btn small ghost" onClick={() => setBulk(new Set())}>Clear</button>
+          </div></div>
+        <textarea value={bulkWhy} onChange={e => setBulkWhy(e.target.value)} placeholder="Shared rationale (applied to every selected hold)" aria-label="Bulk rationale" />
+        <div className="row"><span className="muted" style={{ fontSize: '.82rem' }}>{bulkRuns.length} selected</span>
+          <button className="btn small primary" disabled={!bulkRuns.length} onClick={() => bulkResolve('verify')}>Verify selected</button>
+          <button className="btn small" disabled={!bulkRuns.length} onClick={() => bulkResolve('exclude')}>Exclude selected</button>
+          <button className="btn small" disabled={!bulkRuns.length} onClick={() => bulkResolve('hold')}>Keep on hold</button>
+        </div></div>}
       {h.map(s => <div className="box esc" key={s.run}>
-        <div className="row between"><button className="btn small ghost mono" onClick={() => openSample(s.run)}>{s.run}</button><Chip label="Escalate" /></div>
+        <div className="row between">
+          <div className="row" style={{ gap: 8 }}>
+            {SHOW_BULK && <input type="checkbox" checked={bulk.has(s.run)} onChange={() => bulkToggle(s.run)} aria-label={`Select ${s.run} for bulk`} />}
+            <button className="btn small ghost mono" onClick={() => openSample(s.run)}>{s.run}</button>
+          </div>
+          <Chip label="Escalate" /></div>
         <p>{s.eligibility_note}</p>
         <Rationale id={'h-' + s.run} placeholder="e.g. Origin confirmed in the study's methods" buttons={[['verify', 'Verify', true], ['exclude', 'Exclude'], ['hold', 'Keep on hold']]}
           extra={<RawLink kind="ena" k={s.run} />}
@@ -133,15 +162,41 @@ function S4({ snap, status, act, who, openSample }) {
   const tools = snap.mode.tbprofiler
   const canRun = tools['tb-profiler'] && tools['fasterq-dump']
   const waiting = q.filter(s => s.profiling !== 'Done').map(s => s.run)
+  const [selected, setSelected] = useState(() => new Set())
+  const [n, setN] = useState(5)
+  const toggle = (r) => setSelected(prev => { const s = new Set(prev); s.has(r) ? s.delete(r) : s.add(r); return s })
+  const chosen = waiting.filter(r => selected.has(r))  // keep selection in waiting-order and drop stale ones
   return (
     <>
       <div className="metrics"><div className="metric"><span className="v">{q.length}</span><span className="l">QC-passed runs</span></div>
         <div className="metric"><span className="v" style={{ color: 'var(--ok)' }}>{done.length}</span><span className="l">TB-Profiler results</span></div>
         <div className="metric"><span className="v" style={{ color: 'var(--hold)' }}>{q.length - done.length}</span><span className="l">Awaiting results</span></div></div>
       <div className="box"><h3>Run TB-Profiler</h3>
-        {canRun ? <div className="row"><button className="btn small primary" onClick={() => act(() => api.runProfiler({ ...who, runs: waiting }), 'TB-Profiler started')} disabled={!waiting.length}>Run TB-Profiler on {waiting.length} run(s)</button><span className="muted" style={{ fontSize: '.82rem' }}>Runs on this computer; can take minutes per sample.</span></div>
+        {canRun ? <>
+          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <span className="muted" style={{ fontSize: '.82rem' }}>Pick which runs to profile — one sample can take 15–30 min.</span>
+          </div>
+          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <button className="btn small" onClick={() => setSelected(new Set(waiting.slice(0, Math.max(1, n))))}>Select first</button>
+            <input type="number" min="1" max={waiting.length || 1} value={n} onChange={e => setN(Math.max(1, Number(e.target.value) || 1))} style={{ width: 70 }} aria-label="How many" />
+            <button className="btn small" onClick={() => setSelected(new Set(waiting))}>Select all ({waiting.length})</button>
+            <button className="btn small ghost" onClick={() => setSelected(new Set())}>Clear</button>
+          </div>
+          {waiting.length > 0 && <div className="tw" style={{ maxHeight: 220, overflow: 'auto' }}>
+            <table><tbody>
+              {waiting.map(r => (
+                <tr key={r} className="click" onClick={() => toggle(r)}>
+                  <td style={{ width: 32 }}><input type="checkbox" checked={selected.has(r)} onChange={() => toggle(r)} onClick={e => e.stopPropagation()} aria-label={`Select ${r}`} /></td>
+                  <td className="mono">{r}</td>
+                </tr>
+              ))}
+            </tbody></table>
+          </div>}
+          <div className="row"><button className="btn primary" disabled={!chosen.length} onClick={() => act(() => api.runProfiler({ ...who, runs: chosen }), `TB-Profiler started on ${chosen.length} run(s)`)}>Run TB-Profiler on {chosen.length} selected</button>
+            <span className="muted" style={{ fontSize: '.82rem' }}>Runs on this computer, up to {snap.profiler_concurrency || '?'} at a time (set TBAMR_PROFILER_CONCURRENCY to tune).</span></div>
+        </>
           : <p className="muted" style={{ fontSize: '.88rem' }}>TB-Profiler isn't installed where the backend runs ({Object.entries(tools).map(([k, v]) => `${k}: ${v ? 'yes' : 'no'}`).join(', ')}). Run it yourself and import the <span className="mono">results/&lt;RUN&gt;.results.json</span> files below.</p>}
-        <details><summary className="muted" style={{ cursor: 'pointer' }}>Run list ({waiting.length})</summary><pre className="mono" style={{ whiteSpace: 'pre-wrap' }}>{waiting.join('\n')}</pre></details></div>
+      </div>
       <div className={'drop' + (over ? ' over' : '')} tabIndex={0} onClick={() => input.current.click()} onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && input.current.click()}
         onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}>
         <p><b>Drop TB-Profiler result files here</b> (.results.json) or click to choose</p></div>

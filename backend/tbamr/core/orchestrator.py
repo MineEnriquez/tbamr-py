@@ -6,9 +6,10 @@ approve, but every judgment call inside a stage belongs to an agent or a human.
 from __future__ import annotations
 
 import json
-
+import os
 import threading
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from ..agents.discovery import DiscoveryAssistant
@@ -390,22 +391,48 @@ class Orchestrator:
             return {"imported": ok, "skipped": skipped}
 
     def run_profiler(self, role: str, person: str, runs: list[str]) -> dict[str, Any]:
-        """Run TB-Profiler locally in a background thread (long-running)."""
-        self.require(role, ["analyst"])
+        """Run TB-Profiler locally in a bounded thread pool so several samples profile at once.
 
-        def work():
-            for r in runs:
-                s = self.state.sample(r)
-                if s and s.qc == "Pass":
-                    with self.lock:
-                        self.busy = f"TB-Profiler: {r}"
-                    self.agents["profiling"].run_one(s)
-                    with self.lock:
-                        self.save()
+        Concurrency comes from the TBAMR_PROFILER_CONCURRENCY env var (default max(1, cpu_count//2)).
+        Each worker also uses TBAMR_PROFILER_THREADS cores (default 4) inside tb-profiler and
+        fasterq-dump. Keep concurrency × threads below your physical core count."""
+        self.require(role, ["analyst"])
+        default_conc = max(1, (os.cpu_count() or 2) // 2)
+        concurrency = max(1, int(os.environ.get("TBAMR_PROFILER_CONCURRENCY", str(default_conc))))
+        inflight: set[str] = set()
+
+        def refresh_busy() -> None:
+            if not inflight:
+                self.busy = None
+            else:
+                head = sorted(inflight)[:2]
+                extra = len(inflight) - len(head)
+                self.busy = f"TB-Profiler: {', '.join(head)}" + (f" + {extra} more" if extra > 0 else "")
+
+        def profile_one(r: str) -> None:
+            s = self.state.sample(r)
+            if not s or s.qc != "Pass":
+                return
+            with self.lock:
+                inflight.add(r)
+                refresh_busy()
+            try:
+                self.agents["profiling"].run_one(s)
+            finally:
+                with self.lock:
+                    inflight.discard(r)
+                    refresh_busy()
+                    self.save()
+
+        def work() -> None:
+            with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="tbp") as pool:
+                for _ in pool.map(profile_one, runs):
+                    pass
             with self.lock:
                 self.busy = None
+                self.save()
         threading.Thread(target=work, daemon=True).start()
-        return {"started": runs}
+        return {"started": runs, "concurrency": concurrency, "threads_per_sample": self.agents["profiling"].runner.threads}
 
     def close_profiling(self, role: str, person: str) -> None:
         with self.lock:
@@ -562,6 +589,9 @@ class Orchestrator:
         return cards
 
     def snapshot(self) -> dict[str, Any]:
+        default_conc = max(1, (os.cpu_count() or 2) // 2)
         return {"state": self.state.to_dict(), "pending_overrides": self.pending_overrides, "busy": self.busy,
                 "mode": {"data": "demo" if self.demo else "live", "brain": self.client.mode, "tbprofiler": self.agents["profiling"].runner.available()},
+                "profiler_concurrency": int(os.environ.get("TBAMR_PROFILER_CONCURRENCY", str(default_conc))),
+                "profiler_threads": self.agents["profiling"].runner.threads,
                 "roles": ROLES, "stages": STAGES, "gates": GATES, "rules": RULES}

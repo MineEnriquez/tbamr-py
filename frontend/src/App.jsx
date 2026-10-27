@@ -73,7 +73,13 @@ export default function App() {
 
   const flash = (text, err) => { setToast({ text, err }); setTimeout(() => setToast(null), err ? 6000 : 2500) }
   const act = async (fn, ok) => {
-    try { await fn(); flash(ok) } catch (e) { flash(e.message, true) }
+    // Poll aggressively WHILE the request is in-flight so the UI picks up busy=... as soon as the backend sets it,
+    // not only after the slow /stages/N/run call returns.
+    const p = fn()
+    let polling = true
+    ;(async () => { while (polling) { await refresh(); await new Promise(r => setTimeout(r, 700)) } })()
+    try { await p; flash(ok) } catch (e) { flash(e.message, true) }
+    polling = false
     const s = await refresh()
     if (s) { // follow the pipeline to the first stage that needs attention
       const next = Object.entries(s.state.stage_status).find(([, v]) => v === 'wait' || v === 'ready')
