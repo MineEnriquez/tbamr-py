@@ -485,6 +485,15 @@ class Orchestrator:
         self.save()
         return text
 
+    def save_summary(self, text: str) -> str:
+        """Save a human-edited plain-language summary. Trusts the editor; they're the author now."""
+        if not self.state.report:
+            raise StageError("No report yet.")
+        self.state.report["summary_draft"] = text
+        self.state.report["summary_edited"] = True  # mark it as human-edited (vs AI-drafted)
+        self.save()
+        return text
+
     # ------------------------------------------------------------------ overrides (two-person rule)
     ORDER = {"eligibility": {"Verified": 0, "Hold": 1, "Excluded": 2}, "qc": {"Pass": 0, "Escalated": 1, "Hold": 1, "Excluded": 2}}
 
