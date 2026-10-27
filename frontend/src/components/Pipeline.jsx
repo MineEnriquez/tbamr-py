@@ -37,7 +37,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
     <section className="panel">
       <div className="row between"><div><span className="eyebrow">Stage {n} · owner: {ROLE_LABEL[meta.owner]}</span><h2>{meta.name}</h2></div>{runBtn}</div>
       <div className="tools">{agents.map(a => <span className="tool" key={a}>{a.replace(/_/g, ' ')}</span>)}</div>
-      {busy && <p className="busy muted">Working: {busy}…</p>}
+      {busy && <div className="working" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span>Working on <b>{busy}</b>… agents are reasoning and calling tools; watch the Agent team tab for live traces.</span></div>}
       {status === 'locked' && <div className="box note"><p className="muted">This stage unlocks when the previous stage's human gate is passed.</p></div>}
       {n === 1 && <S1 st={st} status={status} act={act} who={who} />}
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
