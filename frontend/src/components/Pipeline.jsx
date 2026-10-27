@@ -83,6 +83,18 @@ function S1({ st, status, act, who }) {
 
 function S2({ st, status, act, who, openSample }) {
   const v = st.samples.filter(s => s.eligibility === 'Verified'), h = st.samples.filter(s => s.eligibility === 'Hold'), x = st.samples.filter(s => s.eligibility === 'Excluded')
+  const [bulk, setBulk] = useState(() => new Set())
+  const [bulkWhy, setBulkWhy] = useState('')
+  const bulkToggle = (r) => setBulk(prev => { const s = new Set(prev); s.has(r) ? s.delete(r) : s.add(r); return s })
+  const bulkRuns = h.map(s => s.run).filter(r => bulk.has(r))
+  const bulkResolve = (decision) => act(async () => {
+    if (!bulkWhy.trim()) throw new Error('A rationale is required.')
+    const results = await Promise.allSettled(bulkRuns.map(run => api.resolveHold({ ...who, run, decision, rationale: bulkWhy })))
+    const failed = results.filter(r => r.status === 'rejected').length
+    if (failed) throw new Error(`${results.length - failed} applied, ${failed} failed`)
+    setBulk(new Set()); setBulkWhy('')
+  }, `${bulkRuns.length} hold(s) resolved as ${decision}`)
+  const SHOW_BULK = h.length >= 10
   return (
     <>
       <div className="metrics">
@@ -94,8 +106,25 @@ function S2({ st, status, act, who, openSample }) {
       {st.cohort_checks.length > 0 && <div className={'box ' + (st.cohort_checks.some(c => c.outcome === 'Escalate') ? 'esc' : 'note')}>
         <h3>Cohort checks{st.replans ? ` · Orchestrator re-planned ${st.replans}×` : ''}</h3>
         <ul className="clean" style={{ listStyle: 'none', padding: 0 }}>{st.cohort_checks.map(c => <li key={c.text}><Chip label={c.outcome === 'Proceed' ? 'Note' : c.outcome} kind={c.outcome === 'Proceed' ? 'none' : c.outcome} /> {c.text}</li>)}</ul></div>}
+      {SHOW_BULK && <div className="box gate" style={{ gap: 6 }}>
+        <div className="row between"><h3>Bulk resolve · {h.length} holds</h3>
+          <div className="row" style={{ gap: 6 }}>
+            <button className="btn small" onClick={() => setBulk(new Set(h.map(s => s.run)))}>Select all</button>
+            <button className="btn small ghost" onClick={() => setBulk(new Set())}>Clear</button>
+          </div></div>
+        <textarea value={bulkWhy} onChange={e => setBulkWhy(e.target.value)} placeholder="Shared rationale (applied to every selected hold)" aria-label="Bulk rationale" />
+        <div className="row"><span className="muted" style={{ fontSize: '.82rem' }}>{bulkRuns.length} selected</span>
+          <button className="btn small primary" disabled={!bulkRuns.length} onClick={() => bulkResolve('verify')}>Verify selected</button>
+          <button className="btn small" disabled={!bulkRuns.length} onClick={() => bulkResolve('exclude')}>Exclude selected</button>
+          <button className="btn small" disabled={!bulkRuns.length} onClick={() => bulkResolve('hold')}>Keep on hold</button>
+        </div></div>}
       {h.map(s => <div className="box esc" key={s.run}>
-        <div className="row between"><button className="btn small ghost mono" onClick={() => openSample(s.run)}>{s.run}</button><Chip label="Escalate" /></div>
+        <div className="row between">
+          <div className="row" style={{ gap: 8 }}>
+            {SHOW_BULK && <input type="checkbox" checked={bulk.has(s.run)} onChange={() => bulkToggle(s.run)} aria-label={`Select ${s.run} for bulk`} />}
+            <button className="btn small ghost mono" onClick={() => openSample(s.run)}>{s.run}</button>
+          </div>
+          <Chip label="Escalate" /></div>
         <p>{s.eligibility_note}</p>
         <Rationale id={'h-' + s.run} placeholder="e.g. Origin confirmed in the study's methods" buttons={[['verify', 'Verify', true], ['exclude', 'Exclude'], ['hold', 'Keep on hold']]}
           extra={<RawLink kind="ena" k={s.run} />}
