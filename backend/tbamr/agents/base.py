@@ -91,6 +91,12 @@ class LLMAgent(BaseAgent):
                     self.log.trace(self.name, "thought", {"text": b["text"], "mode": self.client.mode})
             uses = [b for b in blocks if b["type"] == "tool_use"]
             if not uses:
+                # Claude stopped answering with text only — nudge it to submit (one chance left in the budget)
+                if step < self.max_steps - 1:
+                    self.log.trace(self.name, "nudge", {"reason": "no tool call", "step": step})
+                    messages.append({"role": "assistant", "content": [b for b in blocks if b["type"] != "text" or b["text"].strip()] or [{"type": "text", "text": "(no response)"}]})
+                    messages.append({"role": "user", "content": "You must finish by calling the submit tool exactly once. Call submit now with the result you have; if no result is possible, submit the minimal structure with a concerns field explaining why."})
+                    continue
                 self.log.trace(self.name, "stopped", {"reason": "no tool call or submission", "step": step})
                 break
             results = []

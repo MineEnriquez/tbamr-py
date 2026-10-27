@@ -19,7 +19,9 @@ from tbamr.tools.tbprofiler import parse_result
 
 @pytest.fixture
 def orch(tmp_path):
-    return build_orchestrator("demo", "replay", str(tmp_path / "t.db"))
+    o = build_orchestrator("demo", "replay", str(tmp_path / "t.db"))
+    o.state.country = "Indonesia"  # demo samples were authored around a country-scoped Indonesian pipeline
+    return o
 
 
 def run_to_report(o):

@@ -42,9 +42,9 @@ class DiscoveryAssistant(LLMAgent):
     def build_tools(self):
         d = self.data
         return [
-            Tool("ena_search_runs", "Search ENA read runs for M. tuberculosis by country, paging through results. Optional extra_query adds ENA query terms, e.g. study_accession!=\"PRJNA1\".",
-                 {"type": "object", "properties": {"country": {"type": "string"}, "extra_query": {"type": "string"}, "limit": {"type": "integer"}}, "required": ["country"]},
-                 lambda country, extra_query="", limit=500: d.ena_search_runs(country=country, extra_query=extra_query, limit=limit)),
+            Tool("ena_search_runs", "Search ENA read runs for M. tuberculosis, paging through results. Set country to a country name (prefix match) to scope the search; leave it empty to search worldwide. Optional extra_query adds ENA query terms, e.g. study_accession!=\"PRJNA1\".",
+                 {"type": "object", "properties": {"country": {"type": "string", "description": "Country name prefix; empty string for worldwide."}, "extra_query": {"type": "string"}, "limit": {"type": "integer"}}, "required": []},
+                 lambda country="", extra_query="", limit=500: d.ena_search_runs(country=country, extra_query=extra_query, limit=limit)),
             Tool("ena_study", "Look up an ENA/INSDC study (BioProject) by accession.",
                  {"type": "object", "properties": {"study_accession": {"type": "string"}}, "required": ["study_accession"]},
                  lambda study_accession: d.ena_study(study_accession)),
@@ -69,7 +69,8 @@ class DiscoveryAssistant(LLMAgent):
 
     def discover(self, country: str, question: str, already_known: list[str] | None = None, focus: str = "",
                  exclude_studies: list[str] | None = None) -> dict[str, Any]:
-        task = (f"Find candidate M. tuberculosis WGS runs from {country} for this question: {question}"
+        scope = f"from {country}" if country else "worldwide"
+        task = (f"Find candidate M. tuberculosis WGS runs ({scope}) for this question: {question}"
                 + (f"\nFollow-up from the Orchestrator: {focus}" if focus else ""))
         res = self.run(task, {"country": country, "already_known": already_known or [], "focus": focus,
                              "exclude_studies": exclude_studies or []})
