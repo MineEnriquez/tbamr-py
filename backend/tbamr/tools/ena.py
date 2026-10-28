@@ -30,9 +30,10 @@ class DataTools:
             return 0
 
     def ena_search_runs(self, country: str = "", extra_query: str = "", limit: int = 500, page_size: int = 200) -> dict[str, Any]:
-        """Search M. tuberculosis read runs, optionally scoped by country (empty = worldwide), paging past the first batch."""
+        """Search M. tuberculosis read runs, optionally scoped by country. Empty, 'worldwide' or 'global'
+        (case-insensitive) all mean no country filter. Paging past the first batch."""
         query = f'tax_tree({TB_TAXON})'
-        if country:
+        if country and country.strip().lower() not in ("worldwide", "global", "any"):
             query += f' AND country="{country}*"'
         if extra_query:
             query += f" AND {extra_query}"
