@@ -410,6 +410,9 @@ class Orchestrator:
                 self.busy = f"TB-Profiler: {', '.join(head)}" + (f" + {extra} more" if extra > 0 else "")
 
         def profile_one(r: str) -> None:
+            # Any failure here (runner crash, log DB write failure, …) is caught so one bad sample never
+            # kills the whole pool thread; the error gets written to the sample's note and logged.
+            import logging as _lg
             s = self.state.sample(r)
             if not s or s.qc != "Pass":
                 return
@@ -417,12 +420,23 @@ class Orchestrator:
                 inflight.add(r)
                 refresh_busy()
             try:
-                self.agents["profiling"].run_one(s)
+                try:
+                    self.agents["profiling"].run_one(s)
+                except Exception as e:
+                    _lg.getLogger("tbamr.profiling").exception("profile_one crashed for %s", r)
+                    try:
+                        s.profiling = s.profiling or "Failed"
+                        s.profiling_note = f"Worker crashed: {type(e).__name__}: {e}"
+                    except Exception:
+                        pass
             finally:
                 with self.lock:
                     inflight.discard(r)
                     refresh_busy()
-                    self.save()
+                    try:
+                        self.save()
+                    except Exception:
+                        _lg.getLogger("tbamr.profiling").exception("state save failed after %s", r)
 
         def work() -> None:
             with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="tbp") as pool:
@@ -430,7 +444,10 @@ class Orchestrator:
                     pass
             with self.lock:
                 self.busy = None
-                self.save()
+                try:
+                    self.save()
+                except Exception:
+                    pass
         threading.Thread(target=work, daemon=True).start()
         return {"started": runs, "concurrency": concurrency, "threads_per_sample": self.agents["profiling"].runner.threads}
 
