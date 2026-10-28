@@ -162,6 +162,27 @@ class DecisionLog:
             r = self.db.execute("SELECT data FROM raw WHERE kind = ? AND key = ?", (kind, key)).fetchone()
             return json.loads(r[0]) if r else None
 
+    def report_history(self) -> list[dict[str, Any]]:
+        """Every stored report version (newest first), with headline fields pulled from the JSON blob.
+
+        Reads from the raw table where releases persist each version at (kind='report', key=version)."""
+        with self._lock:
+            cur = self.db.execute(
+                "SELECT key, ts, length(data), data FROM raw WHERE kind = 'report' ORDER BY CAST(key AS INTEGER) DESC"
+            )
+            out: list[dict[str, Any]] = []
+            for key, ts, size, data in cur.fetchall():
+                row = {"version": key, "ts": ts, "bytes": size, "rule_version": "", "superseded": False, "counts": {}}
+                try:
+                    d = json.loads(data) if data else {}
+                    row["rule_version"] = d.get("rule_version", "")
+                    row["superseded"] = bool(d.get("superseded"))
+                    row["counts"] = d.get("counts", {})
+                except Exception:
+                    pass
+                out.append(row)
+            return out
+
     def record_view(self, person: str, role: str, kind: str, key: str) -> float:
         ts = time.time()
         with self._lock:

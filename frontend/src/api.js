@@ -28,6 +28,7 @@ export const api = {
   release: (b) => call('POST', '/release', b),
   summary: () => call('POST', '/report/summary'),
   saveSummary: (text) => call('PUT', '/report/summary', { text }),
+  reports: () => call('GET', '/reports'),
   executions: (limit = 100) => call('GET', '/executions', undefined, { limit }),
   execution: (id) => call('GET', '/executions/' + id),
   importFiles: (who, files) => { const fd = new FormData(); [...files].forEach(f => fd.append('files', f)); return call('POST', '/profiling/import', fd, who) },
