@@ -1,10 +1,14 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api.js'
 import { fmtTime } from './common.jsx'
 
 /* Embedded log viewer: one entry per discrete action triggered by the user (stage run, gate
    approval, hold resolution, TB-Profiler batch, ...). Each entry stores the stdout/stderr/log
-   output captured while that action was running — scoped, not a continuous live tail. */
+   output captured while that action was running — scoped, not a continuous live tail.
+
+   Executions are grouped by "pipeline run" — a cycle from fresh state through to the next Reset.
+   The current run is live; previous runs are closed and remain selectable so you can look back
+   at logs from before the last reset. */
 
 const STATUS = { ok: 'OK', error: 'Error', running: 'Running…' }
 
@@ -14,6 +18,12 @@ function dur(a, b) {
   if (d < 60) return `${d.toFixed(1)}s`
   const m = Math.floor(d / 60), s = Math.round(d % 60)
   return `${m}m ${s}s`
+}
+
+function runLabel(r) {
+  if (!r) return ''
+  const base = r.label && r.label.trim() ? r.label : (r.started_at ? fmtTime(r.started_at) : `Run #${r.id}`)
+  return r.active ? `${base} · current` : base
 }
 
 function LogView({ text, errorsOnly }) {
@@ -34,38 +44,65 @@ function LogView({ text, errorsOnly }) {
 
 export default function Logs({ version }) {
   const [items, setItems] = useState([])
+  const [runs, setRuns] = useState([])
+  const [runId, setRunId] = useState(null)  // null = active run
   const [sel, setSel] = useState(null)
   const [detail, setDetail] = useState(null)
   const [errorsOnly, setErrorsOnly] = useState(false)
   const [autoPick, setAutoPick] = useState(true)
-  const pull = useCallback(() => api.executions(200).then(d => {
+  const activeRunId = useMemo(() => (runs.find(r => r.active) || {}).id ?? null, [runs])
+  const effectiveRunId = runId ?? activeRunId
+  const selectedRun = useMemo(() => runs.find(r => r.id === effectiveRunId) || null, [runs, effectiveRunId])
+  const isActive = !selectedRun || selectedRun.active
+  const pullRuns = useCallback(() => api.runs().then(setRuns).catch(() => {}), [])
+  const pull = useCallback(() => api.executions(200, effectiveRunId == null ? undefined : effectiveRunId).then(d => {
     setItems(d)
-    if (autoPick && d.length && sel == null) setSel(d[0].id)
-  }).catch(() => {}), [autoPick, sel])
+    if (autoPick && d.length && (sel == null || !d.some(x => x.id === sel))) setSel(d[0].id)
+  }).catch(() => {}), [autoPick, sel, effectiveRunId])
+  useEffect(() => { pullRuns() }, [pullRuns, version])
   useEffect(() => { pull() }, [pull, version])
   useEffect(() => {
     if (sel == null) { setDetail(null); return }
     api.execution(sel).then(setDetail).catch(() => setDetail(null))
   }, [sel])
-  // Live refresh while an execution is still running
+  // Live refresh while an execution is still running (only meaningful on the active run)
   useEffect(() => {
+    if (!isActive) return
     const anyRunning = items.some(x => !x.end_ts)
     if (!anyRunning) return
-    const t = setInterval(pull, 1500)
+    const t = setInterval(() => { pull(); pullRuns() }, 1500)
     return () => clearInterval(t)
-  }, [items, pull])
+  }, [items, pull, pullRuns, isActive])
 
   return (
     <div className="logs">
       <aside className="logs-list">
         <div className="row between" style={{ padding: '4px 10px' }}>
           <h3 style={{ fontSize: '.95rem' }}>Executions</h3>
-          <button className="btn small ghost" onClick={pull}>Refresh</button>
+          <button className="btn small ghost" onClick={() => { pullRuns(); pull() }}>Refresh</button>
         </div>
+        {runs.length > 0 && (
+          <div className="row" style={{ padding: '0 10px 6px', fontSize: '.8rem', gap: 6 }}>
+            <label htmlFor="logs-run" className="muted">Pipeline run</label>
+            <select id="logs-run" value={runId == null ? '' : String(runId)}
+                    onChange={e => { setRunId(e.target.value ? Number(e.target.value) : null); setSel(null); setAutoPick(true) }}
+                    style={{ flex: 1, minWidth: 0 }}>
+              <option value="">Current run</option>
+              {runs.filter(r => !r.active).map(r => (
+                <option key={r.id} value={r.id}>{runLabel(r)}{r.n_executions ? ` · ${r.n_executions}` : ''}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {selectedRun && !selectedRun.active && (
+          <p className="muted" style={{ padding: '0 10px 6px', fontSize: '.75rem' }}>
+            Closed {selectedRun.ended_at ? fmtTime(selectedRun.ended_at) : ''} · read-only snapshot of a previous pipeline run.
+          </p>
+        )}
         <div className="row" style={{ padding: '0 10px 8px', fontSize: '.78rem' }}>
           <label><input type="checkbox" checked={autoPick} onChange={e => setAutoPick(e.target.checked)} /> auto-select newest</label>
         </div>
-        {!items.length && <p className="muted" style={{ padding: '0 10px' }}>Nothing recorded yet. Trigger a stage run or any other action to see captured logs.</p>}
+        {!items.length && <p className="muted" style={{ padding: '0 10px' }}>Nothing recorded in this run yet. Trigger a stage run or any other action to see captured logs.</p>}
         <ul className="logs-items">
           {items.map(x => {
             const status = x.end_ts ? x.status : 'running'

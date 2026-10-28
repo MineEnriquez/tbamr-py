@@ -248,3 +248,31 @@ def test_raw_data_is_backfilled_for_pipelines_started_before_it_was_saved(orch):
     cohort = orch.raw_view("cohort", "all", "pi", "Ana")
     assert all(r[0] for r in cohort["table"]["rows"])
     orch.resolve_hold("pi", "Ana", "DEMO-R15", "verify", "Checked the record")
+
+
+def test_reset_preserves_previous_runs(tmp_path, monkeypatch):
+    """A pipeline reset must close the active run and open a new one, keeping executions from
+    the previous run so the Logs tab can look back at them."""
+    db = str(tmp_path / "runs.db")
+    monkeypatch.setenv("TBAMR_DB", db)
+    app = create_app(build_orchestrator("demo", "replay", db))
+    c = TestClient(app)
+    # First pipeline run: do one action so an execution is recorded.
+    c.post("/api/stages/1/run")
+    runs_before = c.get("/api/runs").json()
+    assert len(runs_before) == 1 and runs_before[0]["active"] is True
+    first_run_id = runs_before[0]["id"]
+    first_execs = c.get("/api/executions", params={"run_id": first_run_id}).json()
+    assert any(e["trigger"] == "Stage 1" for e in first_execs)
+    # Reset. The active run should close; a new one should open; old executions should survive.
+    assert c.post("/api/reset", params={"data": "demo"}).status_code == 200
+    runs_after = c.get("/api/runs").json()
+    assert len(runs_after) == 2
+    active = [r for r in runs_after if r["active"]]
+    closed = [r for r in runs_after if not r["active"]]
+    assert len(active) == 1 and len(closed) == 1
+    assert closed[0]["id"] == first_run_id and closed[0]["ended_at"] is not None
+    # Previous run's executions are still queryable; default (no run_id) returns the new empty run.
+    prev = c.get("/api/executions", params={"run_id": first_run_id}).json()
+    assert any(e["trigger"] == "Stage 1" for e in prev)
+    assert c.get("/api/executions").json() == []

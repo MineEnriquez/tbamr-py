@@ -86,13 +86,26 @@ class DecisionLog:
         self.db.execute("CREATE TABLE IF NOT EXISTS raw (kind TEXT, key TEXT, ts REAL, data TEXT, PRIMARY KEY (kind, key))")
         # receipts: who opened which raw data, and when (gates require them)
         self.db.execute("CREATE TABLE IF NOT EXISTS views (person TEXT, role TEXT, kind TEXT, key TEXT, ts REAL)")
+        # pipeline runs: one row per cycle of work on the pipeline. A run is "active" while ended_at IS NULL;
+        # /api/reset closes the active run (sets ended_at + label from the current scope) and opens a new one.
+        # Executions keep their run_id across resets, so the Logs tab can look back at previous runs' logs.
+        self.db.execute(
+            "CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY AUTOINCREMENT, started_at REAL, ended_at REAL, label TEXT)"
+        )
         # executions: one row per discrete user-triggered unit of work (stage run, gate, profiling batch, etc).
         # log_text holds the captured stdout/stderr/logging output for that unit — scoped, not continuous.
         self.db.execute(
             "CREATE TABLE IF NOT EXISTS executions (id INTEGER PRIMARY KEY AUTOINCREMENT, trigger TEXT, start_ts REAL,"
             " end_ts REAL, status TEXT, log_text TEXT, error TEXT)"
         )
+        # Migrate older DBs that pre-date the runs feature: add the run_id column if missing, then adopt any
+        # orphan rows into a single "Legacy executions" run so the Logs tab doesn't lose them.
+        cols = {r[1] for r in self.db.execute("PRAGMA table_info(executions)").fetchall()}
+        if "run_id" not in cols:
+            self.db.execute("ALTER TABLE executions ADD COLUMN run_id INTEGER")
         self.db.commit()
+        self._adopt_orphan_executions()
+        self._ensure_active_run()
 
     # decisions -------------------------------------------------------------
     def add(self, d: Decision) -> Decision:
@@ -179,30 +192,96 @@ class DecisionLog:
             cur = self.db.execute("SELECT kind, key, MAX(ts) FROM views WHERE person = ? GROUP BY kind, key", (person,))
             return [{"kind": k, "key": key, "ts": ts} for k, key, ts in cur.fetchall()]
 
+    # pipeline runs -------------------------------------------------------
+    def _ensure_active_run(self) -> int:
+        """Return the id of the open run; create one if none is open."""
+        with self._lock:
+            r = self.db.execute("SELECT id FROM runs WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1").fetchone()
+            if r:
+                return int(r[0])
+            cur = self.db.execute("INSERT INTO runs (started_at, ended_at, label) VALUES (?, NULL, NULL)", (time.time(),))
+            self.db.commit()
+            return int(cur.lastrowid)
+
+    def _adopt_orphan_executions(self) -> None:
+        """Older DBs have executions with run_id=NULL. Fold them into one 'Legacy executions' run so they
+        remain visible after the runs feature ships."""
+        with self._lock:
+            orphans = self.db.execute("SELECT MIN(start_ts), MAX(end_ts) FROM executions WHERE run_id IS NULL").fetchone()
+            if not orphans or orphans[0] is None:
+                return
+            start_ts, end_ts = orphans
+            cur = self.db.execute(
+                "INSERT INTO runs (started_at, ended_at, label) VALUES (?, ?, ?)",
+                (start_ts, end_ts or start_ts, "Legacy executions"),
+            )
+            self.db.execute("UPDATE executions SET run_id = ? WHERE run_id IS NULL", (int(cur.lastrowid),))
+            self.db.commit()
+
+    def active_run_id(self) -> int:
+        return self._ensure_active_run()
+
+    def close_active_run(self, label: str = "") -> int | None:
+        """Close the open run with an ended_at timestamp (and optional label). Returns the closed run id."""
+        with self._lock:
+            r = self.db.execute("SELECT id FROM runs WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1").fetchone()
+            if not r:
+                return None
+            rid = int(r[0])
+            self.db.execute("UPDATE runs SET ended_at = ?, label = COALESCE(NULLIF(?, ''), label) WHERE id = ?",
+                            (time.time(), label.strip(), rid))
+            self.db.commit()
+            return rid
+
+    def start_run(self) -> int:
+        """Open a new run. Used by /api/reset after closing the previous one."""
+        with self._lock:
+            cur = self.db.execute("INSERT INTO runs (started_at, ended_at, label) VALUES (?, NULL, NULL)", (time.time(),))
+            self.db.commit()
+            return int(cur.lastrowid)
+
+    def list_runs(self) -> list[dict[str, Any]]:
+        """Runs newest-first, each with its execution count. The active run is the one with ended_at = None."""
+        with self._lock:
+            cur = self.db.execute(
+                "SELECT r.id, r.started_at, r.ended_at, r.label, "
+                " (SELECT COUNT(*) FROM executions e WHERE e.run_id = r.id) AS n_executions "
+                " FROM runs r ORDER BY r.id DESC"
+            )
+            return [{"id": r[0], "started_at": r[1], "ended_at": r[2], "label": r[3], "active": r[2] is None,
+                     "n_executions": r[4]} for r in cur.fetchall()]
+
     # execution log --------------------------------------------------------
     def add_execution(self, trigger: str, start_ts: float, end_ts: float, status: str, log_text: str, error: str = "") -> int:
         with self._lock:
+            run_id = self._ensure_active_run()
             cur = self.db.execute(
-                "INSERT INTO executions (trigger, start_ts, end_ts, status, log_text, error) VALUES (?,?,?,?,?,?)",
-                (trigger, start_ts, end_ts, status, log_text, error),
+                "INSERT INTO executions (trigger, start_ts, end_ts, status, log_text, error, run_id) VALUES (?,?,?,?,?,?,?)",
+                (trigger, start_ts, end_ts, status, log_text, error, run_id),
             )
             self.db.commit()
             return int(cur.lastrowid)
 
-    def list_executions(self, limit: int = 100) -> list[dict[str, Any]]:
+    def list_executions(self, limit: int = 100, run_id: int | None = None) -> list[dict[str, Any]]:
+        """List executions newest-first. If run_id is None, defaults to the active run."""
         with self._lock:
+            if run_id is None:
+                run_id = self._ensure_active_run()
             cur = self.db.execute(
-                "SELECT id, trigger, start_ts, end_ts, status, length(log_text), error FROM executions ORDER BY id DESC LIMIT ?",
-                (limit,),
+                "SELECT id, trigger, start_ts, end_ts, status, length(log_text), error, run_id FROM executions"
+                " WHERE run_id = ? ORDER BY id DESC LIMIT ?",
+                (run_id, limit),
             )
-            return [{"id": r[0], "trigger": r[1], "start_ts": r[2], "end_ts": r[3], "status": r[4], "log_bytes": r[5], "error": r[6]} for r in cur.fetchall()]
+            return [{"id": r[0], "trigger": r[1], "start_ts": r[2], "end_ts": r[3], "status": r[4],
+                     "log_bytes": r[5], "error": r[6], "run_id": r[7]} for r in cur.fetchall()]
 
     def get_execution(self, execution_id: int) -> dict[str, Any] | None:
         with self._lock:
             r = self.db.execute(
-                "SELECT id, trigger, start_ts, end_ts, status, log_text, error FROM executions WHERE id = ?",
+                "SELECT id, trigger, start_ts, end_ts, status, log_text, error, run_id FROM executions WHERE id = ?",
                 (execution_id,),
             ).fetchone()
             if not r:
                 return None
-            return {"id": r[0], "trigger": r[1], "start_ts": r[2], "end_ts": r[3], "status": r[4], "log_text": r[5], "error": r[6]}
+            return {"id": r[0], "trigger": r[1], "start_ts": r[2], "end_ts": r[3], "status": r[4],
+                    "log_text": r[5], "error": r[6], "run_id": r[7]}

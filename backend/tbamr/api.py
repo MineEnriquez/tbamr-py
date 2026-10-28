@@ -31,6 +31,24 @@ def build_orchestrator(data_mode: str | None = None, brain: str | None = None, d
     return Orchestrator(log, client or make_client(brain), data or (DemoDataTools() if data_mode == "demo" else DataTools()))
 
 
+def _run_label_from_state(orch: Orchestrator) -> str:
+    """Describe the run that's about to be closed, so previous runs are legible in the Logs tab.
+    Prefers the released report version, then the approved scope's country+drugs, then just the
+    scope question. Falls back to '' (the UI shows the start time)."""
+    st = orch.state
+    rep = st.report
+    if rep and rep.get("version"):
+        return f"Report v{rep['version']}" + (" · final" if st.gates.get("release", {}).get("kind") == "final" else "")
+    if st.scope and st.gates.get("scope"):
+        loc = st.country or "worldwide"
+        drugs = ", ".join(st.target_drugs or [])
+        return f"Scope: {loc}" + (f" · {drugs}" if drugs else "")
+    if (st.question or "").strip():
+        q = st.question.strip().split(".")[0]
+        return (q[:80] + "…") if len(q) > 80 else q
+    return ""
+
+
 class Who(BaseModel):
     role: str
     person: str = ""
@@ -234,23 +252,45 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         frontend polls (metrics/state/decisions) — their open SQLite connections auto-recreated the
         file without a schema, so the next SELECT hit `no such table: trace`. We now clear tables
         in place behind the orchestrator's own lock so the schema is always valid, and only unlink
-        the file when switching modes (demo <-> live use different file paths anyway)."""
+        the file when switching modes (demo <-> live use different file paths anyway).
+
+        Executions and their captured logs are preserved across resets: the active pipeline run is
+        closed (ended_at + a label derived from the scope), a new run is opened, and the Logs tab
+        can look back at previous runs. Decisions, agent traces, raw-data cache, view receipts and
+        pipeline state are still cleared so the next cycle starts fresh."""
         path = Path(os.environ.get("TBAMR_DB", f"tbamr-{data}.db"))
         old = getattr(app.state, "orch", None)
         if old is not None:
             with old.lock:
                 try:
-                    for table in ("decisions", "trace", "kv", "raw", "views", "executions"):
-                        old.log.db.execute(f"DELETE FROM {table}")
-                    old.log.db.commit()
+                    rid = old.log.active_run_id()
+                    has_execs = old.log.db.execute("SELECT 1 FROM executions WHERE run_id = ? LIMIT 1", (rid,)).fetchone()
+                    if has_execs:  # only close+rotate if the active run has something worth preserving
+                        old.log.close_active_run(_run_label_from_state(old))
+                        for table in ("decisions", "trace", "kv", "raw", "views"):
+                            old.log.db.execute(f"DELETE FROM {table}")
+                        old.log.db.commit()
+                        old.log.start_run()
+                    else:
+                        for table in ("decisions", "trace", "kv", "raw", "views"):
+                            old.log.db.execute(f"DELETE FROM {table}")
+                        old.log.db.commit()
                 except Exception:
                     pass  # schema was already broken; rebuilding below will recreate it
         app.state.orch = build_orchestrator(data, brain, str(path))
         return {"ok": True}
 
+    @app.get("/api/runs")
+    def list_runs():
+        runs = O().log.list_runs()
+        active_id = O().log.active_run_id()
+        for r in runs:
+            r["active"] = r["id"] == active_id
+        return runs
+
     @app.get("/api/executions")
-    def list_executions(limit: int = 100):
-        return O().log.list_executions(limit=max(1, min(500, int(limit))))
+    def list_executions(limit: int = 100, run_id: int | None = None):
+        return O().log.list_executions(limit=max(1, min(500, int(limit))), run_id=run_id)
 
     @app.get("/api/executions/{execution_id}")
     def get_execution(execution_id: int):
