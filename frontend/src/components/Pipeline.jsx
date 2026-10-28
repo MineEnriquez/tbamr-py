@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
 import { Chip, Rationale, actorLabel, ROLE_LABEL } from './common.jsx'
 import { RawLink } from './Raw.jsx'
@@ -32,14 +32,18 @@ function Feed({ decisions }) {
 function Stage({ n, snap, act, who, busy, openSample }) {
   const st = snap.state, meta = snap.stages[n - 1], status = st.stage_status[String(n)]
   const agents = meta.agents
-  const runBtn = <button className="btn primary" disabled={status !== 'ready' || !!busy} onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'ready' ? 'Run agents' : 'Ran'}</button>
+  // Stage 1 "Run agents" is only enabled when the current scope form is saved (no unsaved edits).
+  const [scopeDirty, setScopeDirty] = useState(false)
+  const disabledReason = (n === 1 && status === 'ready' && scopeDirty) ? 'Save the scope first' : (!!busy ? 'A stage is running' : '')
+  const runBtn = <button className="btn primary" disabled={status !== 'ready' || !!busy || (n === 1 && scopeDirty)} title={disabledReason || undefined}
+                   onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'ready' ? 'Run agents' : 'Ran'}</button>
   return (
     <section className="panel">
       <div className="row between"><div><span className="eyebrow">Stage {n} · owner: {ROLE_LABEL[meta.owner]}</span><h2>{meta.name}</h2></div>{runBtn}</div>
       <div className="tools">{agents.map(a => <span className="tool" key={a}>{a.replace(/_/g, ' ')}</span>)}</div>
       {busy && <div className="working" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span>Working on <b>{busy}</b>… agents are reasoning and calling tools; watch the Agent team tab for live traces.</span></div>}
       {status === 'locked' && <div className="box note"><p className="muted">This stage unlocks when the previous stage's human gate is passed.</p></div>}
-      {n === 1 && <S1 st={st} status={status} act={act} who={who} />}
+      {n === 1 && <S1 st={st} status={status} act={act} who={who} onDirtyChange={setScopeDirty} />}
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
       {n === 3 && ['wait', 'done'].includes(status) && <S3 st={st} status={status} act={act} who={who} openSample={openSample} />}
       {n === 4 && ['wait', 'done'].includes(status) && <S4 snap={snap} status={status} act={act} who={who} openSample={openSample} />}
@@ -49,26 +53,36 @@ function Stage({ n, snap, act, who, busy, openSample }) {
   )
 }
 
-function S1({ st, status, act, who }) {
+function S1({ st, status, act, who, onDirtyChange }) {
   const [q, setQ] = useState(st.question)
   const [country, setCountry] = useState(st.country || '')
   const [target, setTarget] = useState(st.cohort_target ?? 8)
   const sc = st.scope || {}
+  // When the form drifts from what's in the backend, mark the whole stage dirty so the Run button disables.
+  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || target !== (st.cohort_target ?? 8))
+  useEffect(() => { onDirtyChange && onDirtyChange(dirty) }, [dirty, onDirtyChange])
   if (status === 'ready') return (
     <div className="box"><span className="eyebrow">Research question</span>
       <textarea value={q} onChange={e => setQ(e.target.value)} aria-label="Research question" />
       <div className="row" style={{ gap: 14, alignItems: 'flex-end' }}>
-        <div className="ctl"><label htmlFor="scope-country">Country (optional)</label>
-          <input id="scope-country" value={country} onChange={e => setCountry(e.target.value)} placeholder="e.g. Indonesia · leave blank for worldwide" style={{ minWidth: 280 }} /></div>
+        <div className="ctl"><label htmlFor="scope-country">Country <span className="muted" style={{ fontWeight: 400 }}>(or state it in the question)</span></label>
+          <input id="scope-country" value={country} onChange={e => setCountry(e.target.value)} placeholder='e.g. Indonesia · "Worldwide" for no filter · or leave blank if the question says so' style={{ minWidth: 320 }} /></div>
         <div className="ctl"><label htmlFor="scope-target">Cohort target</label>
           <input id="scope-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
       </div>
-      <div className="row"><button className="btn small" onClick={() => act(() => api.setScope({ question: q, country, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')}>Save scope</button>
-        <span className="muted" style={{ fontSize: '.82rem' }}>Save, then click Run agents. The Scope Guardian reviews it.</span></div></div>)
+      <div className="row"><button className="btn small primary" disabled={!dirty} onClick={() => act(() => api.setScope({ question: q, country, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
+        <span className="muted" style={{ fontSize: '.82rem' }}>{dirty ? 'Unsaved changes — Save scope before Run agents.' : 'Scope saved. Click Run agents to kick off the Scope Guardian.'}</span></div></div>)
   return (
     <>
-      <div className="box"><span className="eyebrow">Research question</span><p>{st.question}</p>
-        <p className="muted" style={{ fontSize: '.82rem' }}>Scope: {st.country ? <>country <b>{st.country}</b></> : <>worldwide</>} · cohort target {st.cohort_target} · drugs {st.target_drugs.join(', ')}</p></div>
+      <div className="box">
+        <div className="row between" style={{ alignItems: 'flex-start' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span className="eyebrow">Research question</span><p>{st.question}</p>
+            <p className="muted" style={{ fontSize: '.82rem' }}>Scope: {st.country ? <>country <b>{st.country}</b></> : <>worldwide (not set explicitly)</>} · cohort target {st.cohort_target} · drugs {st.target_drugs.join(', ')}</p>
+          </div>
+          <button className="btn small ghost" title="Reopen the scope form; clears downstream work (samples/report) but preserves decision history." onClick={() => { if (confirm('Reopen scope? This clears discovered samples and any report, but keeps the decision history.')) act(() => api.reopenScope(), 'Scope reopened') }}>✎ Edit scope</button>
+        </div>
+      </div>
       {sc.blocking?.length > 0 && <div className="box esc"><h3>Blocking gaps</h3><ul className="clean">{sc.blocking.map(b => <li key={b}>{b}</li>)}</ul></div>}
       <div className="box esc"><h3>Gaps the Guardian found, with proposed definitions</h3>
         <ul className="clean">{(sc.gaps || []).map(g => <li key={g.gap}>{g.gap} <i>Proposed:</i> {g.proposal}{g.added_by === 'guardrail' && <span className="muted"> (added by guardrail)</span>}</li>)}</ul>
@@ -140,15 +154,15 @@ function S3({ st, status, act, who, openSample }) {
   const c = st.samples.filter(s => s.in_cohort)
   return (
     <>
-      <div className="tw"><table><thead><tr><th>Run</th><th className="num">Est. coverage</th><th>Checksum</th><th>QC</th></tr></thead><tbody>
+      <div className="tw"><table><thead><tr><th>Run</th><th className="num">Est. coverage</th><th>Checksum</th><th>Quality Control</th></tr></thead><tbody>
         {c.map(s => <tr className="click" key={s.run} onClick={() => openSample(s.run)}><td className="mono">{s.run}</td><td className="num">{s.coverage ?? '—'}×</td><td>{s.md5 ? 'MD5 listed' : '—'}</td><td><Chip label={s.qc || '—'} /></td></tr>)}
       </tbody></table></div>
       {c.filter(s => s.qc === 'Escalated').map(s => <div className="box esc" key={s.run}><div className="row between"><span className="mono">{s.run}</span><Chip label="Escalate" /></div><p>{s.qc_note}</p>
         <Rationale id={'q-' + s.run} placeholder="e.g. Coverage at target regions >40× in BAM" buttons={[['proceed', 'Proceed with justification', true], ['exclude', 'Exclude']]}
           extra={<RawLink kind="ena" k={s.run} />}
-          onSubmit={(d, r) => act(() => api.resolveQc({ ...who, run: s.run, decision: d, rationale: r }), 'QC decision recorded')} /></div>)}
-      {status === 'wait' && <div className="box gate"><h3>Gate · Confirm QC decisions</h3>
-        <div className="row"><button className="btn primary" onClick={() => act(() => api.gate('qc', who), 'QC confirmed')}>Confirm and advance</button>
+          onSubmit={(d, r) => act(() => api.resolveQc({ ...who, run: s.run, decision: d, rationale: r }), 'Quality Control decision recorded')} /></div>)}
+      {status === 'wait' && <div className="box gate"><h3>Gate · Confirm Quality Control decisions</h3>
+        <div className="row"><button className="btn primary" onClick={() => act(() => api.gate('qc', who), 'Quality Control confirmed')}>Confirm and advance</button>
           <RawLink kind="qc" k="all" /></div></div>}
     </>
   )
@@ -168,7 +182,7 @@ function S4({ snap, status, act, who, openSample }) {
   const chosen = waiting.filter(r => selected.has(r))  // keep selection in waiting-order and drop stale ones
   return (
     <>
-      <div className="metrics"><div className="metric"><span className="v">{q.length}</span><span className="l">QC-passed runs</span></div>
+      <div className="metrics"><div className="metric"><span className="v">{q.length}</span><span className="l">Quality Control-passed runs</span></div>
         <div className="metric"><span className="v" style={{ color: 'var(--ok)' }}>{done.length}</span><span className="l">TB-Profiler results</span></div>
         <div className="metric"><span className="v" style={{ color: 'var(--hold)' }}>{q.length - done.length}</span><span className="l">Awaiting results</span></div></div>
       <div className="box"><h3>Run TB-Profiler</h3>
