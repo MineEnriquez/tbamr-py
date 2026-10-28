@@ -209,9 +209,21 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
 
     @app.post("/api/reset")
     def reset(data: str = "demo", brain: str | None = None):
+        """Reset the pipeline. Previously this unlinked the DB file, which raced against concurrent
+        frontend polls (metrics/state/decisions) — their open SQLite connections auto-recreated the
+        file without a schema, so the next SELECT hit `no such table: trace`. We now clear tables
+        in place behind the orchestrator's own lock so the schema is always valid, and only unlink
+        the file when switching modes (demo <-> live use different file paths anyway)."""
         path = Path(os.environ.get("TBAMR_DB", f"tbamr-{data}.db"))
-        if path.exists() and str(path) != ":memory:":
-            path.unlink()
+        old = getattr(app.state, "orch", None)
+        if old is not None:
+            with old.lock:
+                try:
+                    for table in ("decisions", "trace", "kv", "raw", "views", "executions"):
+                        old.log.db.execute(f"DELETE FROM {table}")
+                    old.log.db.commit()
+                except Exception:
+                    pass  # schema was already broken; rebuilding below will recreate it
         app.state.orch = build_orchestrator(data, brain, str(path))
         return {"ok": True}
 
