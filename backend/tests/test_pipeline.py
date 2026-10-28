@@ -276,3 +276,43 @@ def test_reset_preserves_previous_runs(tmp_path, monkeypatch):
     prev = c.get("/api/executions", params={"run_id": first_run_id}).json()
     assert any(e["trigger"] == "Stage 1" for e in prev)
     assert c.get("/api/executions").json() == []
+
+
+def test_executions_capture_structured_results(tmp_path, monkeypatch):
+    """Stage runs and gate approvals should attach a structured result to their execution row, so the
+    Logs tab can show what each action produced — not just the free-text log."""
+    db = str(tmp_path / "results.db")
+    monkeypatch.setenv("TBAMR_DB", db)
+    orch = build_orchestrator("demo", "replay", db)
+    orch.state.country = "Indonesia"
+    app = create_app(orch)
+    c = TestClient(app)
+    assert c.post("/api/stages/1/run").status_code == 200
+    execs = c.get("/api/executions").json()
+    stage1 = next(e for e in execs if e["trigger"] == "Stage 1")
+    assert stage1["has_result"] is True
+    detail = c.get(f"/api/executions/{stage1['id']}").json()
+    # Stage 1 returns the Guardian's scope dict — look for a recognisable key.
+    assert isinstance(detail["result"], dict) and detail["result"]  # non-empty object
+    # Approving the scope attaches a {by, role} record even though the HTTP response is just {ok: True}.
+    c.post("/api/raw/scope/guardian", params={"role": "pi", "person": "Ana"})  # mark raw as viewed
+    orch.raw_view("scope", "guardian", "pi", "Ana")
+    assert c.post("/api/gates/scope", json={"role": "pi", "person": "Ana"}).status_code == 200
+    gate_exec = next(e for e in c.get("/api/executions").json() if e["trigger"] == "Approve scope")
+    assert gate_exec["has_result"] is True
+    gate_detail = c.get(f"/api/executions/{gate_exec['id']}").json()
+    assert gate_detail["result"] == {"by": "Ana", "role": "pi"}
+
+
+def test_execution_result_handles_unserialisable_values(tmp_path):
+    """A function that returns something JSON can't handle must still produce a stored row (with an
+    error marker in result_json) rather than silently losing the entire log."""
+    from tbamr.core.executions import capture_execution
+    log = DecisionLog(str(tmp_path / "oops.db"))
+    with capture_execution(log, "weird-return") as ctx:
+        ctx.record({"when": object()})  # bare object() isn't JSON-serialisable
+    row = log.list_executions()[0]
+    assert row["trigger"] == "weird-return" and row["has_result"] is True
+    detail = log.get_execution(row["id"])
+    # default=str catches arbitrary objects, so this still parses as a dict.
+    assert isinstance(detail["result"], dict)

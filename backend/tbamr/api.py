@@ -156,72 +156,89 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
 
     @app.post("/api/stages/{n}/run")
     def run_stage(n: int):
-        with capture_execution(O().log, f"Stage {n}"):
-            return guard(O().run_stage, n)
+        with capture_execution(O().log, f"Stage {n}") as ctx:
+            return ctx.record(guard(O().run_stage, n))
 
     @app.post("/api/gates/scope")
     def g_scope(w: Who):
-        with capture_execution(O().log, "Approve scope"):
+        with capture_execution(O().log, "Approve scope") as ctx:
             guard(O().approve_scope, w.role, w.person)
+            ctx.record({"by": w.person, "role": w.role})
         return {"ok": True}
 
     @app.post("/api/gates/cohort")
     def g_cohort(w: Who):
-        with capture_execution(O().log, "Approve cohort"):
+        with capture_execution(O().log, "Approve cohort") as ctx:
             guard(O().approve_cohort, w.role, w.person)
+            ctx.record({"by": w.person, "role": w.role, "cohort_size": sum(1 for s in O().state.samples if s.in_cohort)})
         return {"ok": True}
 
     @app.post("/api/gates/qc")
     def g_qc(w: Who):
-        with capture_execution(O().log, "Confirm QC"):
+        with capture_execution(O().log, "Confirm QC") as ctx:
             guard(O().confirm_qc, w.role, w.person)
+            samples = O().state.samples
+            ctx.record({"by": w.person, "role": w.role,
+                        "qc_pass": sum(s.qc == "Pass" for s in samples),
+                        "qc_escalated": sum(s.qc == "Escalated" for s in samples),
+                        "qc_excluded": sum(s.qc == "Excluded" for s in samples)})
         return {"ok": True}
 
     @app.post("/api/gates/profiling")
     def g_prof(w: Who):
-        with capture_execution(O().log, "Close profiling batch"):
+        with capture_execution(O().log, "Close profiling batch") as ctx:
             guard(O().close_profiling, w.role, w.person)
+            ctx.record({"by": w.person, "role": w.role,
+                        "profiled": sum(s.profiling == "Done" for s in O().state.samples)})
         return {"ok": True}
 
     @app.post("/api/holds/resolve")
     def resolve(r: Resolve):
-        with capture_execution(O().log, f"Resolve hold · {r.run}"):
+        with capture_execution(O().log, f"Resolve hold · {r.run}") as ctx:
             guard(O().resolve_hold, r.role, r.person, r.run, r.decision, r.rationale)
+            ctx.record({"run": r.run, "decision": r.decision, "rationale": r.rationale, "by": r.person, "role": r.role})
         return {"ok": True}
 
     @app.post("/api/qc/resolve")
     def resolve_qc(r: Resolve):
-        with capture_execution(O().log, f"Resolve QC · {r.run}"):
+        with capture_execution(O().log, f"Resolve QC · {r.run}") as ctx:
             guard(O().resolve_qc, r.role, r.person, r.run, r.decision, r.rationale)
+            ctx.record({"run": r.run, "decision": r.decision, "rationale": r.rationale, "by": r.person, "role": r.role})
         return {"ok": True}
 
     @app.post("/api/review")
     def review(r: Review):
-        with capture_execution(O().log, f"Finding review · {r.fid}"):
+        with capture_execution(O().log, f"Finding review · {r.fid}") as ctx:
             guard(O().review, r.role, r.person, r.fid, r.decision, r.rationale)
+            ctx.record({"fid": r.fid, "decision": r.decision, "rationale": r.rationale, "by": r.person, "role": r.role})
         return {"ok": True}
 
     @app.post("/api/overrides")
     def override(o: Override):
-        with capture_execution(O().log, f"Override · {o.run}"):
-            return guard(O().override, o.role, o.person, o.run, o.field, o.to, o.rationale)
+        with capture_execution(O().log, f"Override · {o.run}") as ctx:
+            return ctx.record(guard(O().override, o.role, o.person, o.run, o.field, o.to, o.rationale))
 
     @app.post("/api/overrides/cosign")
     def cosign(c: Cosign):
-        with capture_execution(O().log, f"Cosign override · {c.override_id}"):
+        with capture_execution(O().log, f"Cosign override · {c.override_id}") as ctx:
             guard(O().cosign, c.role, c.person, c.override_id)
+            ctx.record({"override_id": c.override_id, "by": c.person, "role": c.role})
         return {"ok": True}
 
     @app.post("/api/release")
     def release(r: Release):
-        with capture_execution(O().log, f"Release report ({r.kind})"):
+        with capture_execution(O().log, f"Release report ({r.kind})") as ctx:
             guard(O().release, r.role, r.person, r.kind)
+            rep = O().state.report or {}
+            ctx.record({"kind": r.kind, "version": rep.get("version"), "by": r.person, "role": r.role})
         return {"ok": True}
 
     @app.post("/api/report/summary")
     def summary():
-        with capture_execution(O().log, "Draft report summary"):
-            return {"text": guard(O().draft_summary)}
+        with capture_execution(O().log, "Draft report summary") as ctx:
+            text = guard(O().draft_summary)
+            ctx.record({"text": text})
+            return {"text": text}
 
     class SummaryEdit(BaseModel):
         text: str
@@ -238,8 +255,8 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
                 parsed.append((f.filename or "result.json", json.loads(await f.read())))
             except ValueError:
                 raise HTTPException(400, f"{f.filename} is not valid JSON.")
-        with capture_execution(O().log, f"Import TB-Profiler results ({len(parsed)} file(s))"):
-            return guard(O().import_results, role, person, parsed)
+        with capture_execution(O().log, f"Import TB-Profiler results ({len(parsed)} file(s))") as ctx:
+            return ctx.record(guard(O().import_results, role, person, parsed))
 
     @app.post("/api/profiling/run")
     def run_profiler(r: RunProfiler):

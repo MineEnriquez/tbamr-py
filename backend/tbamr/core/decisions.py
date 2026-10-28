@@ -94,15 +94,19 @@ class DecisionLog:
         )
         # executions: one row per discrete user-triggered unit of work (stage run, gate, profiling batch, etc).
         # log_text holds the captured stdout/stderr/logging output for that unit — scoped, not continuous.
+        # result_json holds the structured return value of the wrapped action (what Stage 2 found, the
+        # outcome of a TB-Profiler batch, …) so the Logs tab can show what happened, not just what was said.
         self.db.execute(
             "CREATE TABLE IF NOT EXISTS executions (id INTEGER PRIMARY KEY AUTOINCREMENT, trigger TEXT, start_ts REAL,"
             " end_ts REAL, status TEXT, log_text TEXT, error TEXT)"
         )
-        # Migrate older DBs that pre-date the runs feature: add the run_id column if missing, then adopt any
-        # orphan rows into a single "Legacy executions" run so the Logs tab doesn't lose them.
+        # Migrate older DBs that pre-date later columns: add anything missing. SQLite ALTER TABLE ADD COLUMN
+        # is safe on existing rows (they get NULL). Order matters only if we read these columns elsewhere.
         cols = {r[1] for r in self.db.execute("PRAGMA table_info(executions)").fetchall()}
         if "run_id" not in cols:
             self.db.execute("ALTER TABLE executions ADD COLUMN run_id INTEGER")
+        if "result_json" not in cols:
+            self.db.execute("ALTER TABLE executions ADD COLUMN result_json TEXT")
         self.db.commit()
         self._adopt_orphan_executions()
         self._ensure_active_run()
@@ -252,36 +256,63 @@ class DecisionLog:
                      "n_executions": r[4]} for r in cur.fetchall()]
 
     # execution log --------------------------------------------------------
-    def add_execution(self, trigger: str, start_ts: float, end_ts: float, status: str, log_text: str, error: str = "") -> int:
+    def add_execution(self, trigger: str, start_ts: float, end_ts: float, status: str, log_text: str,
+                      error: str = "", result: Any = None) -> int:
         with self._lock:
             run_id = self._ensure_active_run()
+            result_json = _serialize_result(result)
             cur = self.db.execute(
-                "INSERT INTO executions (trigger, start_ts, end_ts, status, log_text, error, run_id) VALUES (?,?,?,?,?,?,?)",
-                (trigger, start_ts, end_ts, status, log_text, error, run_id),
+                "INSERT INTO executions (trigger, start_ts, end_ts, status, log_text, error, run_id, result_json)"
+                " VALUES (?,?,?,?,?,?,?,?)",
+                (trigger, start_ts, end_ts, status, log_text, error, run_id, result_json),
             )
             self.db.commit()
             return int(cur.lastrowid)
 
     def list_executions(self, limit: int = 100, run_id: int | None = None) -> list[dict[str, Any]]:
-        """List executions newest-first. If run_id is None, defaults to the active run."""
+        """List executions newest-first. If run_id is None, defaults to the active run.
+        has_result is a boolean the UI uses to badge rows that carry structured output."""
         with self._lock:
             if run_id is None:
                 run_id = self._ensure_active_run()
             cur = self.db.execute(
-                "SELECT id, trigger, start_ts, end_ts, status, length(log_text), error, run_id FROM executions"
+                "SELECT id, trigger, start_ts, end_ts, status, length(log_text), error, run_id,"
+                " CASE WHEN result_json IS NULL THEN 0 ELSE 1 END FROM executions"
                 " WHERE run_id = ? ORDER BY id DESC LIMIT ?",
                 (run_id, limit),
             )
             return [{"id": r[0], "trigger": r[1], "start_ts": r[2], "end_ts": r[3], "status": r[4],
-                     "log_bytes": r[5], "error": r[6], "run_id": r[7]} for r in cur.fetchall()]
+                     "log_bytes": r[5], "error": r[6], "run_id": r[7], "has_result": bool(r[8])}
+                    for r in cur.fetchall()]
 
     def get_execution(self, execution_id: int) -> dict[str, Any] | None:
         with self._lock:
             r = self.db.execute(
-                "SELECT id, trigger, start_ts, end_ts, status, log_text, error, run_id FROM executions WHERE id = ?",
+                "SELECT id, trigger, start_ts, end_ts, status, log_text, error, run_id, result_json"
+                " FROM executions WHERE id = ?",
                 (execution_id,),
             ).fetchone()
             if not r:
                 return None
+            try:
+                result = json.loads(r[8]) if r[8] else None
+            except (ValueError, TypeError):
+                result = {"_parse_error": "result_json was not valid JSON", "_raw": r[8]}
             return {"id": r[0], "trigger": r[1], "start_ts": r[2], "end_ts": r[3], "status": r[4],
-                    "log_text": r[5], "error": r[6], "run_id": r[7]}
+                    "log_text": r[5], "error": r[6], "run_id": r[7], "result": result}
+
+
+def _serialize_result(result: Any) -> str | None:
+    """Serialize a Python value to JSON for storage. Returns None if the value is None, or a safe
+    error-marker JSON if serialization fails — never raises, so a bad return value can't lose the log."""
+    if result is None:
+        return None
+    try:
+        text = json.dumps(result, default=str)
+    except (TypeError, ValueError) as e:
+        return json.dumps({"_serialize_error": f"{type(e).__name__}: {e}"})
+    # Keep executions reasonably small: a 200 KB JSON blob dropped into the Logs tab is already more
+    # than anyone will read. Preserve the shape (first element preview) so the UI still shows something.
+    if len(text) > 200_000:
+        return json.dumps({"_truncated": True, "_original_bytes": len(text), "_preview": text[:4000]})
+    return text
