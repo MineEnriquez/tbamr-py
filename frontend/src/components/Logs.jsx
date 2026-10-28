@@ -42,6 +42,44 @@ function LogView({ text, errorsOnly }) {
   )
 }
 
+function resultHeadline(result) {
+  // Compact one-liner so the user doesn't have to open every result. Picks the keys that look
+  // informative without hard-coding every endpoint's shape.
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return ''
+  const parts = []
+  if (result.by) parts.push(`by ${result.by}`)
+  if (result.cohort_size != null) parts.push(`${result.cohort_size} in cohort`)
+  if (result.qc_pass != null) parts.push(`${result.qc_pass} pass · ${result.qc_escalated || 0} escalated · ${result.qc_excluded || 0} excluded`)
+  if (result.profiled != null) parts.push(`${result.profiled} profiled`)
+  if (result.n_runs != null) parts.push(`${result.n_runs} TB-Profiler run(s)`)
+  if (result.status_counts) parts.push(Object.entries(result.status_counts).map(([k, v]) => `${v} ${k || '?'}`).join(', '))
+  if (result.candidates != null) parts.push(`${result.candidates} candidate(s)`)
+  if (result.queued != null) parts.push(`${result.queued} queued`)
+  if (Array.isArray(result.imported)) parts.push(`${result.imported.length} imported` + (result.skipped?.length ? ` · ${result.skipped.length} skipped` : ''))
+  if (result.version != null) parts.push(`v${result.version}`)
+  if (result.kind) parts.push(result.kind)
+  if (result.decision) parts.push(result.decision)
+  if (result.fid) parts.push(result.fid)
+  if (result.run) parts.push(result.run)
+  return parts.join(' · ')
+}
+
+function ResultPanel({ result }) {
+  const [open, setOpen] = useState(false)
+  if (result == null) return null
+  const headline = resultHeadline(result)
+  const json = JSON.stringify(result, null, 2)
+  return (
+    <details open={open} onToggle={e => setOpen(e.currentTarget.open)} className="exec-result">
+      <summary>
+        <span className="eyebrow" style={{ marginRight: 8 }}>Result</span>
+        {headline && <span className="muted" style={{ fontSize: '.82rem' }}>{headline}</span>}
+      </summary>
+      <pre className="exec-result-json">{json}</pre>
+    </details>
+  )
+}
+
 export default function Logs({ version }) {
   const [items, setItems] = useState([])
   const [runs, setRuns] = useState([])
@@ -116,6 +154,7 @@ export default function Logs({ version }) {
                   <span>{x.start_ts ? fmtTime(x.start_ts) : '—'}</span>
                   <span>· {dur(x.start_ts, x.end_ts)}</span>
                   <span>· {x.log_bytes ? `${x.log_bytes.toLocaleString()} B` : '0 B'}</span>
+                  {x.has_result && <span className="logs-result-badge" title="This execution has a structured result">· result</span>}
                 </div>
                 {x.error && <div className="logs-err">{x.error}</div>}
               </li>
@@ -133,6 +172,7 @@ export default function Logs({ version }) {
             </div>
             <label style={{ fontSize: '.82rem' }}><input type="checkbox" checked={errorsOnly} onChange={e => setErrorsOnly(e.target.checked)} /> errors only</label>
           </div>
+          <ResultPanel result={detail.result} />
           <LogView text={detail.log_text} errorsOnly={errorsOnly} />
         </>}
       </section>
