@@ -23,7 +23,12 @@ import os
 import sys
 from pathlib import Path
 
-from .api import build_orchestrator, create_app
+# The harness manages its own DB and app binding. Suppress api.py's module-level `app = create_app()`
+# so importing it below does NOT build a stale orchestrator bound to the default tbamr-demo.db before
+# we have a chance to point TBAMR_DB at the seeded harness file.
+os.environ.setdefault("TBAMR_NO_APP", "1")
+
+from .api import build_orchestrator, create_app  # noqa: E402
 
 
 HARNESS_DB_DEFAULT = "tbamr-harness.db"
@@ -124,13 +129,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "seed":
         return 0
 
-    # serve: launch uvicorn with the seeded DB. The env is set BEFORE importing uvicorn/app so the
-    # module-level `app = create_app()` in api.py reads these when it builds its orchestrator.
-    os.environ["TBAMR_DB"] = str(db_path)
-    os.environ.setdefault("TBAMR_DATA", "demo")
-    os.environ.setdefault("TBAMR_BRAIN", "replay")
+    # serve: build the app explicitly bound to the seeded DB and hand the instance to uvicorn. We
+    # don't rely on tbamr.api:app (we suppressed it above) because the module-level app binds to the
+    # default DB at import time, which is before we know the harness DB path.
     import uvicorn
-    uvicorn.run("tbamr.api:app", host=args.host, port=args.port, reload=False)
+    app = create_app(build_orchestrator("demo", "replay", str(db_path)))
+    uvicorn.run(app, host=args.host, port=args.port)
     return 0
 
 
