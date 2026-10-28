@@ -316,3 +316,44 @@ def test_execution_result_handles_unserialisable_values(tmp_path):
     detail = log.get_execution(row["id"])
     # default=str catches arbitrary objects, so this still parses as a dict.
     assert isinstance(detail["result"], dict)
+
+
+def test_harness_seeds_a_completed_pipeline(tmp_path):
+    """The UI harness should produce a DB where every stage is done, the report exists, and the
+    Logs tab has a captured execution for each step. If a stage API changes shape, this breaks
+    visibly so the harness doesn't quietly rot."""
+    from tbamr.harness import seed
+    db = str(tmp_path / "tbamr-harness.db")
+    summary = seed(db)
+    assert summary["samples"] > 0 and summary["in_cohort"] > 0
+    assert summary["report_version"] == 1
+    # Reopen through the API to make sure the seeded state round-trips (as it will when uvicorn boots)
+    app = create_app(build_orchestrator("demo", "replay", db))
+    c = TestClient(app)
+    state = c.get("/api/state").json()["state"]
+    assert state["report"] is not None
+    assert state["stage_status"]["5"] == "done"
+    assert state["stage_status"]["6"] in ("wait", "done")
+    assert state["gates"].get("scope") and state["gates"].get("cohort")
+    execs = c.get("/api/executions").json()
+    triggers = [e["trigger"] for e in execs]
+    for expected in ("Stage 1", "Stage 6", "Approve scope", "Approve cohort", "Confirm QC", "Close profiling batch", "Draft report summary"):
+        assert expected in triggers, f"harness never captured {expected} (got {triggers})"
+    assert all(e["status"] == "ok" for e in execs), f"some seeded executions failed: {execs}"
+    # Every seeded execution should carry a structured result, so the Logs tab is rich out of the box.
+    assert all(e["has_result"] for e in execs), f"some seeded executions have no result: {execs}"
+
+
+def test_harness_reseed_refuses_non_harness_filenames(tmp_path):
+    """A misconfigured --reseed must never wipe tbamr-live.db or a user's custom DB."""
+    from tbamr.harness import _safe_unlink
+    bad = tmp_path / "tbamr-live.db"
+    bad.write_text("do not delete me")
+    with pytest.raises(SystemExit):
+        _safe_unlink(bad)
+    assert bad.exists()
+    # The safe case: filename contains "harness"
+    ok = tmp_path / "tbamr-harness.db"
+    ok.write_text("fine")
+    _safe_unlink(ok)
+    assert not ok.exists()
