@@ -51,7 +51,7 @@ export default function Report({ st, act, brain }) {
       {r.superseded && <div className="box esc"><p><b>Superseded.</b> Something changed after this version; regenerate it in Stage 6.</p></div>}
       <div className="box note"><p>Computational predictions from public genomes: not laboratory-confirmed susceptibility, not a national prevalence estimate.</p></div>
       <Summary r={r} act={act} />
-      <div><h3>Sample counts</h3>{bar('Total candidates', c.candidates)}{bar('Verified eligible', c.verified)}{bar('QC-passed', c.qc_passed)}{bar('Profiled & evaluated', c.analysed, true)}</div>
+      <div><h3>Sample counts</h3>{bar('Total candidates', c.candidates)}{bar('Verified eligible', c.verified)}{bar('Quality Control-passed', c.qc_passed)}{bar('Profiled & evaluated', c.analysed, true)}</div>
       <div><h3>Resistance evidence by drug <span className="muted" style={{ fontWeight: 400 }}>(n = {c.analysed})</span></h3>
         <div className="tw"><table><thead><tr><th>Drug</th><th className="num">Predicted resistant</th><th className="num">Uncertain / pending</th><th className="num">Reviewed</th><th className="num">Matched DST</th><th className="num">Concordance</th></tr></thead><tbody>
           {r.drugs.map(d => <tr key={d.drug}><td>{d.name}</td><td className="num">{d.predicted_resistant} / {d.n}</td><td className="num">{d.uncertain_or_pending}</td><td className="num">{d.reviewed}</td><td className="num">{d.dst_n} / {d.n}</td><td className="num">{d.dst_n ? `${d.concordant} / ${d.dst_n}` : 'n/a'}</td></tr>)}

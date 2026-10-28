@@ -29,10 +29,13 @@ class ScopeGuardian(LLMAgent):
     title = "Research Scope & Scientific Integrity Guardian"
     description = "Checks the research question, proposes definitions for the playbook's gaps and flags what the data may not support."
     system_prompt = (
-        "Review the researcher's scope. Identify blocking gaps (missing question, drugs or numbers; country is OPTIONAL — "
-        "an empty country means a worldwide search and is valid). Propose concrete definitions for the playbook's policy gaps, "
-        "and warn about parts of the question that public genomes may not support (prevalence, clinical use, comparisons across "
-        "places). You propose; the researcher approves."
+        "Review the researcher's scope. Identify blocking gaps (missing question, drugs or numbers). "
+        "Geographic scope MUST be clear — EITHER the country field is set, OR the question itself names a country "
+        "(e.g. 'in Indonesia'), region ('in sub-Saharan Africa'), or 'worldwide/global' explicitly. If neither is "
+        "true, add it to blocking: 'Geographic scope is not specified — set a country or state it in the question "
+        "(e.g. \"worldwide\").' Propose concrete definitions for the playbook's policy gaps, and warn about parts "
+        "of the question that public genomes may not support (prevalence, clinical use, comparisons across places). "
+        "You propose; the researcher approves."
     )
     max_steps = 3
     submit_schema = {
@@ -57,6 +60,12 @@ class ScopeGuardian(LLMAgent):
             blocking.append("Research question is empty.")
         if not ctx.get("target_drugs"):
             blocking.append("No target drugs selected.")
+        # Geographic scope must come from the country field OR be stated in the question itself.
+        q = str(ctx.get("question", "")).lower()
+        country = str(ctx.get("country", "")).strip()
+        geo_in_q = any(w in q for w in ("worldwide", "global", "globally", " in ", "across ", "within "))
+        if not country and not geo_in_q:
+            blocking.append('Geographic scope is not specified — set a country or state it in the question (e.g. "worldwide").')
         return {"blocking": sorted(set(blocking)), "gaps": gaps, "warnings": list(sub.get("warnings") or []),
                 "asks_comparison_across_places": bool(sub.get("asks_comparison_across_places"))}
 

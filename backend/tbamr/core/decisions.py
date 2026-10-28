@@ -86,6 +86,12 @@ class DecisionLog:
         self.db.execute("CREATE TABLE IF NOT EXISTS raw (kind TEXT, key TEXT, ts REAL, data TEXT, PRIMARY KEY (kind, key))")
         # receipts: who opened which raw data, and when (gates require them)
         self.db.execute("CREATE TABLE IF NOT EXISTS views (person TEXT, role TEXT, kind TEXT, key TEXT, ts REAL)")
+        # executions: one row per discrete user-triggered unit of work (stage run, gate, profiling batch, etc).
+        # log_text holds the captured stdout/stderr/logging output for that unit — scoped, not continuous.
+        self.db.execute(
+            "CREATE TABLE IF NOT EXISTS executions (id INTEGER PRIMARY KEY AUTOINCREMENT, trigger TEXT, start_ts REAL,"
+            " end_ts REAL, status TEXT, log_text TEXT, error TEXT)"
+        )
         self.db.commit()
 
     # decisions -------------------------------------------------------------
@@ -172,3 +178,31 @@ class DecisionLog:
         with self._lock:
             cur = self.db.execute("SELECT kind, key, MAX(ts) FROM views WHERE person = ? GROUP BY kind, key", (person,))
             return [{"kind": k, "key": key, "ts": ts} for k, key, ts in cur.fetchall()]
+
+    # execution log --------------------------------------------------------
+    def add_execution(self, trigger: str, start_ts: float, end_ts: float, status: str, log_text: str, error: str = "") -> int:
+        with self._lock:
+            cur = self.db.execute(
+                "INSERT INTO executions (trigger, start_ts, end_ts, status, log_text, error) VALUES (?,?,?,?,?,?)",
+                (trigger, start_ts, end_ts, status, log_text, error),
+            )
+            self.db.commit()
+            return int(cur.lastrowid)
+
+    def list_executions(self, limit: int = 100) -> list[dict[str, Any]]:
+        with self._lock:
+            cur = self.db.execute(
+                "SELECT id, trigger, start_ts, end_ts, status, length(log_text), error FROM executions ORDER BY id DESC LIMIT ?",
+                (limit,),
+            )
+            return [{"id": r[0], "trigger": r[1], "start_ts": r[2], "end_ts": r[3], "status": r[4], "log_bytes": r[5], "error": r[6]} for r in cur.fetchall()]
+
+    def get_execution(self, execution_id: int) -> dict[str, Any] | None:
+        with self._lock:
+            r = self.db.execute(
+                "SELECT id, trigger, start_ts, end_ts, status, log_text, error FROM executions WHERE id = ?",
+                (execution_id,),
+            ).fetchone()
+            if not r:
+                return None
+            return {"id": r[0], "trigger": r[1], "start_ts": r[2], "end_ts": r[3], "status": r[4], "log_text": r[5], "error": r[6]}

@@ -10,3 +10,4 @@ backend/tbdb/
 fasterq.tmp.*
 *.errlog.txt
 tbamr-live.db.broken-*
+tbamr-backend.log*

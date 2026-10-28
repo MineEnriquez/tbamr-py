@@ -56,10 +56,11 @@ class VerificationTasker(LLMAgent):
 
     # 1. rule pre-checks -----------------------------------------------------------
     def precheck(self, samples: list[Sample], country: str) -> list[tuple[Sample, str]]:
-        """Classify each run. If `country` is non-empty, the research is scoped to that country and
+        """Classify each run. If `country` is a real country, the research is scoped to that country and
         runs whose ENA country field names a different place are excluded; missing-country goes to
-        the agent. If `country` is empty (worldwide search), origin is informational only."""
-        scoped = bool(country.strip())
+        the agent. If `country` is empty or a worldwide sentinel ('worldwide'/'global'/'any'),
+        origin is informational only."""
+        scoped = country.strip().lower() not in ("", "worldwide", "global", "any")
         seen: dict[str, str] = {}
         ambiguous: list[tuple[Sample, str]] = []
         for s in samples:
