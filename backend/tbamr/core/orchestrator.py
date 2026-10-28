@@ -439,9 +439,11 @@ class Orchestrator:
                         _lg.getLogger("tbamr.profiling").exception("state save failed after %s", r)
 
         def work() -> None:
-            with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="tbp") as pool:
-                for _ in pool.map(profile_one, runs):
-                    pass
+            from .executions import capture_execution
+            with capture_execution(self.log, f"TB-Profiler batch ({len(runs)} run(s))"):
+                with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="tbp") as pool:
+                    for _ in pool.map(profile_one, runs):
+                        pass
             with self.lock:
                 self.busy = None
                 try:
@@ -501,6 +503,23 @@ class Orchestrator:
         self.state.report["summary_draft"] = text
         self.save()
         return text
+
+    def reopen_scope(self) -> None:
+        """Reset the pipeline back to Stage 1 ready so the researcher can edit scope without a full
+        pipeline reset. Clears downstream work (samples, cohort checks, gates, report) because
+        everything downstream was derived from the scope that's about to change. Decision history
+        and agent traces are preserved for the audit trail."""
+        with self.lock:
+            self.state.stage_status = {"1": "ready", "2": "locked", "3": "locked", "4": "locked", "5": "locked", "6": "locked"}
+            self.state.samples = []
+            self.state.scope = {}
+            self.state.cohort_checks = []
+            self.state.gates = {}
+            self.state.report = None
+            self.state.replans = 0
+            self.pending_overrides = []
+            self.save()
+            self.orch("—", Outcome.INFO, RULES["scope"], "Scope reopened; downstream state cleared, decision history preserved.", 1)
 
     def save_summary(self, text: str) -> str:
         """Save a human-edited plain-language summary. Trusts the editor; they're the author now."""
