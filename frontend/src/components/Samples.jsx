@@ -20,8 +20,8 @@ export function reviewCell(s) {
 export default function Samples({ st, openSample }) {
   return (
     <>
-      <p className="muted">Four statuses stay separate for every run: eligibility, QC, resistance evidence and scientific review. Click a row for its decision history, the Evidence Analyst's notes and overrides.</p>
-      <div className="tw"><table><thead><tr><th>Run</th><th>Study</th><th>Location</th><th>Eligibility</th><th>QC</th><th>Profiling</th><th>Resistance evidence</th><th>Review</th></tr></thead><tbody>
+      <p className="muted">Four statuses stay separate for every run: eligibility, quality control, resistance evidence and scientific review. Click a row for its decision history, the Evidence Analyst's notes and overrides.</p>
+      <div className="tw"><table><thead><tr><th>Run</th><th>Study</th><th>Location</th><th>Eligibility</th><th>Quality Control</th><th>Profiling</th><th>Resistance evidence</th><th>Review</th></tr></thead><tbody>
         {st.samples.map(s => <tr key={s.run} className="click" onClick={() => openSample(s.run)}>
           <td className="mono">{s.run}</td><td className="mono">{s.study}</td><td>{s.location}</td><td><Chip label={s.eligibility || 'Not assessed'} kind={s.eligibility || 'none'} /></td>
           <td><Chip label={s.qc || '—'} kind={s.qc || 'none'} /></td><td><Chip label={s.profiling || '—'} kind={s.profiling ? s.profiling.split(' ')[0] : 'none'} /></td><td>{evidenceCell(s)}</td><td>{reviewCell(s)}</td></tr>)}
@@ -49,7 +49,7 @@ export function Drawer({ run, st, pending, act, who, close, version }) {
           <dt>Library</dt><dd>{s.library_strategy} · {s.platform}</dd><dt>Est. coverage</dt><dd>{s.coverage ?? '—'}×</dd><dt>Matched DST</dt><dd>{Object.keys(s.dst).length ? Object.entries(s.dst).map(([k, v]) => `${k}:${v}`).join(' ') : 'Unavailable'}</dd>
           {s.lineage && <><dt>Lineage</dt><dd className="mono">{s.lineage}</dd></>}{s.profiling_note && <><dt>Profiling</dt><dd style={{ fontSize: '.85rem' }}>{s.profiling_note}</dd></>}</dl>
         <div className="row"><RawLink kind="ena" k={s.run} label="View raw archive record" />{s.profiling === 'Done' && <RawLink kind="tbprofiler" k={s.run} label="View raw TB-Profiler JSON" />}</div>
-        <div className="row" style={{ gap: 6 }}><Chip label={'Eligibility: ' + (s.eligibility || '—')} kind={s.eligibility || 'none'} /><Chip label={'QC: ' + (s.qc || '—')} kind={s.qc || 'none'} /></div>
+        <div className="row" style={{ gap: 6 }}><Chip label={'Eligibility: ' + (s.eligibility || '—')} kind={s.eligibility || 'none'} /><Chip label={'Quality Control: ' + (s.qc || '—')} kind={s.qc || 'none'} /></div>
         {s.findings.length > 0 && <div className="box"><h3>Findings</h3>{s.findings.map(f => <div key={f.fid} style={{ fontSize: '.88rem', display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div className="row between"><span><span className="mono">{f.gene} {f.change}</span> · {f.drug}</span><Chip label={f.review} kind={f.review === 'Not required' ? 'none' : f.review.split(' ')[0]} /></div>
           {f.interpretation && <p className="muted"><span className="eyebrow">Evidence Analyst note · AI draft</span><br />{f.interpretation}</p>}</div>)}</div>}
@@ -57,7 +57,7 @@ export function Drawer({ run, st, pending, act, who, close, version }) {
           <div className="row"><button className="btn small primary" onClick={() => act(() => api.cosign({ ...who, override_id: p.id }), 'Override co-signed')}>Co-sign as {who.person || ROLE_LABEL[who.role]}</button>
             <RawLink kind="ena" k={run} /></div></div>)}
         <div className="box"><h3>Override a status</h3><p className="muted" style={{ fontSize: '.84rem' }}>More cautious changes apply at once. Relaxing a safeguard needs a second, different named person.</p>
-          <div className="row"><select value={field} onChange={e => setField(e.target.value)} aria-label="Field"><option value="eligibility">Eligibility</option><option value="qc">QC</option></select>
+          <div className="row"><select value={field} onChange={e => setField(e.target.value)} aria-label="Field"><option value="eligibility">Eligibility</option><option value="qc">Quality Control</option></select>
             <select value={to} onChange={e => setTo(e.target.value)} aria-label="New status">{(field === 'eligibility' ? ['Verified', 'Hold', 'Excluded'] : ['Pass', 'Escalated', 'Excluded']).map(o => <option key={o}>{o}</option>)}</select></div>
           <textarea value={why} onChange={e => setWhy(e.target.value)} placeholder="Rationale (required)" />
           <div className="row"><button className="btn small primary" onClick={() => act(() => api.override({ ...who, run, field, to, rationale: why }), 'Override recorded')}>Submit override</button>
