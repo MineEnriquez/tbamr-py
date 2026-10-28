@@ -173,6 +173,14 @@ tbody tr.click{cursor:pointer} tbody tr.click:hover td{background:var(--surface-
 .log-view .ll-ERROR .ll-lvl,.log-view .ll-CRITICAL .ll-lvl{color:var(--esc)}
 .log-view .ll-DEBUG{color:var(--muted)}
 .log-view .ll-trace{color:var(--esc);background:color-mix(in srgb,var(--esc-bg) 50%,transparent);padding-left:4px;border-left:2px solid var(--esc)}
+/* structured result captured alongside the log (what the action produced, not just what it printed) */
+.logs-result-badge{color:var(--blue);font-weight:600}
+.exec-result{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:0;overflow:hidden}
+.exec-result>summary{cursor:pointer;padding:8px 12px;list-style:none;display:flex;align-items:center;gap:6px;user-select:none}
+.exec-result>summary::-webkit-details-marker{display:none}
+.exec-result>summary::before{content:"▸";display:inline-block;color:var(--muted);font-size:.7rem;transition:transform .12s}
+.exec-result[open]>summary::before{transform:rotate(90deg)}
+.exec-result-json{margin:0;padding:10px 12px;border-top:1px solid var(--line);background:var(--surface);font-family:var(--f-mono);font-size:.74rem;line-height:1.45;white-space:pre-wrap;word-break:break-word;max-height:360px;overflow:auto;color:var(--ink)}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spinner{animation:none}.working::after{animation:none}}
 

@@ -440,10 +440,26 @@ class Orchestrator:
 
         def work() -> None:
             from .executions import capture_execution
-            with capture_execution(self.log, f"TB-Profiler batch ({len(runs)} run(s))"):
+            with capture_execution(self.log, f"TB-Profiler batch ({len(runs)} run(s))") as ctx:
                 with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="tbp") as pool:
                     for _ in pool.map(profile_one, runs):
                         pass
+                # Record what the batch actually produced per sample, so the Logs tab can show the
+                # outcome of a historical TB-Profiler run alongside the captured log output.
+                outcomes = []
+                for r in runs:
+                    s = self.state.sample(r)
+                    if not s:
+                        outcomes.append({"run": r, "status": "unknown", "note": "sample not found in state"})
+                        continue
+                    m = s.profile_meta or {}
+                    outcomes.append({"run": r, "status": s.profiling or "", "note": s.profiling_note or "",
+                                     "tool": m.get("tool"), "db": m.get("db"),
+                                     "resistance_annotations": len(m.get("mutations", []) or []),
+                                     "median_depth": m.get("median_depth")})
+                ctx.record({"concurrency": concurrency, "threads_per_sample": self.agents["profiling"].runner.threads,
+                            "n_runs": len(runs), "outcomes": outcomes,
+                            "status_counts": dict(Counter(o["status"] for o in outcomes))})
             with self.lock:
                 self.busy = None
                 try:
