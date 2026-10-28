@@ -91,11 +91,18 @@ class LLMAgent(BaseAgent):
                     self.log.trace(self.name, "thought", {"text": b["text"], "mode": self.client.mode})
             uses = [b for b in blocks if b["type"] == "tool_use"]
             if not uses:
-                # Claude stopped answering with text only — nudge it to submit (one chance left in the budget)
+                # Claude replied with text only — nudge differently depending on whether it has done any work yet.
+                # Nudging it to "submit now" on step 0 produces empty submissions; nudging it to use its tools
+                # steers it back to work. Only switch to the submit-nudge after it has at least called one tool.
                 if step < self.max_steps - 1:
-                    self.log.trace(self.name, "nudge", {"reason": "no tool call", "step": step})
+                    did_work = bool(self.called)
+                    nudge = ("Call the submit tool now with the result you have; if no result is possible, "
+                             "submit the minimal structure with a concerns field explaining why.") if did_work else (
+                             "Start by using your tools to gather the information this task needs. "
+                             "You must not submit until you have real data from your tool calls.")
+                    self.log.trace(self.name, "nudge", {"reason": "no tool call", "step": step, "did_work": did_work})
                     messages.append({"role": "assistant", "content": [b for b in blocks if b["type"] != "text" or b["text"].strip()] or [{"type": "text", "text": "(no response)"}]})
-                    messages.append({"role": "user", "content": "You must finish by calling the submit tool exactly once. Call submit now with the result you have; if no result is possible, submit the minimal structure with a concerns field explaining why."})
+                    messages.append({"role": "user", "content": nudge})
                     continue
                 self.log.trace(self.name, "stopped", {"reason": "no tool call or submission", "step": step})
                 break

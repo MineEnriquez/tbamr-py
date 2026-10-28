@@ -410,6 +410,9 @@ class Orchestrator:
                 self.busy = f"TB-Profiler: {', '.join(head)}" + (f" + {extra} more" if extra > 0 else "")
 
         def profile_one(r: str) -> None:
+            # Any failure here (runner crash, log DB write failure, …) is caught so one bad sample never
+            # kills the whole pool thread; the error gets written to the sample's note and logged.
+            import logging as _lg
             s = self.state.sample(r)
             if not s or s.qc != "Pass":
                 return
@@ -417,20 +420,36 @@ class Orchestrator:
                 inflight.add(r)
                 refresh_busy()
             try:
-                self.agents["profiling"].run_one(s)
+                try:
+                    self.agents["profiling"].run_one(s)
+                except Exception as e:
+                    _lg.getLogger("tbamr.profiling").exception("profile_one crashed for %s", r)
+                    try:
+                        s.profiling = s.profiling or "Failed"
+                        s.profiling_note = f"Worker crashed: {type(e).__name__}: {e}"
+                    except Exception:
+                        pass
             finally:
                 with self.lock:
                     inflight.discard(r)
                     refresh_busy()
-                    self.save()
+                    try:
+                        self.save()
+                    except Exception:
+                        _lg.getLogger("tbamr.profiling").exception("state save failed after %s", r)
 
         def work() -> None:
-            with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="tbp") as pool:
-                for _ in pool.map(profile_one, runs):
-                    pass
+            from .executions import capture_execution
+            with capture_execution(self.log, f"TB-Profiler batch ({len(runs)} run(s))"):
+                with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="tbp") as pool:
+                    for _ in pool.map(profile_one, runs):
+                        pass
             with self.lock:
                 self.busy = None
-                self.save()
+                try:
+                    self.save()
+                except Exception:
+                    pass
         threading.Thread(target=work, daemon=True).start()
         return {"started": runs, "concurrency": concurrency, "threads_per_sample": self.agents["profiling"].runner.threads}
 
@@ -484,6 +503,23 @@ class Orchestrator:
         self.state.report["summary_draft"] = text
         self.save()
         return text
+
+    def reopen_scope(self) -> None:
+        """Reset the pipeline back to Stage 1 ready so the researcher can edit scope without a full
+        pipeline reset. Clears downstream work (samples, cohort checks, gates, report) because
+        everything downstream was derived from the scope that's about to change. Decision history
+        and agent traces are preserved for the audit trail."""
+        with self.lock:
+            self.state.stage_status = {"1": "ready", "2": "locked", "3": "locked", "4": "locked", "5": "locked", "6": "locked"}
+            self.state.samples = []
+            self.state.scope = {}
+            self.state.cohort_checks = []
+            self.state.gates = {}
+            self.state.report = None
+            self.state.replans = 0
+            self.pending_overrides = []
+            self.save()
+            self.orch("—", Outcome.INFO, RULES["scope"], "Scope reopened; downstream state cleared, decision history preserved.", 1)
 
     def save_summary(self, text: str) -> str:
         """Save a human-edited plain-language summary. Trusts the editor; they're the author now."""
