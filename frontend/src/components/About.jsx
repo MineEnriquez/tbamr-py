@@ -96,15 +96,6 @@ export default function About() {
         ))}</tbody>
       </table></div>
 
-      <h3>What has — and has not — been verified</h3>
-      <ul className="clean">
-        <li>Offline demo, end to end, in a browser (all six stages, review, report, metrics, overrides).</li>
-        <li>Claude request format checked against a mocked SDK.</li>
-        <li><b>Live Claude reasoning has not been run yet</b> (needs your API key). Agents may phrase things differently from the replay scripts; the guardrails apply either way.</li>
-        <li><b>Live ENA / Europe PMC calls were not reachable from the build environment</b>; the paging logic is tested with mocked HTTP. Try <code>python -m tbamr.cli --live</code> first.</li>
-        <li><b>TB-Profiler runner not executed</b> (tools not installed in the build environment).</li>
-      </ul>
-
       <p className="muted" style={{ marginTop: '2rem', fontSize: '.85rem' }}>
         Full source and setup instructions: see the project README.
       </p>
