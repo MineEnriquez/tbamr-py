@@ -1,6 +1,6 @@
 import React from 'react'
 import { api } from '../api.js'
-import { Chip, Rationale } from './common.jsx'
+import { Chip, Rationale, RoleBadge } from './common.jsx'
 import { RawLink } from './Raw.jsx'
 
 const GRADE = { 0: 'Grading not reported', 1: 'Group 1 · Assoc. w/ R', 2: 'Group 2 · Assoc. w/ R (interim)', 3: 'Group 3 · Uncertain', 5: 'Group 5 · Not assoc. w/ R' }
@@ -10,7 +10,7 @@ export default function Review({ st, act, who, openSample }) {
   if (!fs.length) return <div className="panel"><p className="muted">The queue fills after Stage 5: uncertain gradings, low depth, minor variants and discordance wait here for the TB Microbiologist.</p></div>
   return (
     <>
-      <p className="muted">Only the TB Microbiologist can change scientific review status. The Evidence Analyst's note is an AI draft to help the reviewer, never a decision.</p>
+      <p className="role-reqd">Only <RoleBadge role="tbexpert" /> can change scientific review status. The Evidence Analyst's note is an AI draft to help the reviewer, never a decision.</p>
       <div className="team">{fs.map(f => (
         <div className="panel" key={f.fid} style={{ gap: 10 }}>
           <div className="row between"><button className="btn small ghost mono" onClick={() => openSample(f.sample_id)}>{f.sample_id}</button><Chip label={f.review} kind={f.review.split(' ')[0]} /></div>
