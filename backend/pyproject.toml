@@ -7,3 +7,12 @@ dependencies = ["fastapi>=0.115", "uvicorn[standard]>=0.32", "httpx>=0.27", "pyt
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# `ui` runs headless Playwright against a backend-only uvicorn + a built frontend/dist bundle.
+#   Default `pytest` skips them so first-time contributors don't need Chromium.
+#   `pytest -m ui` runs only the UI tests. `pytest -m 'not ui'` is the fast path (default).
+# `live` requires network access to the ENA Portal API and may be slow; opt-in only.
+markers = [
+  "ui: Playwright tests that drive the built React frontend in a headless browser",
+  "live: tests that hit the real ENA Portal API over the network",
+]
+addopts = "-m 'not ui and not live'"
