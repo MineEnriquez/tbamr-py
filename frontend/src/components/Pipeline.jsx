@@ -1,19 +1,133 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api.js'
 import { Chip, Rationale, actorLabel, ROLE_LABEL } from './common.jsx'
 import { RawLink } from './Raw.jsx'
 
 const STATUS = { locked: 'Locked', ready: 'Ready to run', wait: 'Waiting for human', done: 'Done' }
 
+/* Scope-conflict detector: if the research question text names a specific country that disagrees
+ * with the Country input field, the Scope Guardian (backend) will silently use the field and ignore
+ * the question. We detect it client-side so the user is forced to reconcile the two before Run.
+ *
+ * Deliberately small list — common countries + a handful of demonyms. Not exhaustive, but it
+ * catches the realistic mistake of "the Indonesian / Kenyan picture" vs the Country field. */
+const COUNTRY_ALIASES = [
+  ['Indonesia', ['indonesia', 'indonesian']],
+  ['Kenya', ['kenya', 'kenyan']],
+  ['India', ['india', 'indian']],
+  ['Nigeria', ['nigeria', 'nigerian']],
+  ['South Africa', ['south africa', 'south african']],
+  ['Philippines', ['philippines', 'philippine', 'filipino']],
+  ['Vietnam', ['vietnam', 'vietnamese']],
+  ['Pakistan', ['pakistan', 'pakistani']],
+  ['Bangladesh', ['bangladesh', 'bangladeshi']],
+  ['China', ['china', 'chinese']],
+  ['Myanmar', ['myanmar', 'burma', 'burmese']],
+  ['Thailand', ['thailand', 'thai']],
+  ['Peru', ['peru', 'peruvian']],
+  ['Brazil', ['brazil', 'brazilian']],
+  ['Mexico', ['mexico', 'mexican']],
+  ['Ethiopia', ['ethiopia', 'ethiopian']],
+  ['Tanzania', ['tanzania', 'tanzanian']],
+  ['Uganda', ['uganda', 'ugandan']],
+  ['Mozambique', ['mozambique', 'mozambican']],
+  ['Russia', ['russia', 'russian']],
+  ['Ukraine', ['ukraine', 'ukrainian']],
+  ['Zambia', ['zambia', 'zambian']],
+  ['Zimbabwe', ['zimbabwe', 'zimbabwean']],
+]
+
+function detectCountryInQuestion(question) {
+  const q = ' ' + String(question || '').toLowerCase() + ' '
+  for (const [canonical, aliases] of COUNTRY_ALIASES) {
+    for (const a of aliases) {
+      // word-boundary match: surround alias with non-letter chars in the padded string
+      if (new RegExp('[^a-z]' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^a-z]').test(q)) {
+        return { canonical, matched: a }
+      }
+    }
+  }
+  return null
+}
+
+/* Strip the specific alias we matched out of the question text (word-boundary), leaving the rest
+ * of the sentence intact so the user can keep editing. */
+function stripCountryFromQuestion(question, alias) {
+  return String(question || '')
+    .replace(new RegExp('\\b' + alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi'), '')
+    .replace(/\s+/g, ' ').trim()
+}
+
 export default function Pipeline({ snap, decisions, view, setView, act, who, busy, openSample }) {
   const st = snap.state
+  // view===0 is the Start hero (research question gets full width + big typography); views 1-6 are
+  // the regular stages, which share the panel with the Live decisions feed.
+  if (view === 0) return <StartHero snap={snap} act={act} who={who} busy={busy} setView={setView} />
   return (
-    <>
-      <div className="grid2">
-        <Stage n={view} snap={snap} act={act} who={who} busy={busy} openSample={openSample} />
-        <Feed decisions={decisions} />
+    <div className="grid2">
+      <Stage n={view} snap={snap} act={act} who={who} busy={busy} openSample={openSample} />
+      <Feed decisions={decisions} />
+    </div>
+  )
+}
+
+/* The landing / Start view: single big panel focused on the research question. When Stage 1 has
+ * already run we show the saved scope prominently and point the user at Stage 1 for the Guardian's
+ * findings. All behaviour (dirty gate, conflict detection, Save+Run) matches the S1 editor. */
+function StartHero({ snap, act, who, busy, setView }) {
+  const st = snap.state, status = st.stage_status['1']
+  const [q, setQ] = useState(st.question)
+  const [country, setCountry] = useState(st.country || '')
+  const [target, setTarget] = useState(st.cohort_target ?? 8)
+  const conflict = useMemo(() => {
+    const inQ = detectCountryInQuestion(q)
+    const field = country.trim()
+    if (!inQ || !field) return null
+    if (inQ.canonical.toLowerCase() === field.toLowerCase()) return null
+    return { canonical: inQ.canonical, matched: inQ.matched, field }
+  }, [q, country])
+  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || target !== (st.cohort_target ?? 8))
+  const save = () => act(() => api.setScope({ question: q, country, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')
+  const start = () => act(() => api.run(1), 'Stage 1 finished')
+  const canRun = status === 'ready' && !busy && !dirty && !conflict
+  if (status !== 'ready') return (
+    <section className="panel start-hero">
+      <span className="eyebrow">Start · Research question</span>
+      <h1 className="start-q">{st.question || <span className="muted">No research question yet.</span>}</h1>
+      <p className="start-sub">Scope: {st.country ? <>country <b>{st.country}</b></> : <>worldwide</>} · cohort target <b>{st.cohort_target}</b> · drugs <b>{st.target_drugs.join(', ')}</b></p>
+      <div className="row" style={{ gap: 10, marginTop: 12 }}>
+        <button className="btn primary" onClick={() => setView(1)}>Go to Stage 1 →</button>
+        <button className="btn ghost" title="Reopen the scope form; clears downstream work (samples/report) but preserves decision history." onClick={() => { if (confirm('Reopen scope? This clears discovered samples and any report, but keeps the decision history.')) act(() => api.reopenScope(), 'Scope reopened') }}>✎ Edit scope</button>
       </div>
-    </>
+    </section>
+  )
+  return (
+    <section className="panel start-hero">
+      <span className="eyebrow">Start · Define the research question</span>
+      <h2 className="start-h">What do you want the TB-AMR agents to investigate?</h2>
+      <p className="start-sub muted">Nothing moves until you've written this. The Scope Guardian will check it for the four required definitions before any sample is pulled.</p>
+      <textarea value={q} onChange={e => setQ(e.target.value)} aria-label="Research question" className="start-ta"
+        placeholder="e.g. What patterns of drug resistance can we identify in Mycobacterium tuberculosis genomic samples from Indonesia, and which mutations are associated with resistance to rifampicin and isoniazid?" />
+      <div className="row" style={{ gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div className="ctl"><label htmlFor="start-country">Country <span className="muted" style={{ fontWeight: 400 }}>(or state it in the question)</span></label>
+          <input id="start-country" value={country} onChange={e => setCountry(e.target.value)} placeholder='e.g. Indonesia · "Worldwide" for no filter · or leave blank if the question says so' style={{ minWidth: 320 }} /></div>
+        <div className="ctl"><label htmlFor="start-target">Cohort target</label>
+          <input id="start-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
+      </div>
+      {conflict && <div className="box esc" style={{ marginTop: 10 }}>
+        <h3>Country/question conflict — pick one</h3>
+        <p>Your question mentions <b>{conflict.canonical}</b> but the Country field is set to <b>{conflict.field}</b>. The agents only read the Country field, so one of these will be silently ignored. Pick which one to keep before you can save or start.</p>
+        <div className="row" style={{ gap: 6 }}>
+          <button className="btn small primary" onClick={() => setCountry(conflict.canonical)}>Use <b>{conflict.canonical}</b> (set the field)</button>
+          <button className="btn small" onClick={() => setQ(stripCountryFromQuestion(q, conflict.matched))}>Use <b>{conflict.field}</b> (remove "{conflict.matched}" from the question)</button>
+        </div>
+      </div>}
+      <div className="row" style={{ gap: 8, marginTop: 14 }}>
+        <button className="btn primary" disabled={!dirty || !!conflict} onClick={save}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
+        <button className="btn primary" disabled={!canRun} title={!canRun ? (conflict ? 'Resolve the conflict first' : dirty ? 'Save the scope first' : busy ? 'A stage is running' : '') : 'Hand the scope to the Scope Guardian'} onClick={start}>Start the pipeline →</button>
+        <span className="muted" style={{ fontSize: '.82rem' }}>{conflict ? 'Fix the conflict above.' : dirty ? 'Save, then Start.' : canRun ? 'Ready to start.' : ''}</span>
+      </div>
+    </section>
   )
 }
 
@@ -32,10 +146,15 @@ function Feed({ decisions }) {
 function Stage({ n, snap, act, who, busy, openSample }) {
   const st = snap.state, meta = snap.stages[n - 1], status = st.stage_status[String(n)]
   const agents = meta.agents
-  // Stage 1 "Run agents" is only enabled when the current scope form is saved (no unsaved edits).
+  // Stage 1 "Run agents" is only enabled when the current scope form is saved AND has no
+  // country/question conflict (the Guardian would otherwise silently use the field and ignore the question).
   const [scopeDirty, setScopeDirty] = useState(false)
-  const disabledReason = (n === 1 && status === 'ready' && scopeDirty) ? 'Save the scope first' : (!!busy ? 'A stage is running' : '')
-  const runBtn = <button className="btn primary" disabled={status !== 'ready' || !!busy || (n === 1 && scopeDirty)} title={disabledReason || undefined}
+  const [scopeBlocked, setScopeBlocked] = useState(false)
+  const disabled = n === 1 && status === 'ready' && (scopeDirty || scopeBlocked)
+  const disabledReason = (n === 1 && status === 'ready')
+    ? (scopeBlocked ? 'Resolve the country/question conflict first' : (scopeDirty ? 'Save the scope first' : ''))
+    : (busy ? 'A stage is running' : '')
+  const runBtn = <button className="btn primary" disabled={status !== 'ready' || !!busy || disabled} title={disabledReason || undefined}
                    onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'ready' ? 'Run agents' : 'Ran'}</button>
   return (
     <section className="panel">
@@ -43,7 +162,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       <div className="tools">{agents.map(a => <span className="tool" key={a}>{a.replace(/_/g, ' ')}</span>)}</div>
       {busy && <div className="working" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span>Working on <b>{busy}</b>… agents are reasoning and calling tools; watch the Agent team tab for live traces.</span></div>}
       {status === 'locked' && <div className="box note"><p className="muted">This stage unlocks when the previous stage's human gate is passed.</p></div>}
-      {n === 1 && <S1 st={st} status={status} act={act} who={who} onDirtyChange={setScopeDirty} />}
+      {n === 1 && <S1 st={st} status={status} act={act} who={who} onDirtyChange={setScopeDirty} onBlockedChange={setScopeBlocked} />}
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
       {n === 3 && ['wait', 'done'].includes(status) && <S3 st={st} status={status} act={act} who={who} openSample={openSample} />}
       {n === 4 && ['wait', 'done'].includes(status) && <S4 snap={snap} status={status} act={act} who={who} openSample={openSample} />}
@@ -53,14 +172,25 @@ function Stage({ n, snap, act, who, busy, openSample }) {
   )
 }
 
-function S1({ st, status, act, who, onDirtyChange }) {
+function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
   const [q, setQ] = useState(st.question)
   const [country, setCountry] = useState(st.country || '')
   const [target, setTarget] = useState(st.cohort_target ?? 8)
   const sc = st.scope || {}
+  // Detect a question/country-field conflict: if the question clearly names a country different
+  // from the Country field, the Guardian will silently use the field. Force the user to reconcile.
+  const conflict = useMemo(() => {
+    const inQ = detectCountryInQuestion(q)
+    const fieldTrim = country.trim()
+    if (!inQ) return null
+    if (!fieldTrim) return null  // only the question specifies a country — fine, let the Guardian use it
+    if (inQ.canonical.toLowerCase() === fieldTrim.toLowerCase()) return null  // they agree
+    return { canonical: inQ.canonical, matched: inQ.matched, field: fieldTrim }
+  }, [q, country])
   // When the form drifts from what's in the backend, mark the whole stage dirty so the Run button disables.
   const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || target !== (st.cohort_target ?? 8))
   useEffect(() => { onDirtyChange && onDirtyChange(dirty) }, [dirty, onDirtyChange])
+  useEffect(() => { onBlockedChange && onBlockedChange(!!conflict) }, [conflict, onBlockedChange])
   if (status === 'ready') return (
     <div className="box"><span className="eyebrow">Research question</span>
       <textarea value={q} onChange={e => setQ(e.target.value)} aria-label="Research question" />
@@ -70,8 +200,18 @@ function S1({ st, status, act, who, onDirtyChange }) {
         <div className="ctl"><label htmlFor="scope-target">Cohort target</label>
           <input id="scope-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
       </div>
-      <div className="row"><button className="btn small primary" disabled={!dirty} onClick={() => act(() => api.setScope({ question: q, country, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
-        <span className="muted" style={{ fontSize: '.82rem' }}>{dirty ? 'Unsaved changes — Save scope before Run agents.' : 'Scope saved. Click Run agents to kick off the Scope Guardian.'}</span></div></div>)
+      {conflict && <div className="box esc" style={{ marginTop: 10 }}>
+        <h3>Country/question conflict — pick one</h3>
+        <p>Your question mentions <b>{conflict.canonical}</b> but the Country field is set to <b>{conflict.field}</b>. The agents only read the Country field, so one of these will be silently ignored. Pick which one to keep before you can save or run.</p>
+        <div className="row" style={{ gap: 6 }}>
+          <button className="btn small primary" onClick={() => setCountry(conflict.canonical)}>Use <b>{conflict.canonical}</b> (set the field)</button>
+          <button className="btn small" onClick={() => setQ(stripCountryFromQuestion(q, conflict.matched))}>Use <b>{conflict.field}</b> (remove "{conflict.matched}" from the question)</button>
+        </div>
+      </div>}
+      <div className="row"><button className="btn small primary" disabled={!dirty || !!conflict} onClick={() => act(() => api.setScope({ question: q, country, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
+        <span className="muted" style={{ fontSize: '.82rem' }}>
+          {conflict ? 'Resolve the conflict above before saving.' : (dirty ? 'Unsaved changes — Save scope before Run agents.' : 'Scope saved. Click Run agents to kick off the Scope Guardian.')}
+        </span></div></div>)
   return (
     <>
       <div className="box">
