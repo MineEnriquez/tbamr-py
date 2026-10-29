@@ -12,10 +12,11 @@ from typing import Any
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from .article import render_article_html
 from .core.decisions import DecisionLog, GuardrailViolation
 from .core.executions import capture_execution
 from .core.orchestrator import Orchestrator, PermissionDenied, StageError
@@ -246,6 +247,23 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
     @app.put("/api/report/summary")
     def save_summary(s: SummaryEdit):
         return {"text": guard(O().save_summary, s.text)}
+
+    @app.get("/api/report/{version}/article.html")
+    def report_article(version: int, print: int = 0, download: int = 0):
+        """Self-contained publishable HTML article for a released (or draft) report version.
+        `?print=1` auto-opens the browser Print dialog so the user can Save-as-PDF in one click.
+        `?download=1` sets Content-Disposition: attachment for a direct file download."""
+        rep = O().state.report
+        if not rep:
+            raise HTTPException(404, "No report has been built yet (Stage 6).")
+        if int(rep.get("version") or 0) != int(version):
+            raise HTTPException(404, f"No report v{version} (current is v{rep.get('version')}).")
+        html_doc = render_article_html(O().state, rep, print_mode=bool(print),
+                                       download_url=f"/api/report/{version}/article.html?download=1" if not download else None)
+        headers = {}
+        if download:
+            headers["Content-Disposition"] = f'attachment; filename="tbamr-report-v{version}.html"'
+        return HTMLResponse(html_doc, headers=headers)
 
     @app.post("/api/profiling/import")
     async def import_results(role: str, person: str = "", files: list[UploadFile] = File(...)):

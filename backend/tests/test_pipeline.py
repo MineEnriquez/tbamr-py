@@ -357,3 +357,50 @@ def test_harness_reseed_refuses_non_harness_filenames(tmp_path):
     ok.write_text("fine")
     _safe_unlink(ok)
     assert not ok.exists()
+
+
+# ---------------------------------------------------------------- publishable article
+def test_report_article_renders_all_sections_and_streams_a_pdf_print_variant(orch):
+    """A full pipeline run exposes a self-contained HTML article at /api/report/{v}/article.html,
+    with every main report section and inline SVG plots. The print=1 variant auto-triggers the
+    browser's Print dialog so users can Save-as-PDF without a server-side PDF dependency."""
+    report = run_to_report(orch)
+    assert report and report["version"] == 1
+    orch.draft_summary()  # realistic article has a plain-language summary
+    # Final release is blocked by any pending finding; "draft" always succeeds. Using draft keeps
+    # the test independent of the demo cohort's finding mix.
+    orch.release("pi", "Ana", "draft")
+    c = TestClient(create_app(orch))
+
+    r = c.get("/api/report/1/article.html")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
+    html = r.text
+    assert "<!doctype html>" in html.lower()
+    assert "Genomic resistance evidence" in html
+    # Scope context is pulled from state, not the report dict.
+    assert "Indonesia" in html
+    # Core sections are all present.
+    for h in ("Plain-language summary", "Sample counts", "Resistance evidence by drug",
+              "Most frequent mutations", "Lineages", "Limitations", "Unresolved findings",
+              "Exclusions and holds", "Provenance"):
+        assert f">{h}" in html, f"article missing section {h!r}"
+    # Status chip reflects the actual release gate.
+    assert "Exploratory draft" in html
+    # Inline SVG plots so the file is truly self-contained (no external assets).
+    assert "<svg" in html and "http://www.w3.org/2000/svg" in html
+
+    r_dl = c.get("/api/report/1/article.html", params={"download": 1})
+    assert r_dl.status_code == 200
+    assert 'attachment; filename="tbamr-report-v1.html"' in r_dl.headers.get("content-disposition", "")
+
+    r_print = c.get("/api/report/1/article.html", params={"print": 1})
+    assert r_print.status_code == 200 and "window.print()" in r_print.text
+
+    missing = c.get("/api/report/9/article.html")
+    assert missing.status_code == 404
+
+
+def test_report_article_404s_when_no_report_exists(orch):
+    c = TestClient(create_app(orch))
+    r = c.get("/api/report/1/article.html")
+    assert r.status_code == 404 and "Stage 6" in r.json()["detail"]
