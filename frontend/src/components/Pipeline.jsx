@@ -167,6 +167,19 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       {n === 3 && ['wait', 'done'].includes(status) && <S3 st={st} status={status} act={act} who={who} openSample={openSample} />}
       {n === 4 && ['wait', 'done'].includes(status) && <S4 snap={snap} status={status} act={act} who={who} openSample={openSample} />}
       {n === 5 && status === 'done' && <S5 st={st} act={act} />}
+      {n === 6 && status === 'ready' && (
+        <div className="box note">
+          <p><b>Run agents</b> will hand the pipeline to the Reporting Orchestrator, which assembles the evidence report from everything approved in Stages 1 – 5. You'll then see, on the <b>Report</b> tab:</p>
+          <ul className="clean" style={{ fontSize: '.9rem' }}>
+            <li>Sample counts: candidates → verified → QC-passed → profiled.</li>
+            <li>Per-drug resistance: predicted resistant, uncertain / pending, reviewed, and concordance with any matched DST.</li>
+            <li>The most frequent mutations and lineages observed in the cohort.</li>
+            <li>Unresolved findings, exclusions / holds, and the policy limitations the Scope Guardian wrote.</li>
+            <li>A plain-language summary (optional — Claude drafts it, you can edit).</li>
+          </ul>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>Every number is derived by rule from the decision log, so the report is reproducible. Release stays with <RoleBadge role="pi" />.</p>
+        </div>
+      )}
       {n === 6 && ['wait', 'done'].includes(status) && <S6 st={st} act={act} who={who} />}
     </section>
   )
