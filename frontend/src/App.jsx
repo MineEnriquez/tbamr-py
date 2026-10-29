@@ -21,7 +21,7 @@ export default function App() {
   const [decisions, setDecisions] = useState([])
   const [metrics, setMetrics] = useState(null)
   const [tab, setTab] = useState('pipeline')
-  const [view, setView] = useState(1)
+  const [view, setView] = useState(0)  // view 0 = Start hero; 1-6 = pipeline stages
   const [role, setRole] = useState(load('tbamr.role') || 'pi')
   const [person, setPerson] = useState(load('tbamr.person'))
   const [sel, setSel] = useState(null)
@@ -115,7 +115,11 @@ export default function App() {
         </div>
       </div>
       <div className="banner">
-        <span className={'tag ' + snap.mode.data}>{snap.mode.data === 'demo' ? 'DEMO DATA (simulated)' : 'LIVE DATA · ENA'}</span>
+        <ModeSwitch mode={snap.mode.data} busy={!!snap.busy} onSwitch={next => {
+          if (confirm(`Switch data mode to ${next.toUpperCase()}? This resets the pipeline (previous decisions stay in the log).`)) {
+            act(() => api.reset(next), `Switched to ${next} mode`)
+          }
+        }} />
         <span className={'tag ' + snap.mode.brain}>{snap.mode.brain === 'claude' ? 'Claude agents (live reasoning)' : 'Replay agents (scripted, no API key)'}</span>
       </div>
       <Flow snap={snap} team={team} view={tab === 'pipeline' ? view : null} pending={pending} onPick={n => { setView(n); setTab(n === 5 && pending ? 'review' : 'pipeline') }} />
@@ -136,6 +140,22 @@ export default function App() {
       <footer>{snap.mode.data === 'demo' ? 'Demo data: every accession starting DEMO/PRJDEMO is simulated.' : 'Live data from the ENA Portal API.'} <a href="#about" onClick={e => { e.preventDefault(); setTab('about') }}>About</a></footer>
     </div>
     </RawCtx.Provider>
+  )
+}
+
+/* Two-state switch for the data mode. Clicking flips demo ↔ live and resets the pipeline.
+ * Live mode talks to the real ENA Portal API (and uses Claude if ANTHROPIC_API_KEY is present);
+ * demo mode runs offline against simulated DEMO/PRJDEMO accessions. */
+function ModeSwitch({ mode, busy, onSwitch }) {
+  const live = mode === 'live'
+  const next = live ? 'demo' : 'live'
+  return (
+    <button type="button" role="switch" aria-checked={live} disabled={busy}
+      className={'mode-switch ' + mode} title={`Click to switch to ${next.toUpperCase()} mode (resets the pipeline)`}
+      onClick={() => onSwitch(next)}>
+      <span className={'mode-track' + (live ? ' on' : '')}><span className="mode-knob" /></span>
+      <span className="mode-label">{live ? 'LIVE DATA · ENA' : 'DEMO DATA (simulated)'}</span>
+    </button>
   )
 }
 

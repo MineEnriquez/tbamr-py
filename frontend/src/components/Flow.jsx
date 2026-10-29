@@ -23,13 +23,15 @@ export default function Flow({ snap, team, view, onPick, pending }) {
   const st = snap.state
   const byName = Object.fromEntries(team.map(a => [a.name, a]))
   const released = !!st.gates?.release
+  const startCur = view === 0
   return (
     <section className="flow" aria-label="Workflow diagram">
       <div className="fchart">
-        <div className="fnode cap">
+        <button className={`fnode cap clickable${startCur ? ' cur' : ''}`} onClick={() => onPick(0)}
+          aria-label="Start — define the research question">
           <span className="fcap">start</span>
           <span className="fnode-body">Research question</span>
-        </div>
+        </button>
         <Arrow />
         {snap.stages.map((s, idx) => {
           const status = st.stage_status[String(s.n)]
