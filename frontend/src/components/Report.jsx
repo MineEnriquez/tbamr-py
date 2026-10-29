@@ -47,7 +47,12 @@ export default function Report({ st, act, brain }) {
   return (
     <section className="panel">
       <div className="row between"><div><span className="eyebrow">Report v{r.version} · {r.rule_version}</span><h2>Genomic resistance evidence</h2></div>
-        <div className="row"><RawLink kind="report" k={String(r.version)} label="View underlying data" /><Chip label={released ? 'Released · final' : 'Exploratory · not scientifically approved'} kind={released ? 'Proceed' : 'Pending'} /></div></div>
+        <div className="row" style={{ gap: 6 }}>
+          <a className="btn small" href={`/api/report/${r.version}/article.html?download=1`} download={`tbamr-report-v${r.version}.html`} title="Self-contained HTML article with inline plots">Download HTML</a>
+          <a className="btn small" href={`/api/report/${r.version}/article.html?print=1`} target="_blank" rel="noopener" title="Opens the article and auto-triggers the browser Print dialog, so you can Save as PDF">Download PDF</a>
+          <RawLink kind="report" k={String(r.version)} label="View underlying data" />
+          <Chip label={released ? 'Released · final' : 'Exploratory · not scientifically approved'} kind={released ? 'Proceed' : 'Pending'} />
+        </div></div>
       {r.superseded && <div className="box esc"><p><b>Superseded.</b> Something changed after this version; regenerate it in Stage 6.</p></div>}
       <div className="box note"><p>Computational predictions from public genomes: not laboratory-confirmed susceptibility, not a national prevalence estimate.</p></div>
       <Summary r={r} act={act} />
