@@ -60,7 +60,7 @@ const FRONTEND_PKGS = [
 
 const EXTERNAL = [
   ['SQLite', 'stdlib (via Python sqlite3)', 'decision log, agent trace, raw cache, executions, runs'],
-  ['TB-Profiler', 'optional, subprocess', 'resistance profiling for live isolates; parser handles v4.x–v6.x JSON'],
+  ['TB-Profiler', 'docker (staphb/tbprofiler) or local binary', 'resistance profiling for live isolates; parser handles v4.x–v6.x JSON'],
   ['fasterq-dump (sra-tools)', 'optional, subprocess', 'FASTQ retrieval before TB-Profiler'],
   ['ENA Portal API', 'ebi.ac.uk/ena/portal/api', 'run + study metadata (TBAMR_DATA=live)'],
   ['Europe PMC API', 'europepmc.org/RestfulWebService', 'linked publications (TBAMR_DATA=live)'],
@@ -186,7 +186,18 @@ export default function About() {
       <p className="muted" style={{ fontSize: '.9rem' }}>
         Source and database: <span className="mono">github.com/jodyphelan/TBProfiler</span>.
         This project parses TB-Profiler JSON (v4.x – v6.x) via <span className="mono">backend/tbamr/tools/tbprofiler.py</span>;
-        the tool itself is invoked as a subprocess when <span className="mono">tb-profiler</span> and <span className="mono">fasterq-dump</span> are on the PATH.
+        the runner invokes the tool either as a local <span className="mono">tb-profiler</span> binary or via Docker.
+      </p>
+      <p className="muted" style={{ fontSize: '.9rem' }}>
+        Docker image used by this project: <b><span className="mono">staphb/tbprofiler</span></b>, maintained by the
+        <b> State Public Health Bioinformatics (StaPH-B)</b> consortium. It bundles TB-Profiler, snpEff
+        and the WHO resistance database at a pinned version, so results are reproducible across machines.
+        Install once with:
+      </p>
+      <pre className="box mono" style={{ fontSize: '.85rem', padding: '8px 12px', margin: '4px 0 8px' }}>docker pull staphb/tbprofiler</pre>
+      <p className="muted" style={{ fontSize: '.9rem' }}>
+        Image on Docker Hub: <span className="mono">hub.docker.com/r/staphb/tbprofiler</span>.
+        Source: <span className="mono">github.com/StaPH-B/docker-builds/tree/master/build-files/tbprofiler</span>.
       </p>
       <p className="muted" style={{ fontSize: '.9rem' }}>
         Sample metadata and sequencing runs come from the <b>European Nucleotide Archive (ENA)</b> at EMBL-EBI,
