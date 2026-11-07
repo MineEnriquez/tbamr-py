@@ -404,3 +404,19 @@ def test_report_article_404s_when_no_report_exists(orch):
     c = TestClient(create_app(orch))
     r = c.get("/api/report/1/article.html")
     assert r.status_code == 404 and "Stage 6" in r.json()["detail"]
+
+
+def test_release_is_archived_after_it_is_recorded(orch, monkeypatch):
+    """Regression for #19: the Mongo archive must see the release decision already in the log."""
+    import tbamr.stores.results as results
+    seen = {}
+
+    def fake_save(state, report, gate):
+        seen["logged"] = any(d["outcome"] == "Approve" and "report v" in d["rationale"] for d in orch.log.all())
+        seen["gate"] = dict(state.gates.get("release", {}))
+
+    monkeypatch.setattr(results, "save_release", fake_save)
+    run_to_report(orch)
+    orch.raw_view("report", str(orch.state.report["version"]), "pi", "Ana")
+    orch.release("pi", "Ana", "draft")
+    assert seen == {"logged": True, "gate": {"by": "Ana", "role": "pi", "kind": "draft", "version": orch.state.report["version"]}}
