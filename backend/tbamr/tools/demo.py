@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..logutil import logged
+
 GENOME = 4_411_532
 
 # run, biosample, study, country, strategy, platform, layout, est. coverage (None = base_count missing), md5
@@ -202,6 +204,7 @@ class DemoDataTools:
 
     is_demo = True
 
+    @logged("tbamr.tools.demo")
     def ena_count(self, query: str) -> int:
         return len(self._match(query))
 
@@ -217,23 +220,28 @@ class DemoDataTools:
                 rows = [r for r in rows if r["study_accession"] != acc]
         return rows
 
+    @logged("tbamr.tools.demo")
     def ena_search_runs(self, country: str = "Indonesia", extra_query: str = "", limit: int = 500, page_size: int = 200) -> dict[str, Any]:
         q = f'tax_tree(1773) AND country="{country}*"' + (f" AND {extra_query}" if extra_query else "")
         matches = self._match(q)
         rows = matches[:limit]
         return {"query": q, "returned": len(rows), "total_in_ena": len(matches), "runs": rows, "demo": True}
 
+    @logged("tbamr.tools.demo")
     def ena_run(self, run_accession: str) -> dict[str, Any] | None:
         return next((_row(r) for r in _RUNS if r[0] == run_accession), None)
 
+    @logged("tbamr.tools.demo")
     def ena_study(self, study_accession: str) -> dict[str, Any]:
         return {"study_accession": study_accession, "study_title": _STUDIES.get(study_accession), "demo": True}
 
+    @logged("tbamr.tools.demo")
     def ena_file_report(self, run_accession: str) -> dict[str, Any]:
         r = self.ena_run(run_accession) or {}
         files = 1 if r.get("library_layout") == "SINGLE" else 2
         return {"run_accession": run_accession, "fastq_ftp": "", "fastq_md5": ";".join(f"demo{i + 1}" for i in range(files)) if r.get("fastq_md5") else "", "demo": True}
 
+    @logged("tbamr.tools.demo")
     def find_publications(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
         for acc, pubs in _PUBS.items():
             if acc in query:

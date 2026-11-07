@@ -9,6 +9,7 @@ from typing import Any
 
 import httpx
 
+from ..logutil import logged
 from ..stores.cache import cache
 
 ENA = "https://www.ebi.ac.uk/ena/portal/api"
@@ -25,6 +26,7 @@ class DataTools:
     def ena_count(self, query: str) -> int:
         return cache.wrap("ena", {"m": "count", "q": query}, lambda: self._ena_count(query))
 
+    @logged("tbamr.tools.ena")
     def _ena_count(self, query: str) -> int:
         r = self.http.get(f"{ENA}/count", params={"result": "read_run", "query": query})
         r.raise_for_status()
@@ -41,6 +43,7 @@ class DataTools:
             lambda: self._ena_search_runs(country, extra_query, limit, page_size),
         )
 
+    @logged("tbamr.tools.ena")
     def _ena_search_runs(self, country: str = "", extra_query: str = "", limit: int = 500, page_size: int = 200) -> dict[str, Any]:
         """Search M. tuberculosis read runs, optionally scoped by country. Empty, 'worldwide' or 'global'
         (case-insensitive) all mean no country filter.
@@ -70,6 +73,7 @@ class DataTools:
         """One run's record (same fields as the search)."""
         return cache.wrap("ena", {"m": "run", "acc": run_accession}, lambda: self._ena_run(run_accession))
 
+    @logged("tbamr.tools.ena")
     def _ena_run(self, run_accession: str) -> dict[str, Any] | None:
         r = self.http.get(f"{ENA}/search", params={"result": "read_run", "query": f'run_accession="{run_accession}"', "fields": RUN_FIELDS, "format": "json", "limit": 1})
         r.raise_for_status()
@@ -79,6 +83,7 @@ class DataTools:
     def ena_study(self, study_accession: str) -> dict[str, Any]:
         return cache.wrap("ena", {"m": "study", "acc": study_accession}, lambda: self._ena_study(study_accession))
 
+    @logged("tbamr.tools.ena")
     def _ena_study(self, study_accession: str) -> dict[str, Any]:
         r = self.http.get(
             f"{ENA}/search",
@@ -91,6 +96,7 @@ class DataTools:
     def ena_file_report(self, run_accession: str) -> dict[str, Any]:
         return cache.wrap("ena", {"m": "filereport", "acc": run_accession}, lambda: self._ena_file_report(run_accession))
 
+    @logged("tbamr.tools.ena")
     def _ena_file_report(self, run_accession: str) -> dict[str, Any]:
         r = self.http.get(
             f"{ENA}/filereport",
@@ -104,6 +110,7 @@ class DataTools:
     def find_publications(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
         return cache.wrap("pmc", {"m": "find", "q": query, "limit": limit}, lambda: self._find_publications(query, limit))
 
+    @logged("tbamr.tools.ena")
     def _find_publications(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
         r = self.http.get(EPMC, params={"query": query, "format": "json", "resultType": "lite", "pageSize": limit})
         r.raise_for_status()

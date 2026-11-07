@@ -7,6 +7,7 @@ can bypass the playbook's safeguards.
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import threading
 import time
@@ -68,6 +69,43 @@ def check_agent_decision(d: Decision) -> Decision:
     return d
 
 
+_DLOG = logging.getLogger("tbamr.decisions")
+_MAXLOG = 400
+
+
+def _clip(text: Any, n: int = _MAXLOG) -> str:
+    t = text if isinstance(text, str) else json.dumps(text, default=str)
+    t = " ".join(t.split())
+    return t if len(t) <= n else t[: n - 1] + "…"
+
+
+def _agent_logger(actor_or_agent: str) -> logging.Logger:
+    """tbamr.agents.<name> for agents, tbamr.humans for people, tbamr.orchestrator for the orchestrator."""
+    a = actor_or_agent or "?"
+    if a.startswith("human:"):
+        return logging.getLogger("tbamr.humans")
+    name = a.split(":", 1)[1] if a.startswith("agent:") else a
+    return logging.getLogger("tbamr.orchestrator" if name == "orchestrator" else f"tbamr.agents.{name}")
+
+
+def _trace_summary(kind: str, payload: Any) -> str:
+    """One readable line per agent step; the full payload stays in the trace table."""
+    p = payload if isinstance(payload, dict) else {"value": payload}
+    if kind == "tool_call":
+        out = p.get("output_preview")
+        return f"tool {p.get('tool')} input={_clip(p.get('input'), 160)} → {_clip(out, 200)}"
+    if kind == "thought":
+        return f"thought: {_clip(p.get('text'), 300)}"
+    if kind == "task":
+        return f"task ({p.get('mode')}): {_clip(p.get('task'), 240)}"
+    if kind == "submit":
+        sizes = {k: (len(v) if isinstance(v, (list, dict)) else v) for k, v in p.items() if k not in ("search_notes",)}
+        return f"submitted {_clip(sizes, 300)}"
+    if kind in ("nudge", "stopped", "guardrail", "fallback", "handoff"):
+        return f"{kind}: {_clip(p, 300)}"
+    return f"{kind}: {_clip(p, 300)}"
+
+
 class DecisionLog:
     """Append-only decision log backed by SQLite. Overrides never delete history."""
 
@@ -113,8 +151,15 @@ class DecisionLog:
 
     # decisions -------------------------------------------------------------
     def add(self, d: Decision) -> Decision:
-        with self._lock:
+        lg = _agent_logger(d.actor)
+        try:
             check_agent_decision(d)
+        except Exception as e:
+            lg.warning("decision REJECTED by guardrail actor=%s sample=%s outcome=%s: %s", d.actor, d.sample_id, d.outcome.value, e)
+            raise
+        lg.info("decision stage=%s sample=%s outcome=%s rule=%s actor=%s — %s%s", d.stage, d.sample_id, d.outcome.value,
+                d.rule_version, d.actor, _clip(d.rationale), f" | evidence: {_clip(d.evidence, 200)}" if d.evidence else "")
+        with self._lock:
             self.db.execute(
                 "INSERT INTO decisions VALUES (?,?,?,?,?,?,?,?,?)",
                 (d.id, d.ts, d.stage, d.sample_id, d.outcome.value, d.rule_version, d.actor, d.rationale, d.evidence),
@@ -136,6 +181,8 @@ class DecisionLog:
 
     # agent trace ------------------------------------------------------------
     def trace(self, agent: str, kind: str, payload: Any) -> int:
+        lg = _agent_logger(agent)
+        (lg.warning if kind in ("guardrail", "stopped", "fallback") else lg.info)("%s", _trace_summary(kind, payload))
         text = json.dumps(payload, default=str)
         if len(text) > 20000:  # never store invalid (cut) JSON; the full value lives in the raw table
             text = json.dumps({"truncated": True, "preview": text[:4000]})
@@ -170,6 +217,7 @@ class DecisionLog:
 
     # raw data + view receipts ---------------------------------------------------
     def put_raw(self, kind: str, key: str, data: Any) -> None:
+        _DLOG.debug("raw stored kind=%s key=%s", kind, key)
         with self._lock:
             self.db.execute("INSERT OR REPLACE INTO raw VALUES (?,?,?,?)", (kind, key, time.time(), json.dumps(data, default=str)))
             self.db.commit()
@@ -202,6 +250,7 @@ class DecisionLog:
 
     def record_view(self, person: str, role: str, kind: str, key: str) -> float:
         ts = time.time()
+        logging.getLogger("tbamr.humans").info("raw data viewed by %s (%s): %s/%s", person or "unnamed", role, kind, key)
         with self._lock:
             self.db.execute("INSERT INTO views VALUES (?,?,?,?,?)", (person, role, kind, key, ts))
             self.db.commit()
