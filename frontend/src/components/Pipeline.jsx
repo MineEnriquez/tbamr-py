@@ -388,6 +388,7 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
         </div>
       </div>
       {sc.blocking?.length > 0 && <div className="box esc"><h3>Blocking gaps</h3><ul className="clean">{sc.blocking.map(b => <li key={b}>{b}</li>)}</ul></div>}
+      {sc.from_cache && <div className="box note cached-note" role="note"><b>Cached answer.</b> This scope is identical to an earlier one, so the Scope Guardian's review below was reused from the cache: no new model call was made. Change the scope, or turn off the Claude cache in Admin, for a fresh review.</div>}
       {sc.warnings?.length > 0 && <div className="box hold"><h3>Warnings from the Scope Guardian</h3><ul className="clean">{sc.warnings.map(w => <li key={w}>{w}</li>)}</ul></div>}
       <Definitions gaps={sc.gaps || []} />
       {status === 'wait' && <div className="box gate"><h3>Gate · Researcher approval</h3>

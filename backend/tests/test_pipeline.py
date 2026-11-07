@@ -618,7 +618,7 @@ def test_release_is_archived_after_it_is_recorded(orch, monkeypatch):
 def test_guardian_wording_never_replaces_the_applied_definitions():
     """The model's proposed definitions are kept as suggestions; the applied text always comes from the rules."""
     divergent = lambda m: [{"type": "tool_use", "name": "submit", "input": {"blocking": [], "warnings": [], "asks_comparison_across_places": False,
-        "gaps": [{"key": "missing_dst", "gap": "DST", "proposal": "Exclude samples without phenotypic DST."},
+        "gaps": [{"key": "missing_dst", "gap": "DST", "agrees": False, "proposal": "Exclude samples without phenotypic DST."},
                  {"key": "transmission", "gap": "Transmission", "proposal": "No transmission inference."}]}}]
     g = ScopeGuardian(DecisionLog(), ReplayClient({"scope_guardian": divergent}))
     res = g.review("Rifampicin resistance in Indonesia", "Indonesia", ["Rifampicin"], 8)
@@ -680,3 +680,28 @@ def test_worker_thread_logs_reach_the_execution(tmp_path):
         t.start(); t.join()
     ex = log.get_execution(log.list_executions(1)[0]["id"])
     assert "worker says hi" in ex["log_text"]
+
+
+# ---------------------------------------------------------------- Scope Guardian signal: no restatements, no boilerplate
+def _guardian_with(submission, cached=False):
+    class Client(ReplayClient):
+        last_call_cached = cached
+    return ScopeGuardian(DecisionLog(), Client({"scope_guardian": lambda m: [{"type": "tool_use", "name": "submit", "input": submission}]}))
+
+
+def test_guardian_shows_suggestions_only_for_proposed_changes():
+    sub = {"blocking": [], "asks_comparison_across_places": False, "warnings": [f"w{i}" for i in range(7)],
+           "gaps": [{"key": "verified_origin", "agrees": True, "proposal": "Suggestion only: keep the rule that runs are Verified ..."},
+                    {"key": "missing_dst", "agrees": False, "proposal": "Also report how many runs have DST."},
+                    {"key": "duplicates", "proposal": "Keep one run per BioSample."}]}  # no `agrees`: treated as agreement
+    res = _guardian_with(sub).review("Rifampicin resistance in Indonesia", "Indonesia", ["Rifampicin"], 8)
+    by = {g["key"]: g for g in res["gaps"]}
+    assert "suggestion" not in by["verified_origin"] and "suggestion" not in by["duplicates"]  # restatements are dropped
+    assert by["missing_dst"]["suggestion"] == "Also report how many runs have DST."
+    assert res["warnings"] == ["w0", "w1", "w2", "w3"]  # capped at 4 model warnings
+    assert res["from_cache"] is False
+
+
+def test_guardian_flags_a_cached_answer():
+    sub = {"blocking": [], "asks_comparison_across_places": False, "warnings": [], "gaps": []}
+    assert _guardian_with(sub, cached=True).review("Rifampicin resistance in Indonesia", "Indonesia", ["Rifampicin"], 8)["from_cache"] is True

@@ -71,7 +71,7 @@ def scope_guardian(messages):
     if places:
         warnings.append("The question compares places; that needs verified isolates from several locations, which will be checked after discovery.")
     # The definitions are fixed by the pipeline's rules; the scripted agent accepts them as given.
-    gaps = [{"key": g["key"], "gap": g["gap"], "proposal": g.get("applied", "")} for g in c.get("required_policy_gaps", [])]
+    gaps = [{"key": g["key"], "gap": g["gap"], "agrees": True} for g in c.get("required_policy_gaps", [])]
     return [think(f"Read the question ({len(q)} characters) and {len(c.get('target_drugs', []))} target drug(s). Accepting the four playbook definitions as the rules apply them; {len(warnings)} warning(s)."),
             use("submit", blocking=[], gaps=gaps, warnings=warnings, asks_comparison_across_places=places)]
 

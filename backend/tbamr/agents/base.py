@@ -91,9 +91,12 @@ class LLMAgent(BaseAgent):
         messages: list[dict[str, Any]] = [{"role": "user", "content": task + ("\n\nContext (JSON):\n" + json.dumps(ctx, default=str) if ctx else "")}]
         self.log.trace(self.name, "task", {"task": task, "mode": self.client.mode})
         by_name = {t.name: t for t in self.tools}
+        calls = cached = 0
         for step in range(self.max_steps):
             _AGENT_LOG.info("LLMAgent.step agent=%s step=%s/%s", self.name, step + 1, self.max_steps)
             blocks = self.client.complete(self.name, system, messages, tools)
+            calls += 1
+            cached += bool(getattr(self.client, "last_call_cached", False))
             for b in blocks:
                 if b["type"] == "text" and b["text"].strip():
                     self.log.trace(self.name, "thought", {"text": b["text"], "mode": self.client.mode})
@@ -122,8 +125,11 @@ class LLMAgent(BaseAgent):
                     except Exception as e:  # malformed submission → escalate, never crash the pipeline
                         self.log.trace(self.name, "guardrail", {"rejected": str(e)})
                         return {"ok": False, "error": str(e), "submission": u["input"]}
+                    from_cache = calls > 0 and cached == calls
+                    if from_cache:
+                        _AGENT_LOG.info("LLMAgent.run agent=%s answered entirely from the cache (%d call(s)); no new model call", self.name, calls)
                     self.log.trace(self.name, "submit", accepted)
-                    return {"ok": True, **accepted}
+                    return {"ok": True, **accepted, "from_cache": from_cache}
                 tool = by_name.get(u["name"])
                 if tool is None:
                     out: Any = {"error": f"Unknown tool {u['name']}"}

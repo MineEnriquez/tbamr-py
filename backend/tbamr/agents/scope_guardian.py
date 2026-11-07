@@ -35,6 +35,9 @@ REQUIRED_GAPS = [
 ]
 
 
+MAX_WARNINGS = 4  # model warnings shown; rule notes (target, run time) are added on top
+
+
 class ScopeGuardian(LLMAgent):
     name = "scope_guardian"
     title = "Research Scope & Scientific Integrity Guardian"
@@ -45,9 +48,11 @@ class ScopeGuardian(LLMAgent):
         "country (optionally one subnational region inside it), or worldwide because the researcher asked for it explicitly. "
         "Never widen or change it. If the target "
         "has a `problem`, it is already blocking. The four playbook definitions are fixed by the pipeline's rules (given as "
-        "`required_policy_gaps` with their applied text); you may add a suggestion for any of them, but it is shown as a "
-        "suggestion and not applied. Warn about parts "
-        "of the question that public genomes may not support (prevalence, clinical use, comparisons across places). "
+        "`required_policy_gaps` with their applied text). For each one, set `agrees` to true if you accept it as applied; "
+        "only when you would change the rule set `agrees` to false and put the change you propose in `proposal`. Never "
+        "restate a rule you agree with. Warnings: at most 4, specific to this question, these drugs and this target; do not "
+        "repeat the four definitions or the standing caveats they already cover (no prevalence or clinical claims, missing "
+        "DST, public genomes as a convenience sample). Return no warnings rather than generic ones. "
         "You propose; the researcher approves."
     )
     max_steps = 3
@@ -55,7 +60,10 @@ class ScopeGuardian(LLMAgent):
         "type": "object",
         "properties": {
             "blocking": {"type": "array", "items": {"type": "string"}},
-            "gaps": {"type": "array", "items": {"type": "object", "properties": {"key": {"type": "string"}, "gap": {"type": "string"}, "proposal": {"type": "string"}}, "required": ["gap", "proposal"]}},
+            "gaps": {"type": "array", "items": {"type": "object", "properties": {
+                "key": {"type": "string"}, "gap": {"type": "string"},
+                "agrees": {"type": "boolean", "description": "true = you accept the applied rule as is"},
+                "proposal": {"type": "string", "description": "only when agrees is false: the change you propose"}}, "required": ["key", "agrees"]}},
             "warnings": {"type": "array", "items": {"type": "string"}},
             "asks_comparison_across_places": {"type": "boolean"},
         },
@@ -71,7 +79,7 @@ class ScopeGuardian(LLMAgent):
             m = proposed.pop(key, None) or {}
             text = str(m.get("proposal") or "").strip()
             g = {"key": key, "gap": gap, "proposal": applied, "applied": True}
-            if text and text != applied:
+            if m.get("agrees") is False and text and text != applied:  # only a real proposed change, never a restatement
                 g["suggestion"] = text
             gaps.append(g)
         n_sug = sum(1 for g in gaps if g.get("suggestion"))
@@ -91,7 +99,7 @@ class ScopeGuardian(LLMAgent):
         target = ctx.get("target") or resolve_target(ctx.get("question"), ctx.get("country"), ctx.get("region"))
         if target["problem"]:
             blocking.append(target["problem"])
-        warnings = list(sub.get("warnings") or [])
+        warnings = [w for w in (sub.get("warnings") or []) if str(w).strip()][:MAX_WARNINGS]
         for extra in (target.get("note"), target.get("notice")):  # rule notes lead the Guardian's own warnings
             if extra and extra not in warnings:
                 warnings.insert(0, extra)
@@ -104,10 +112,12 @@ class ScopeGuardian(LLMAgent):
         ctx = {"question": question, "country": country, "region": region, "target": target, "target_drugs": target_drugs, "cohort_target": cohort_target,
                "required_policy_gaps": [{"key": k, "gap": g, "applied": p} for k, g, p in REQUIRED_GAPS]}
         res = self.run("Review this research scope and submit your assessment.", ctx)
-        if not res.get("ok"):
+        if res.get("ok"):
+            res = {k: v for k, v in res.items() if k != "ok"}
+        else:
             res = {"blocking": [target["problem"]] if target["problem"] else [], "gaps": [{"key": k, "gap": g, "proposal": p, "applied": True} for k, g, p in REQUIRED_GAPS],
                    "warnings": ([target["notice"]] if target.get("notice") else []) + ["The Guardian could not complete its review; a human should check the scope."], "asks_comparison_across_places": False,
-                   "target": target}
+                   "target": target, "from_cache": False}
         self.log.put_raw("scope", "guardian", {"input": ctx, "result": res, "brain": self.client.mode})
         outcome = Outcome.HOLD if res["blocking"] else Outcome.ESCALATE
         place = target["country"] + (f" · {target['region']}" if target.get("region") else "")
