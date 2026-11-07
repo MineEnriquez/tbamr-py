@@ -680,3 +680,51 @@ def test_worker_thread_logs_reach_the_execution(tmp_path):
         t.start(); t.join()
     ex = log.get_execution(log.list_executions(1)[0]["id"])
     assert "worker says hi" in ex["log_text"]
+
+
+# ---------------------------------------------------------------- report integrity: what the PI agreed is what the report does
+def test_flagged_calls_count_as_uncertain_not_resistant(orch):
+    """Calls pending review (low depth, discordant DST, interim needing review) must not be counted as predicted resistant."""
+    rep = run_to_report(orch)
+    rif = next(r for r in rep["drugs"] if r["drug"] == "RIF")
+    flagged = {"DEMO-R09", "DEMO-R14", "DEMO-R34"}  # discordant DST, 6 reads, interim grading sent to review
+    resistant = {f.sample_id for s in orch.state.samples for f in s.findings if f.drug == "RIF" and f.cls == "tech" and f.review in ("Not required", "Reviewed")}
+    assert not flagged & resistant and rif["predicted_resistant"] == len(resistant) == 8
+    assert rif["uncertain_or_pending"] >= len(flagged)
+    assert sum(p["resistant"]["RIF"] for p in rep["by_place"]) == rif["predicted_resistant"]  # same rule in the regional table
+    assert "Predicted resistant:" in rep["resistance_definition"]
+
+
+def test_reviewed_call_becomes_resistant(orch):
+    run_to_report(orch)
+    f = next(f for f in orch.state.sample("DEMO-R14").findings if f.gene == "rpoB")
+    orch.review("tbexpert", "Tess", f.fid, "Reviewed", "Read support checked in IGV; call accepted.")
+    rep = orch.agents["reporting"].build(orch.state, 99)
+    assert next(r for r in rep["drugs"] if r["drug"] == "RIF")["predicted_resistant"] == 9
+
+
+def test_no_mdr_labels_reach_the_agents_or_the_summary(orch):
+    seen = []
+    def policy(messages):
+        seen.append(messages[0]["content"])
+        return [{"type": "tool_use", "name": "submit", "input": {"notes": []}}]
+    orch.agents["evidence"].client = ReplayClient({"evidence": policy})
+    rep = run_to_report(orch)
+    assert seen and not any("tbprofiler_type" in m or "MDR-TB" in m for m in seen)
+    lim = " ".join(rep["limitations"])
+    assert "no MDR, RR or HR labels" in lim and "not statistical associations" in lim and "tool-assigned" in lim
+    captured = {}
+    class C:
+        mode = "claude"
+        def text(self, system, prompt):
+            captured["system"], captured["prompt"] = system, prompt
+            return "ok"
+    orch.agents["reporting"].client = C()
+    orch.agents["reporting"].draft_summary(rep)
+    assert "never label isolates MDR" in captured["system"] and "'associated with'" in captured["system"]
+    assert "catalogue" in captured["prompt"]
+
+
+def test_report_flags_mixed_catalogue_versions(orch):
+    rep = run_to_report(orch)  # the demo deliberately mixes a 4.x file without a database, demo-db and tbdb
+    assert rep["catalogue_consistent"] is False and rep["limitations"][0].startswith("Mixed or unrecorded mutation-catalogue versions")

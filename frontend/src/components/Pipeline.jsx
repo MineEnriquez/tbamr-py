@@ -523,8 +523,8 @@ function S4({ snap, status, act, who, openSample }) {
         onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}>
         <p><b>Drop TB-Profiler result files here</b> (.results.json) or click to choose</p></div>
       <input ref={input} type="file" accept=".json" multiple hidden onChange={e => { upload(e.target.files); e.target.value = '' }} />
-      {done.length > 0 && <div className="tw"><table><thead><tr><th>Run</th><th>Lineage</th><th>TB-Profiler type</th><th>Source</th><th></th></tr></thead><tbody>
-        {done.map(s => <tr className="click" key={s.run} onClick={() => openSample(s.run)}><td className="mono">{s.run}</td><td className="mono">{s.lineage || '—'}</td><td>{s.drtype || '—'}</td><td className="muted" style={{ fontSize: '.82rem' }}>{s.profiling_note}</td><td><RawLink kind="tbprofiler" k={s.run} label="Raw JSON" /></td></tr>)}</tbody></table></div>}
+      {done.length > 0 && <div className="tw"><table><thead><tr><th>Run</th><th>Lineage</th><th>Source</th><th></th></tr></thead><tbody>
+        {done.map(s => <tr className="click" key={s.run} onClick={() => openSample(s.run)}><td className="mono">{s.run}</td><td className="mono">{s.lineage || '—'}</td><td className="muted" style={{ fontSize: '.82rem' }}>{s.profiling_note}</td><td><RawLink kind="tbprofiler" k={s.run} label="Raw JSON" /></td></tr>)}</tbody></table></div>}
       {status === 'wait' && <div className="box gate"><h3>Gate · Close profiling batch</h3>
         <p className="role-reqd">Only <RoleBadge role="analyst" /> can close the batch.</p>
         <p>Results imported later are evaluated automatically.</p>
