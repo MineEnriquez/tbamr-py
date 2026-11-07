@@ -253,6 +253,8 @@ footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);paddi
 .fchart{display:flex;align-items:stretch;justify-content:space-between;gap:8px;overflow:visible;padding:18px 0 6px;flex-wrap:nowrap;min-height:0;min-width:0}
 .fnode{flex:1 1 0;min-width:96px;max-width:180px;position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px 10px 18px;margin-top:0;text-align:center;cursor:pointer;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:10px;justify-content:center;transition:border-color .15s, box-shadow .15s}
 .fnode:hover,.fnode:focus-visible{border-color:var(--blue);box-shadow:var(--shadow-md);transform:translateY(-2px);z-index:6}
+/* Stage cards get a deeper, blue-tinted lift on hover so the active target is unmistakable. */
+.fnode.stage:hover,.fnode.stage:focus-visible{box-shadow:0 14px 32px rgb(15 50 110 / .22), 0 4px 10px rgb(15 50 110 / .12), 0 0 0 1px var(--blue);transform:translateY(-4px)}
 .fnode.stage{min-height:170px}
 /* floating pill chip that sits above the card, outside the rectangle */
 .fnode .fcap{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:500 .66rem/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:inline-flex;gap:7px;align-items:center;white-space:nowrap;z-index:2}
