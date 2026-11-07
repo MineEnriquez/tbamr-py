@@ -24,6 +24,7 @@ from .decisions import DecisionLog
 
 
 _tls = threading.local()
+_write_lock = threading.Lock()  # worker threads attached to one execution share its buffer
 
 
 class ExecutionContext:
@@ -53,9 +54,10 @@ class _TLSHandler(logging.Handler):
             if not stack:
                 return
             msg = self.format(record)
-            stack[-1].write(msg + "\n")
-            if record.exc_info:
-                stack[-1].write("".join(traceback.format_exception(*record.exc_info)))
+            with _write_lock:
+                stack[-1].write(msg + "\n")
+                if record.exc_info:
+                    stack[-1].write("".join(traceback.format_exception(*record.exc_info)))
         except Exception:
             pass
 
@@ -83,6 +85,30 @@ def _install_handler() -> None:
         lg.propagate = True
         if lg.level == 0:
             lg.setLevel(logging.INFO)
+
+
+def current_buffer() -> io.StringIO | None:
+    """The log buffer of the execution running on this thread, to hand to worker threads (see attach_buffer)."""
+    stack = getattr(_tls, "stack", None)
+    return stack[-1] if stack else None
+
+
+@contextmanager
+def attach_buffer(buf: io.StringIO | None) -> Iterator[None]:
+    """Run a block on a worker thread with its logs going to an existing execution's buffer.
+
+    Capture is per thread, so without this, work done in a thread pool (e.g. TB-Profiler batches) would
+    log nowhere and be missing from the Logs tab."""
+    if buf is None:
+        yield
+        return
+    stack: list[io.StringIO] = getattr(_tls, "stack", None) or []
+    _tls.stack = stack
+    stack.append(buf)
+    try:
+        yield
+    finally:
+        stack.pop()
 
 
 @contextmanager

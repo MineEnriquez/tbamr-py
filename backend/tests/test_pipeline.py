@@ -662,3 +662,21 @@ def test_every_agent_logs_its_actions(orch, caplog):
                    "report v1 RIF:", "Stage 3 finished", "→ Orchestrator.run_stage(", "← QCAnalyst.assess ok"):
         assert needle in joined, f"missing log: {needle!r}"
 
+
+def test_worker_thread_logs_reach_the_execution(tmp_path):
+    """Thread-pool work (TB-Profiler batches) must log into the execution that started it, not vanish."""
+    import logging
+    import threading
+    from tbamr.core.executions import attach_buffer, capture_execution, current_buffer
+    log = DecisionLog(str(tmp_path / "x.db"))
+    with capture_execution(log, "batch"):
+        buf = current_buffer()
+
+        def worker():
+            with attach_buffer(buf):
+                logging.getLogger("tbamr.profiling").info("worker says hi")
+
+        t = threading.Thread(target=worker)
+        t.start(); t.join()
+    ex = log.get_execution(log.list_executions(1)[0]["id"])
+    assert "worker says hi" in ex["log_text"]

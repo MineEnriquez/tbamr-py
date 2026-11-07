@@ -475,10 +475,16 @@ class Orchestrator:
                         _lg.getLogger("tbamr.profiling").exception("state save failed after %s", r)
 
         def work() -> None:
-            from .executions import capture_execution
+            from .executions import attach_buffer, capture_execution, current_buffer
             with capture_execution(self.log, f"TB-Profiler batch ({len(runs)} run(s))") as ctx:
+                buf = current_buffer()
+
+                def profile_logged(r: str) -> None:  # pool threads log into this batch's execution
+                    with attach_buffer(buf):
+                        profile_one(r)
+
                 with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="tbp") as pool:
-                    for _ in pool.map(profile_one, runs):
+                    for _ in pool.map(profile_logged, runs):
                         pass
                 # Record what the batch actually produced per sample, so the Logs tab can show the
                 # outcome of a historical TB-Profiler run alongside the captured log output.
