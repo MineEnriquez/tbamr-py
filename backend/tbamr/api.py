@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from .article import render_article_html
 from .core.decisions import DecisionLog, GuardrailViolation
 from .core.executions import capture_execution
+from .core.geo import resolve_target
 from .core.orchestrator import Orchestrator, PermissionDenied, StageError
 from .llm.client import make_client
 from .stores import cache as cache_module, mongo as mongo_module, results as results_module
@@ -43,7 +44,7 @@ def _run_label_from_state(orch: Orchestrator) -> str:
     if rep and rep.get("version"):
         return f"Report v{rep['version']}" + (" · final" if st.gates.get("release", {}).get("kind") == "final" else "")
     if st.scope and st.gates.get("scope"):
-        loc = st.country or "worldwide"
+        loc = st.country or "target not set"
         drugs = ", ".join(st.target_drugs or [])
         return f"Scope: {loc}" + (f" · {drugs}" if drugs else "")
     if (st.question or "").strip():
@@ -86,7 +87,7 @@ class Release(Who):
 
 class Scope(BaseModel):
     question: str
-    country: str = ""  # empty = worldwide search
+    country: str = ""  # INSDC country name or "Worldwide"; empty → must be named in the question, else Stage 1 blocks
     target_drugs: list[str] = ["Rifampicin", "Isoniazid"]
     cohort_target: int = 8
 
@@ -150,6 +151,11 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         st.question, st.country, st.target_drugs, st.cohort_target = s.question, s.country, s.target_drugs, s.cohort_target
         O().save()
         return {"ok": True}
+
+    @app.get("/api/scope/target")
+    def scope_target(question: str = "", country: str = ""):
+        """Resolve the target population the same way Stage 1 will, so the form can show it before running."""
+        return resolve_target(question, country)
 
     @app.post("/api/scope/reopen")
     def reopen_scope():

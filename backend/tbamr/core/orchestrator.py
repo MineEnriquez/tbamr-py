@@ -23,6 +23,7 @@ from ..tools.demo import DST as DEMO_DST
 from ..tools.demo import demo_tbprofiler_failure, demo_tbprofiler_json
 from ..tools.tbprofiler import parse_result
 from .decisions import Decision, DecisionLog, Outcome
+from .geo import search_country
 from .models import GATES, ROLES, RULES, STAGES, THRESHOLDS, PipelineState, Sample
 
 
@@ -219,13 +220,19 @@ class Orchestrator:
         st = self.state
         self.orch("—", Outcome.INFO, RULES["scope"], "Handing the research scope to the Scope Guardian.", 1)
         st.scope = self.agents["scope_guardian"].review(st.question, st.country, st.target_drugs, st.cohort_target)
+        target = st.scope.get("target") or {}
+        if target.get("country") and not target.get("problem"):
+            st.country = target["country"]  # canonical INSDC name or "Worldwide"; downstream agents read st.country
         self._set(1, "wait")
         return st.scope
 
     def _s2(self):
         st = self.state
-        self.orch("—", Outcome.INFO, RULES["elig"], "Asking the Discovery Assistant for candidate runs.", 2)
-        found = self.agents["discovery"].discover(st.country, st.question)
+        if not st.country:
+            raise StageError("No target population is set. Reopen the scope and set a country, or \"Worldwide\".")
+        where = search_country(st.country)
+        self.orch("—", Outcome.INFO, RULES["elig"], f"Asking the Discovery Assistant for candidate runs ({where or 'worldwide, as requested'}).", 2)
+        found = self.agents["discovery"].discover(where, st.question)
         self._add_rows(found["rows"])
         self.orch("—", Outcome.INFO, RULES["elig"], f"Handing {len(st.samples)} candidate(s) to the Verification Tasker.", 2)
         self.agents["verification"].verify(st.samples, st.country)
@@ -235,7 +242,7 @@ class Orchestrator:
             st.replans += 1
             studies = sorted({s.study for s in st.samples if s.eligibility == "Verified"})
             self.orch("COHORT", Outcome.RETRY, RULES["cohort"], f"Re-planning: asking Discovery for studies other than {', '.join(studies)} to support the comparison.", 2)
-            more = self.agents["discovery"].discover(st.country, st.question, already_known=[s.run for s in st.samples],
+            more = self.agents["discovery"].discover(where, st.question, already_known=[s.run for s in st.samples],
                                                      focus=f"The verified cohort comes from one location. Find runs from other studies than {', '.join(studies)}.",
                                                      exclude_studies=studies)
             new = self._add_rows(more["rows"])

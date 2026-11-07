@@ -109,7 +109,7 @@ class PipelineState:
         "What patterns of drug resistance can we identify in Mycobacterium tuberculosis genomic samples, "
         "and which mutations are associated with resistance to rifampicin and isoniazid?"
     )
-    country: str = ""  # empty = worldwide; set by the researcher at Stage 1 if they want to scope by country
+    country: str = ""  # target population: INSDC country or "Worldwide" (explicit only); resolved at Stage 1
     target_drugs: list[str] = field(default_factory=lambda: ["Rifampicin", "Isoniazid"])
     cohort_target: int = 8
     stage_status: dict[str, str] = field(

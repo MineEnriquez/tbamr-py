@@ -50,6 +50,33 @@ function detectCountryInQuestion(question) {
   return null
 }
 
+/* Live target-population check: asks the backend (same rule Stage 1 applies) which country the
+ * study is about. Worldwide only counts when stated explicitly; anything unclear blocks the start. */
+function useTarget(question, country) {
+  const [t, setT] = useState(null)
+  useEffect(() => {
+    let live = true
+    const id = setTimeout(() => api.scopeTarget(question || '', country || '').then(r => live && setT(r)).catch(() => live && setT(null)), 250)
+    return () => { live = false; clearTimeout(id) }
+  }, [question, country])
+  return t
+}
+
+function TargetNote({ t }) {
+  if (!t) return null
+  if (t.problem) return <div className="box esc target-note" role="status"><b>Target population unclear.</b> {t.problem}</div>
+  const where = t.country === 'Worldwide' ? <><b>worldwide</b> (all countries, as requested)</> : <b>{t.country}</b>
+  return <p className="target-note ok" role="status">Target population: {where} <span className="muted">· from the {t.source === 'field' ? 'Country field' : 'question'}</span></p>
+}
+
+/* Scope summary line once the scope has been handed to the Guardian. */
+function ScopeTarget({ st }) {
+  const t = st.scope?.target
+  if (st.country === 'Worldwide') return <>target <b>worldwide</b> (requested explicitly)</>
+  if (st.country) return <>target <b>{st.country}</b>{t?.source === 'question' ? ' (from the question)' : ''}</>
+  return <span className="target-missing">target population not set</span>
+}
+
 /* Strip the specific alias we matched out of the question text (word-boundary), leaving the rest
  * of the sentence intact so the user can keep editing. */
 function stripCountryFromQuestion(question, alias) {
@@ -86,15 +113,17 @@ function StartHero({ snap, act, who, busy, setView }) {
     if (inQ.canonical.toLowerCase() === field.toLowerCase()) return null
     return { canonical: inQ.canonical, matched: inQ.matched, field }
   }, [q, country])
+  const tgt = useTarget(q, country)
+  const unclear = !!tgt?.problem
   const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || target !== (st.cohort_target ?? 8))
   const save = () => act(() => api.setScope({ question: q, country, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')
   const start = () => act(() => api.run(1), 'Stage 1 finished')
-  const canRun = status === 'ready' && !busy && !dirty && !conflict
+  const canRun = status === 'ready' && !busy && !dirty && !conflict && !unclear
   if (status !== 'ready') return (
     <section className="panel start-hero">
       <span className="eyebrow">Start · Research question</span>
       <h1 className="start-q">{st.question || <span className="muted">No research question yet.</span>}</h1>
-      <p className="start-sub">Scope: {st.country ? <>country <b>{st.country}</b></> : <>worldwide</>} · cohort target <b>{st.cohort_target}</b> · drugs <b>{st.target_drugs.join(', ')}</b></p>
+      <p className="start-sub">Scope: <ScopeTarget st={st} /> · cohort target <b>{st.cohort_target}</b> · drugs <b>{st.target_drugs.join(', ')}</b></p>
       <div className="row" style={{ gap: 10, marginTop: 12 }}>
         <button className="btn primary" onClick={() => setView(1)}>Go to Stage 1 →</button>
         <button className="btn ghost" title="Reopen the scope form; clears downstream work (samples/report) but preserves decision history." onClick={() => { if (confirm('Reopen scope? This clears discovered samples and any report, but keeps the decision history.')) act(() => api.reopenScope(), 'Scope reopened') }}>✎ Edit scope</button>
@@ -109,8 +138,8 @@ function StartHero({ snap, act, who, busy, setView }) {
       <textarea value={q} onChange={e => setQ(e.target.value)} aria-label="Research question" className="start-ta"
         placeholder="e.g. What patterns of drug resistance can we identify in Mycobacterium tuberculosis genomic samples from Indonesia, and which mutations are associated with resistance to rifampicin and isoniazid?" />
       <div className="row" style={{ gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <div className="ctl"><label htmlFor="start-country">Country <span className="muted" style={{ fontWeight: 400 }}>(or state it in the question)</span></label>
-          <input id="start-country" value={country} onChange={e => setCountry(e.target.value)} placeholder='e.g. Indonesia · "Worldwide" for no filter · or leave blank if the question says so' style={{ minWidth: 320 }} /></div>
+        <div className="ctl"><label htmlFor="start-country">Target country <span className="muted" style={{ fontWeight: 400 }}>(or name it in the question)</span></label>
+          <input id="start-country" value={country} onChange={e => setCountry(e.target.value)} placeholder='e.g. Indonesia, or "Worldwide" for all countries' style={{ minWidth: 320 }} /></div>
         <div className="ctl"><label htmlFor="start-target">Cohort target</label>
           <input id="start-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
       </div>
@@ -122,10 +151,11 @@ function StartHero({ snap, act, who, busy, setView }) {
           <button className="btn small" onClick={() => setQ(stripCountryFromQuestion(q, conflict.matched))}>Use <b>{conflict.field}</b> (remove "{conflict.matched}" from the question)</button>
         </div>
       </div>}
+      {!conflict && <TargetNote t={tgt} />}
       <div className="row" style={{ gap: 8, marginTop: 14 }}>
         <button className="btn primary" disabled={!dirty || !!conflict} onClick={save}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
-        <button className="btn primary" disabled={!canRun} title={!canRun ? (conflict ? 'Resolve the conflict first' : dirty ? 'Save the scope first' : busy ? 'A stage is running' : '') : 'Hand the scope to the Scope Guardian'} onClick={start}>Start the pipeline →</button>
-        <span className="muted" style={{ fontSize: '.82rem' }}>{conflict ? 'Fix the conflict above.' : dirty ? 'Save, then Start.' : canRun ? 'Ready to start.' : ''}</span>
+        <button className="btn primary" disabled={!canRun} title={!canRun ? (conflict ? 'Resolve the conflict first' : unclear ? 'Set a clear target population first' : dirty ? 'Save the scope first' : busy ? 'A stage is running' : '') : 'Hand the scope to the Scope Guardian'} onClick={start}>Start the pipeline →</button>
+        <span className="muted" style={{ fontSize: '.82rem' }}>{conflict ? 'Fix the conflict above.' : unclear ? 'Set the target population above.' : dirty ? 'Save, then Start.' : canRun ? 'Ready to start.' : ''}</span>
       </div>
     </section>
   )
@@ -152,7 +182,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
   const [scopeBlocked, setScopeBlocked] = useState(false)
   const disabled = n === 1 && status === 'ready' && (scopeDirty || scopeBlocked)
   const disabledReason = (n === 1 && status === 'ready')
-    ? (scopeBlocked ? 'Resolve the country/question conflict first' : (scopeDirty ? 'Save the scope first' : ''))
+    ? (scopeBlocked ? 'Set a clear target population (and resolve any country/question conflict) first' : (scopeDirty ? 'Save the scope first' : ''))
     : (busy ? 'A stage is running' : '')
   const runBtn = <button className="btn primary" disabled={status !== 'ready' || !!busy || disabled} title={disabledReason || undefined}
                    onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'ready' ? 'Run agents' : 'Ran'}</button>
@@ -229,15 +259,17 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
     return { canonical: inQ.canonical, matched: inQ.matched, field: fieldTrim }
   }, [q, country])
   // When the form drifts from what's in the backend, mark the whole stage dirty so the Run button disables.
+  const tgt = useTarget(status === 'ready' ? q : st.question, status === 'ready' ? country : st.country)
+  const unclear = status === 'ready' && !!tgt?.problem
   const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || target !== (st.cohort_target ?? 8))
   useEffect(() => { onDirtyChange && onDirtyChange(dirty) }, [dirty, onDirtyChange])
-  useEffect(() => { onBlockedChange && onBlockedChange(!!conflict) }, [conflict, onBlockedChange])
+  useEffect(() => { onBlockedChange && onBlockedChange(!!conflict || unclear) }, [conflict, unclear, onBlockedChange])
   if (status === 'ready') return (
     <div className="box"><span className="eyebrow">Research question</span>
       <textarea value={q} onChange={e => setQ(e.target.value)} aria-label="Research question" />
       <div className="row" style={{ gap: 14, alignItems: 'flex-end' }}>
-        <div className="ctl"><label htmlFor="scope-country">Country <span className="muted" style={{ fontWeight: 400 }}>(or state it in the question)</span></label>
-          <input id="scope-country" value={country} onChange={e => setCountry(e.target.value)} placeholder='e.g. Indonesia · "Worldwide" for no filter · or leave blank if the question says so' style={{ minWidth: 320 }} /></div>
+        <div className="ctl"><label htmlFor="scope-country">Target country <span className="muted" style={{ fontWeight: 400 }}>(or name it in the question)</span></label>
+          <input id="scope-country" value={country} onChange={e => setCountry(e.target.value)} placeholder='e.g. Indonesia, or "Worldwide" for all countries' style={{ minWidth: 320 }} /></div>
         <div className="ctl"><label htmlFor="scope-target">Cohort target</label>
           <input id="scope-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
       </div>
@@ -249,9 +281,10 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
           <button className="btn small" onClick={() => setQ(stripCountryFromQuestion(q, conflict.matched))}>Use <b>{conflict.field}</b> (remove "{conflict.matched}" from the question)</button>
         </div>
       </div>}
+      {!conflict && <TargetNote t={tgt} />}
       <div className="row"><button className="btn small primary" disabled={!dirty || !!conflict} onClick={() => act(() => api.setScope({ question: q, country, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
         <span className="muted" style={{ fontSize: '.82rem' }}>
-          {conflict ? 'Resolve the conflict above before saving.' : (dirty ? 'Unsaved changes — Save scope before Run agents.' : 'Scope saved. Click Run agents to kick off the Scope Guardian.')}
+          {conflict ? 'Resolve the conflict above before saving.' : unclear ? 'Set a clear target population before running.' : (dirty ? 'Unsaved changes — Save scope before Run agents.' : 'Scope saved. Click Run agents to kick off the Scope Guardian.')}
         </span></div></div>)
   return (
     <>
@@ -259,7 +292,7 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
         <div className="row between" style={{ alignItems: 'flex-start' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <span className="eyebrow">Research question</span><p>{st.question}</p>
-            <p className="muted" style={{ fontSize: '.82rem' }}>Scope: {st.country ? <>country <b>{st.country}</b></> : <>worldwide (not set explicitly)</>} · cohort target {st.cohort_target} · drugs {st.target_drugs.join(', ')}</p>
+            <p className="muted" style={{ fontSize: '.82rem' }}>Scope: <ScopeTarget st={st} /> · cohort target {st.cohort_target} · drugs {st.target_drugs.join(', ')}</p>
           </div>
           <button className="btn small ghost" title="Reopen the scope form; clears downstream work (samples/report) but preserves decision history." onClick={() => { if (confirm('Reopen scope? This clears discovered samples and any report, but keeps the decision history.')) act(() => api.reopenScope(), 'Scope reopened') }}>✎ Edit scope</button>
         </div>

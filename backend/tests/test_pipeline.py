@@ -12,6 +12,7 @@ from tbamr.core.decisions import Decision, DecisionLog, GuardrailViolation, Outc
 from tbamr.core.models import Finding, Sample
 from tbamr.core.orchestrator import PermissionDenied, StageError
 from tbamr.llm.client import ReplayClient
+from tbamr.core.geo import resolve_target
 from tbamr.tools.demo import SCENARIOS, DemoDataTools
 from tbamr.tools.ena import DataTools
 from tbamr.tools.tbprofiler import parse_result
@@ -238,6 +239,8 @@ def test_ena_paging_with_mock_transport():
 def test_api_flow(tmp_path):
     app = create_app(build_orchestrator("demo", "replay", str(tmp_path / "a.db")))
     c = TestClient(app)
+    assert c.get("/api/scope/target", params={"question": "Resistance patterns"}).json()["problem"]  # no silent worldwide
+    assert c.post("/api/scope", json={"question": "Resistance patterns", "country": "Indonesia"}).status_code == 200
     assert c.post("/api/stages/1/run").status_code == 200
     assert c.post("/api/gates/scope", json={"role": "analyst"}).status_code == 403
     raw = c.get("/api/raw/scope/guardian", params={"role": "pi", "person": "Ana"}).json()
@@ -311,6 +314,7 @@ def test_executions_capture_structured_results(tmp_path, monkeypatch):
     orch.state.country = "Indonesia"
     app = create_app(orch)
     c = TestClient(app)
+    assert c.post("/api/scope", json={"question": "Resistance patterns", "country": "Indonesia"}).status_code == 200
     assert c.post("/api/stages/1/run").status_code == 200
     execs = c.get("/api/executions").json()
     stage1 = next(e for e in execs if e["trigger"] == "Stage 1")
@@ -429,3 +433,52 @@ def test_report_article_404s_when_no_report_exists(orch):
     r = c.get("/api/report/1/article.html")
     assert r.status_code == 404 and "Stage 6" in r.json()["detail"]
 
+
+# ---------------------------------------------------------------- target population (worldwide only when asked)
+@pytest.mark.parametrize("question,field,country,blocked", [
+    ("Which rifampicin mutations are common in Mycobacterium tuberculosis genomes?", "", "", True),  # nothing named: no silent worldwide
+    ("Rifampicin resistance in Indonesia", "", "Indonesia", False),  # named in the question
+    ("Rifampicin resistance patterns", "vietnam", "Viet Nam", False),  # alias canonicalised to the INSDC name
+    ("Rifampicin resistance worldwide", "", "Worldwide", False),  # explicit worldwide
+    ("Rifampicin resistance patterns", "Worldwide", "Worldwide", False),
+    ("Rifampicin resistance in sub-Saharan Africa", "", "", True),  # region only: not filterable
+    ("Compare Kenya and Uganda", "", "", True),  # several countries
+    ("Rifampicin resistance in Kenya", "Indonesia", "", True),  # field contradicts the question
+    ("Rifampicin resistance patterns", "Indonesa", "", True),  # unrecognised name
+    ("Resistance in Papua New Guinea", "", "Papua New Guinea", False),  # longest name wins over "Guinea"
+])
+def test_target_population_resolution(question, field, country, blocked):
+    t = resolve_target(question, field)
+    assert bool(t["problem"]) is blocked and t["country"] == country
+
+
+def test_stage1_blocks_without_a_clear_target(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "g.db"))
+    o.state.question, o.state.country = "Which mutations explain rifampicin resistance?", ""
+    o.run_stage(1)
+    assert any("No target population" in b for b in o.state.scope["blocking"])
+    o.raw_view("scope", "guardian", "pi", "Ana")
+    with pytest.raises(StageError):
+        o.approve_scope("pi", "Ana")
+
+
+def test_question_country_becomes_the_search_scope(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "q.db"))
+    o.state.question, o.state.country = "Which mutations explain rifampicin resistance in Indonesia?", ""
+    o.run_stage(1)
+    assert o.state.country == "Indonesia" and o.state.scope["target"]["source"] == "question"
+    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.run_stage(2)
+    assert o.state.sample("DEMO-R06").eligibility == "Excluded"  # Viet Nam is outside the resolved scope
+
+
+def test_explicit_worldwide_searches_without_a_country_filter(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "w.db"))
+    o.state.question, o.state.country = "Global patterns of rifampicin resistance", ""
+    o.run_stage(1)
+    assert o.state.country == "Worldwide" and not o.state.scope["blocking"]
+    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.run_stage(2)
+    calls = [t for t in o.log.traces("discovery") if t["kind"] == "tool_call"]
+    assert all('country="Worldwide' not in json.dumps(t["payload"]) for t in calls)
+    assert o.state.sample("DEMO-R06").eligibility == "Verified"  # origin is informational for worldwide

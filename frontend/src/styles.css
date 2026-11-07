@@ -320,3 +320,9 @@ footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);paddi
 .flegend .sw i.s-locked{background:var(--line)}
 
 .seg.theme button{padding:5px 10px}
+
+/* Target-population check under the scope form */
+.target-note{margin-top:10px}
+p.target-note.ok{font-size:.88rem;color:var(--ok)}
+p.target-note.ok b{color:var(--ink)}
+.target-missing{color:var(--esc);font-weight:600}

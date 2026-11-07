@@ -205,7 +205,7 @@ class DemoDataTools:
         rows = [_row(r) for r in _RUNS]
         if 'country="' in query:
             prefix = query.split('country="', 1)[1].split('"', 1)[0].rstrip("*").strip().lower()
-            if prefix:  # scoped search: prefix match (case-insensitive, like ENA), plus records with no country and loose-search decoys
+            if prefix and prefix not in ("worldwide", "global", "any"):  # scoped search: prefix match (case-insensitive, like ENA), plus records with no country and loose-search decoys
                 rows = [r for r in rows if r["country"].lower().startswith(prefix) or not r["country"] or r["run_accession"] in _DECOYS]
         for part in query.split(" AND "):
             if "study_accession!=" in part:
