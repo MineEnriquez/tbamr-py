@@ -42,7 +42,7 @@ export default function Flow({ snap, team, view, onPick, pending }) {
             <React.Fragment key={s.n}>
               <button className={`fnode stage s-${status}${cur ? ' cur' : ''}${busy ? ' busy' : ''}`} onClick={() => onPick(s.n)}
                 aria-label={`Stage ${s.n}: ${s.name}, ${STATUS[status]}, owner ${ROLE_LABEL[role]}`}>
-                <span className="fcap">stage {s.n} <span className="fcap-dot" /> {STATUS[status]}</span>
+                <span className="fcap fcap-2"><span className="fcap-n">stage {s.n}</span><span className="fcap-s">{STATUS[status]}</span></span>
                 <span className="fnode-body"><span className="fnode-icon">{ICONS[s.n]}</span>{s.name}</span>
                 <span className="fnode-meta">{ROLE_LABEL[role]} · {gate}{s.n === 5 && pending ? <b className="fnode-count"> {pending}</b> : null}</span>
                 <div className="fbtip" role="tooltip">
