@@ -326,3 +326,5 @@ footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);paddi
 p.target-note.ok{font-size:.88rem;color:var(--ok)}
 p.target-note.ok b{color:var(--ink)}
 .target-missing{color:var(--esc);font-weight:600}
+.target-notice{margin-top:8px;font-size:.88rem;border-left:3px solid var(--hold)}
+.target-notice p{margin-top:4px}

@@ -65,8 +65,11 @@ function useTarget(question, country) {
 function TargetNote({ t }) {
   if (!t) return null
   if (t.problem) return <div className="box esc target-note" role="status"><b>Target population unclear.</b> {t.problem}</div>
-  const where = t.country === 'Worldwide' ? <><b>worldwide</b> (all countries, as requested)</> : <b>{t.country}</b>
-  return <p className="target-note ok" role="status">Target population: {where} <span className="muted">· from the {t.source === 'field' ? 'Country field' : 'question'}</span></p>
+  const where = t.country === 'Worldwide' ? <b>worldwide</b> : <b>{t.country}</b>
+  return <>
+    <p className="target-note ok" role="status">Target population: {where} <span className="muted">· from the {t.source === 'field' ? 'Country field' : 'question'}</span></p>
+    {t.notice && <div className="box note target-notice"><b>Expected run time</b><p>{t.notice}</p></div>}
+  </>
 }
 
 /* Scope summary line once the scope has been handed to the Guardian. */

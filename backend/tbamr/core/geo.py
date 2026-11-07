@@ -16,6 +16,11 @@ import re
 from typing import Any
 
 WORLDWIDE = "Worldwide"
+# Shown whenever the scope resolves to worldwide, so the researcher knows the cost before starting.
+WORLDWIDE_NOTICE = ("Worldwide scope: no country filter is applied. Discovery retrieves up to 500 candidate runs from the archive, "
+                    "and every run that passes QC must be downloaded and profiled with TB-Profiler. At this scale, profiling (Stage 4) "
+                    "can take several hours, depending on network bandwidth and available CPU cores. For a first analysis, "
+                    "a single-country scope is usually faster and easier to interpret.")
 
 # INSDC /country vocabulary (the values ENA's country field starts with).
 INSDC_COUNTRIES = [
@@ -128,7 +133,7 @@ def resolve_target(question: str | None, country_field: str | None) -> dict[str,
         if is_worldwide(field):
             if named:
                 return {"country": "", "source": "", "problem": f'The Country field says worldwide but the question names {", ".join(named)}. Clear one of them.'}
-            return {"country": WORLDWIDE, "source": "field", "problem": None}
+            return {"country": WORLDWIDE, "source": "field", "problem": None, "notice": WORLDWIDE_NOTICE}
         c = canonical_country(field)
         if not c:
             return {"country": "", "source": "", "problem": f'"{field}" is not a recognised country. Use the country name as the archive records it (e.g. "Indonesia", "Viet Nam") or "Worldwide".'}
@@ -143,8 +148,8 @@ def resolve_target(question: str | None, country_field: str | None) -> dict[str,
     if len(named) > 1:
         return {"country": "", "source": "", "problem": f'The question names several countries ({", ".join(named)}). The pipeline studies one country at a time: set the Country field to one, or to "Worldwide".'}
     if _says_worldwide(q):
-        return {"country": WORLDWIDE, "source": "question", "problem": None}
+        return {"country": WORLDWIDE, "source": "question", "problem": None, "notice": WORLDWIDE_NOTICE}
     regions = _regions_in(q)
     if regions:
         return {"country": "", "source": "", "problem": f'The question names a region ({", ".join(regions)}) but archive records can only be filtered by country. Set the Country field to one country, or to "Worldwide".'}
-    return {"country": "", "source": "", "problem": 'No target population: the question does not name a country and the Country field is empty. Set a country, or enter "Worldwide" if you really mean all countries.'}
+    return {"country": "", "source": "", "problem": 'No target population: the question does not name a country and the Country field is empty. Enter a target country, or "Worldwide" to include all countries.'}

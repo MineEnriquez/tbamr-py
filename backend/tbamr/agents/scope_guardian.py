@@ -64,7 +64,10 @@ class ScopeGuardian(LLMAgent):
         target = ctx.get("target") or resolve_target(ctx.get("question"), ctx.get("country"))
         if target["problem"]:
             blocking.append(target["problem"])
-        return {"blocking": sorted(set(blocking)), "gaps": gaps, "warnings": list(sub.get("warnings") or []),
+        warnings = list(sub.get("warnings") or [])
+        if target.get("notice") and target["notice"] not in warnings:
+            warnings.insert(0, target["notice"])
+        return {"blocking": sorted(set(blocking)), "gaps": gaps, "warnings": warnings,
                 "asks_comparison_across_places": bool(sub.get("asks_comparison_across_places")), "target": target}
 
     def review(self, question: str, country: str, target_drugs: list[str], cohort_target: int) -> dict[str, Any]:
@@ -74,7 +77,7 @@ class ScopeGuardian(LLMAgent):
         res = self.run("Review this research scope and submit your assessment.", ctx)
         if not res.get("ok"):
             res = {"blocking": [target["problem"]] if target["problem"] else [], "gaps": [{"key": k, "gap": g, "proposal": p} for k, g, p in REQUIRED_GAPS],
-                   "warnings": ["The Guardian could not complete its review; a human should check the scope."], "asks_comparison_across_places": False,
+                   "warnings": ([target["notice"]] if target.get("notice") else []) + ["The Guardian could not complete its review; a human should check the scope."], "asks_comparison_across_places": False,
                    "target": target}
         self.log.put_raw("scope", "guardian", {"input": ctx, "result": res, "brain": self.client.mode})
         outcome = Outcome.HOLD if res["blocking"] else Outcome.ESCALATE
