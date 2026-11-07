@@ -260,8 +260,11 @@ footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);paddi
 .fnode.stage:hover,.fnode.stage:focus-visible{box-shadow:var(--shadow-lift);transform:translateY(-4px)}
 .fnode.stage{min-height:170px}
 /* floating pill chip that sits above the card, outside the rectangle */
-.fnode .fcap{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:500 .66rem/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:inline-flex;gap:7px;align-items:center;white-space:nowrap;z-index:2}
-.fnode .fcap-dot{width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.5}
+.fnode .fcap{position:absolute;top:0;left:50%;transform:translate(-50%,-50%);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:500 .66rem/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:inline-flex;gap:7px;align-items:center;white-space:nowrap;z-index:2}
+/* Stage chips: two short lines (stage number over status) so the chip stays narrower than the card. */
+.fnode .fcap.fcap-2{flex-direction:column;gap:3px;border-radius:10px;padding:5px 12px;max-width:calc(100% - 16px)}
+.fnode .fcap-n{font-weight:600;letter-spacing:.1em}
+.fnode .fcap-s{font-size:.6rem;letter-spacing:.06em;opacity:.9}
 .fnode-body{font-family:var(--f-body);font-weight:400;font-size:1.05rem;letter-spacing:.005em;line-height:1.3;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:6px;word-break:break-word}
 .fnode-icon{font-size:1.3rem;line-height:1;opacity:.9}
 .fnode-meta{font:400 .78rem/1.45 var(--f-body);color:var(--muted);letter-spacing:.015em;white-space:normal;word-break:break-word}
