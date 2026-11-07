@@ -313,6 +313,26 @@ function Stage({ n, snap, act, who, busy, openSample }) {
   )
 }
 
+/* The playbook's required definitions, as the pipeline's rules apply them. They are the same on every
+ * run, so they sit in a neutral, collapsed box; the Guardian's own wording appears only as a labelled
+ * suggestion that is not applied. Extra points the Guardian raised are listed as suggestions too. */
+function Definitions({ gaps }) {
+  const applied = gaps.filter(g => g.applied !== false)
+  const extra = gaps.filter(g => g.applied === false)
+  const nSug = gaps.filter(g => g.suggestion).length
+  return (
+    <details className="box note defs">
+      <summary><b>Definitions this run will apply</b> <span className="muted">· {applied.length} standard playbook rules{nSug ? ` · ${nSug} Guardian suggestion${nSug > 1 ? 's' : ''} (not applied)` : ''}</span></summary>
+      <ul className="clean">{applied.map(g => <li key={g.key}>
+        <b>{g.gap}.</b> {g.proposal}
+        {g.suggestion && <div className="def-sug"><span className="muted">Guardian's suggestion, not applied:</span> {g.suggestion}</div>}
+      </li>)}</ul>
+      {extra.length > 0 && <><h3>Other points the Guardian raised (not applied)</h3><ul className="clean">{extra.map((g, i) => <li key={i}><b>{g.gap}.</b> {g.suggestion}</li>)}</ul></>}
+      <p className="muted" style={{ fontSize: '.82rem', margin: 0 }}>These are fixed by the pipeline's rules. Approving the scope accepts them for this run; changing one means changing the rule.</p>
+    </details>
+  )
+}
+
 function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
   const [q, setQ] = useState(st.question)
   const [country, setCountry] = useState(st.country || '')
@@ -368,12 +388,11 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
         </div>
       </div>
       {sc.blocking?.length > 0 && <div className="box esc"><h3>Blocking gaps</h3><ul className="clean">{sc.blocking.map(b => <li key={b}>{b}</li>)}</ul></div>}
-      <div className="box esc"><h3>Gaps the Guardian found, with proposed definitions</h3>
-        <ul className="clean">{(sc.gaps || []).map(g => <li key={g.gap}>{g.gap} <i>Proposed:</i> {g.proposal}{g.added_by === 'guardrail' && <span className="muted"> (added by guardrail)</span>}</li>)}</ul>
-        {sc.warnings?.length > 0 && <><h3>Warnings</h3><ul className="clean">{sc.warnings.map(w => <li key={w}>{w}</li>)}</ul></>}</div>
+      {sc.warnings?.length > 0 && <div className="box hold"><h3>Warnings from the Scope Guardian</h3><ul className="clean">{sc.warnings.map(w => <li key={w}>{w}</li>)}</ul></div>}
+      <Definitions gaps={sc.gaps || []} />
       {status === 'wait' && <div className="box gate"><h3>Gate · Researcher approval</h3>
         <p className="role-reqd">Only <RoleBadge role="pi" /> can approve the scope.</p>
-        <p>Approving accepts the proposed definitions.</p>
+        <p>Approving accepts the definitions this run will apply.</p>
         <div className="row"><button className="btn primary" onClick={() => act(() => api.gate('scope', who), 'Scope approved')}>Approve scope</button>
           <RawLink kind="scope" k="guardian" /></div></div>}
       {status === 'done' && <p className="okmsg">Scope approved by {st.gates.scope?.person || ROLE_LABEL[st.gates.scope?.role] || 'researcher'}</p>}

@@ -29,7 +29,7 @@ def main() -> None:
     o.state.country, o.state.region = a.country, a.region
     p = lambda *x: print(*x, flush=True)
     p(f"Mode: data={'live' if a.live else 'demo'} brain={o.client.mode}\n")
-    p("Stage 1 · Scope Guardian"); s = o.run_stage(1); p(f"  {len(s['gaps'])} definitions proposed, warnings: {s['warnings']}")
+    p("Stage 1 · Scope Guardian"); s = o.run_stage(1); p(f"  {len(s['gaps'])} definitions applied, warnings: {s['warnings']}")
     if s["blocking"]:
         p("  Blocked:", *s["blocking"]); return
     p(f"  target population: {o.state.country}" + (f" · {o.state.region}" if o.state.region else ""))

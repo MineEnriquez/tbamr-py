@@ -100,7 +100,7 @@ export default function App() {
   return (
     <RawCtx.Provider value={raw}>
     {snap.busy && <BusyBar busy={snap.busy} traces={liveTraces} />}
-    <div className="wrap">
+    <div className={'wrap' + (snap.mode.data === 'demo' ? ' demo-mode' : '') + (snap.mode.brain === 'replay' ? ' replay-mode' : '')}>
       <div className="top">
         <div><h1>TB-AMR Agent Team</h1>
           <p className="muted" style={{ fontSize: '.85rem' }}>
