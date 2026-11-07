@@ -705,3 +705,12 @@ def test_guardian_shows_suggestions_only_for_proposed_changes():
 def test_guardian_flags_a_cached_answer():
     sub = {"blocking": [], "asks_comparison_across_places": False, "warnings": [], "gaps": []}
     assert _guardian_with(sub, cached=True).review("Rifampicin resistance in Indonesia", "Indonesia", ["Rifampicin"], 8)["from_cache"] is True
+
+
+
+def test_tests_never_reach_the_real_claude_api(tmp_path):
+    """A reset rebuilds the app via make_client(); in tests it must stay on the scripted agents even if a key is set."""
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "b.db"))))
+    assert c.post("/api/reset", params={"data": "demo"}).status_code == 200
+    assert c.get("/api/state").json()["mode"]["brain"] == "replay"
+
