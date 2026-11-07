@@ -114,7 +114,8 @@ class PipelineState:
         "and which mutations are associated with resistance to rifampicin and isoniazid?"
     )
     country: str = ""  # target population: INSDC country or "Worldwide" (explicit only); resolved at Stage 1
-    region: str = ""  # optional subnational target inside `country` (free text, matched against ENA "Country: Region")
+    region: str = ""
+    revision_rounds: int = 0  # times the question was replaced by the Scope Guardian's wording (0 = the researcher's own)  # optional subnational target inside `country` (free text, matched against ENA "Country: Region")
     target_drugs: list[str] = field(default_factory=lambda: ["Rifampicin", "Isoniazid"])
     cohort_target: int = DEFAULT_COHORT_TARGET
     stage_status: dict[str, str] = field(

@@ -78,7 +78,8 @@ class EvidenceAnalyst(LLMAgent):
             if not s.findings:
                 self.decide(s.run, Outcome.PROCEED, RULES["evid"], "No resistance-associated variants reported; QC passing.", stage=5)
                 continue
-            ctx = {"sample": {"run": s.run, "lineage": s.lineage, "tbprofiler_type": s.drtype, "dst": s.dst or "unavailable"},
+            # The tool's resistance-type label (e.g. "MDR-TB") is deliberately not passed: the study assigns no such labels.
+            ctx = {"sample": {"run": s.run, "lineage": s.lineage, "dst": s.dst or "unavailable"},
                    "findings": [{"fid": f.fid, "drug": DRUG_NAMES.get(f.drug, f.drug), "variant": f"{f.gene} {f.change}", "grading": GRADE.get(f.grade, f.confidence),
                                  "depth": f.depth, "read_fraction": f.freq, "rule_classification": f.cls, "rule_review": f.review, "rule_reason": f.reason} for f in s.findings]}
             res = self.run(f"Interpret the findings for {s.run}.", ctx)

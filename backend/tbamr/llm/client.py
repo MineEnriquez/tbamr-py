@@ -46,11 +46,16 @@ class ClaudeClient:
             agent, self.model, len(tools),
         )
 
+        fetched = []
+
         def live() -> list[dict[str, Any]]:
+            fetched.append(True)
             _LOG.info("LLM Anthropic messages.create agent=%s model=%s", agent, self.model)
             return self._complete_live(system, messages, tools)
 
-        return cache.wrap("claude", key, live)
+        out = cache.wrap("claude", key, live)
+        self.last_call_cached = not fetched  # read by the agent loop to tell a cached answer from a fresh one
+        return out
 
     def _complete_live(self, system, messages, tools):
         resp = self.client.messages.create(
@@ -92,6 +97,8 @@ class ReplayClient:
 
         self.policies = policies or POLICIES
         self._n = 0
+
+    last_call_cached = False  # scripted policies never come from the cache
 
     def complete(self, agent, system, messages, tools):
         _LOG.info("LLM complete agent=%s brain=replay model=replay-script", agent)

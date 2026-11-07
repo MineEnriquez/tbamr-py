@@ -19,6 +19,19 @@ from .base import RuleAgent
 
 _LOG = logging.getLogger("tbamr.agents.reporting")
 
+# The study's definition of genotypic resistance, stated in every report and applied by counts_as_resistant().
+RESISTANCE_DEFINITION = (
+    "Predicted resistant: a WHO-catalogue Group 1 or 2 mutation for the drug (as graded by the TB-Profiler database named "
+    "below), with at least 10 supporting reads, in at least 90% of reads, no conflicting phenotypic DST, and not pending "
+    "review. Calls that fail any of these, or are Group 3, are reported as uncertain until the TB Microbiologist reviews them."
+)
+
+
+def counts_as_resistant(f: Any) -> bool:
+    """A finding counts toward 'predicted resistant' only if it is a technical call that is not awaiting review
+    (flagged calls - low depth, minor variant, DST discordance, uncertain grading - count as uncertain instead)."""
+    return f.cls == "tech" and f.review in ("Not required", "Reviewed")
+
 
 class ReportingOrchestrator(RuleAgent):
     name = "reporting"
@@ -40,7 +53,7 @@ class ReportingOrchestrator(RuleAgent):
         drugs = sorted({"RIF", "INH", *[f.drug for f in fx]}, key=lambda d: (pri.get(d, 2), d))
         rows = []
         for d in drugs:
-            pred = {f.sample_id for f in fx if f.drug == d and f.cls == "tech" and f.review != "Not supported"}
+            pred = {f.sample_id for f in fx if f.drug == d and counts_as_resistant(f)}
             unc = {f.sample_id for f in fx if f.drug == d and (f.cls == "uncertain" or f.review in ("Pending", "Needs more data"))}
             rev = {f.sample_id for f in fx if f.drug == d and f.review == "Reviewed"}
             with_dst = [s for s in analysed if d in s.dst]
@@ -61,7 +74,10 @@ class ReportingOrchestrator(RuleAgent):
         if not n:
             limitations.append("No TB-Profiler results yet, so there are no resistance predictions.")
         limitations += ["No isolate-matched phenotypic DST is linked unless shown above; missing DST is never counted as agreement.",
-                        "Public genomes are a convenience sample: no national prevalence estimate and no clinical use."]
+                        "Public genomes are a convenience sample: no national prevalence estimate and no clinical use.",
+                        "Mutation counts are descriptive: they are not statistical associations and imply no causal link.",
+                        "Each drug is reported separately; this study assigns no MDR, RR or HR labels to isolates.",
+                        "Lineages are tool-assigned and listed descriptively; no lineage-resistance, clustering or transmission inference is made."]
         report = {
             "version": version, "generated_at": time.time(), "rule_version": RULES["rpt"], "superseded": False,
             "counts": {"candidates": len(st.samples), "verified": len(cohort), "qc_passed": len(qc), "analysed": n,
@@ -74,8 +90,18 @@ class ReportingOrchestrator(RuleAgent):
             "limitations": limitations,
             "provenance": {"tools": sorted({s.profile_meta.get("tool") for s in analysed if s.profile_meta.get("tool")}),
                            "databases": sorted({str(s.profile_meta.get("db")) for s in analysed if s.profile_meta.get("db")}), "rules": RULES},
+            "resistance_definition": RESISTANCE_DEFINITION,
+            "catalogue_consistent": True,
+            "scope_warnings": [{"warning": w, **({k: v for k, v in (st.scope.get("responses") or {}).get(str(i), {}).items() if k != "ts"})}
+                               for i, w in enumerate(st.scope.get("warnings") or [])],
             "gates": st.gates, "summary_draft": None,
         }
+        dbs = report["provenance"]["databases"]
+        if n and (len(dbs) > 1 or "not in file" in dbs):
+            report["catalogue_consistent"] = False
+            report["limitations"].insert(0, f"Mixed or unrecorded mutation-catalogue versions in this report ({', '.join(dbs)}): calls are not "
+                                            "comparable across runs. Re-profile all runs with one catalogue version before release.")
+            _LOG.warning("report v%s mixes catalogue versions: %s", version, dbs)
         _LOG.info("report v%s counts: candidates=%d verified=%d qc_passed=%d analysed=%d", version, len(st.samples), len(cohort), len(qc), n)
         for r in rows:
             _LOG.info("report v%s %s: predicted resistant %d/%d, uncertain/pending %d, reviewed %d, DST %d (concordant %s)",
@@ -92,7 +118,7 @@ class ReportingOrchestrator(RuleAgent):
         location names, e.g. "Bandung, West Java" -> "West Java"; uncatalogued text is shown as recorded)."""
         worldwide = st.country == WORLDWIDE
         kind = "country" if worldwide else "region"
-        pred = {(f.sample_id, f.drug) for f in fx if f.cls == "tech" and f.review != "Not supported"}
+        pred = {(f.sample_id, f.drug) for f in fx if counts_as_resistant(f)}
         groups: dict[str, list] = {}
         for s in analysed:
             key = (country_of(s.country) if worldwide else place_label(s.country, st.country)) or "not recorded"
@@ -106,8 +132,13 @@ class ReportingOrchestrator(RuleAgent):
     @logged("tbamr.agents")
     def draft_summary(self, report: dict[str, Any]) -> str:
         brief = {k: report[k] for k in ("counts", "drugs", "top_mutations", "lineages", "limitations")}
+        brief["resistance_definition"] = report.get("resistance_definition")
+        brief["catalogue"] = report.get("provenance", {}).get("databases")
         system = ("You draft plain-language summaries of TB genomic resistance evidence reports for researchers. Use only the numbers given, "
-                  "state denominators, never claim clinical relevance or prevalence, and call nothing confirmed unless 'reviewed' > 0. About 150 words.")
+                  "state denominators, never claim clinical relevance or prevalence, and call nothing confirmed unless 'reviewed' > 0. "
+                  "Report each drug separately and never label isolates MDR, RR or HR. Describe mutations as observed counts: never as "
+                  "'associated with' resistance, statistically or causally. Mention lineages only as a description of the cohort, with no "
+                  "lineage-resistance, clustering or transmission claims. State the mutation catalogue version given. About 150 words.")
         _LOG.info("drafting plain-language summary for report v%s with %s", report.get("version"), getattr(self.client, "mode", "?"))
         text = self.client.text(system, f"Report data: {brief}")
         _LOG.info("summary drafted for report v%s (%d characters)", report.get("version"), len(text or ""))

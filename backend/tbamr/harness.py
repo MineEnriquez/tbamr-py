@@ -72,6 +72,8 @@ def seed(db_path: str) -> dict:
         # Mark the Guardian's raw as viewed so the gate's note_raw records a receipt (not required,
         # but it keeps the audit trail in the seeded DB looking realistic).
         orch.raw_view("scope", "guardian", **PI)
+        for i in range(len(orch.state.scope.get("warnings") or [])):  # every Guardian warning needs the PI's answer
+            expect(c.post(f"/api/scope/warnings/{i}", json={**PI, "decision": "accept", "rationale": "Accepted in the seeded demo."}), f"Answer warning {i + 1}")
         expect(c.post("/api/gates/scope", json=PI), "Approve scope")
         expect(c.post("/api/stages/2/run"), "Stage 2")
         orch.raw_view("cohort", "all", **PI)

@@ -33,6 +33,9 @@ def main() -> None:
     if s["blocking"]:
         p("  Blocked:", *s["blocking"]); return
     p(f"  target population: {o.state.country}" + (f" · {o.state.region}" if o.state.region else ""))
+    for i, w in enumerate(s["warnings"]):  # the walkthrough PI accepts each warning, as a real PI must answer them
+        o.respond_warning("pi", "Researcher", i, "accept", "Accepted in the walkthrough.")
+        p(f"  ✓ warning {i + 1} accepted: {w[:90]}")
     o.approve_scope("pi", "Researcher"); p("  ✓ scope approved by PI")
     p("Stage 2 · Discovery + Verification"); r = o.run_stage(2)
     st = o.state

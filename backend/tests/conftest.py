@@ -35,6 +35,11 @@ _TEST_DB_DIR = tempfile.mkdtemp(prefix="tbamr-test-db-")
 os.environ["TBAMR_DB"] = os.path.join(_TEST_DB_DIR, "tbamr-test.db")
 atexit.register(shutil.rmtree, _TEST_DB_DIR, True)
 
+# Never call the real Claude API from tests: /api/reset rebuilds the app with make_client(), which picks Claude whenever
+# ANTHROPIC_API_KEY is set, so UI tests after a reset would make paid, non-deterministic calls. Set TBAMR_TEST_BRAIN=claude
+# to opt in deliberately.
+os.environ["TBAMR_BRAIN"] = os.environ.get("TBAMR_TEST_BRAIN", "replay")
+
 
 def _free_port() -> int:
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
