@@ -10,12 +10,14 @@ Blocks are normalised to plain dicts:
 """
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Callable, Protocol
 
 from ..stores.cache import cache
 
 DEFAULT_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5-5")
+_LOG = logging.getLogger("tbamr.llm")
 
 
 class LLMClient(Protocol):
@@ -39,7 +41,16 @@ class ClaudeClient:
         # Cache keyed by the whole request shape. Enabled by default; the admin page lets a user
         # turn Claude caching off when they want fresh reasoning for every call.
         key = {"m": "complete", "model": self.model, "agent": agent, "system": system, "messages": messages, "tools": tools}
-        return cache.wrap("claude", key, lambda: self._complete_live(system, messages, tools))
+        _LOG.info(
+            "LLM complete agent=%s model=%s brain=claude tools=%s",
+            agent, self.model, len(tools),
+        )
+
+        def live() -> list[dict[str, Any]]:
+            _LOG.info("LLM Anthropic messages.create agent=%s model=%s", agent, self.model)
+            return self._complete_live(system, messages, tools)
+
+        return cache.wrap("claude", key, live)
 
     def _complete_live(self, system, messages, tools):
         resp = self.client.messages.create(
@@ -55,7 +66,13 @@ class ClaudeClient:
 
     def text(self, system: str, prompt: str) -> str:
         key = {"m": "text", "model": self.model, "system": system, "prompt": prompt}
-        return cache.wrap("claude", key, lambda: self._text_live(system, prompt))
+        _LOG.info("LLM text model=%s brain=claude", self.model)
+
+        def live() -> str:
+            _LOG.info("LLM Anthropic messages.create (text) model=%s", self.model)
+            return self._text_live(system, prompt)
+
+        return cache.wrap("claude", key, live)
 
     def _text_live(self, system: str, prompt: str) -> str:
         resp = self.client.messages.create(model=self.model, max_tokens=800, system=system, messages=[{"role": "user", "content": prompt}])
@@ -77,6 +94,7 @@ class ReplayClient:
         self._n = 0
 
     def complete(self, agent, system, messages, tools):
+        _LOG.info("LLM complete agent=%s brain=replay model=replay-script", agent)
         policy = self.policies.get(agent)
         if policy is None:
             raise KeyError(f"No replay policy for agent '{agent}'")
@@ -88,6 +106,7 @@ class ReplayClient:
         return blocks
 
     def text(self, system: str, prompt: str) -> str:
+        _LOG.info("LLM text brain=replay model=replay-script")
         return ("[Replay mode — no live model] This summary is generated from the report numbers by a template. "
                 "Add an Anthropic API key to have Claude draft it.")
 

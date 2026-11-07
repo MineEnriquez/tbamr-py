@@ -13,6 +13,7 @@ from typing import Any
 
 from ..core.decisions import Outcome
 from ..core.models import RULES, THRESHOLDS, Finding, Sample
+from ..logutil import logged
 from ..tools.tbprofiler import DRUG_NAMES
 from .base import LLMAgent
 
@@ -63,6 +64,7 @@ class EvidenceAnalyst(LLMAgent):
         allowed = {f["fid"] for f in ctx.get("findings", [])}
         return {"notes": [n for n in sub.get("notes", []) if n.get("fid") in allowed]}
 
+    @logged("tbamr.agents")
     def evaluate(self, samples: list[Sample]) -> dict[str, int]:
         todo = [s for s in samples if s.profiling == "Done" and not s.findings and s.profile_meta.get("evaluated") is not True]
         for s in todo:

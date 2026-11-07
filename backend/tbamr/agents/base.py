@@ -8,10 +8,14 @@ LLMAgent   — Claude-powered: given a goal and tools, it decides which tools to
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any, Callable
 
 from ..core.decisions import Decision, DecisionLog, Outcome
+from ..logutil import logged
+
+_AGENT_LOG = logging.getLogger("tbamr.agents")
 
 
 @dataclass
@@ -30,8 +34,7 @@ GUARDRAILS_TEXT = (
     "Never invent accessions, numbers or publications; use only what your tools return. "
     "Never relax a mandatory criterion to reach a sample count. Never upgrade an uncertain finding to confirmed. "
     "Never make clinical or prevalence claims. When evidence is ambiguous, escalate to a human with the evidence you found. "
-    "Finish by calling the submit tool exactly once."
-)
+    "Finish by calling the submit tool exactly once." )
 
 
 class BaseAgent:
@@ -76,15 +79,20 @@ class LLMAgent(BaseAgent):
         return submission
 
     # loop -------------------------------------------------------------------------
+    @logged("tbamr.agents")
     def run(self, task: str, ctx: dict[str, Any] | None = None) -> dict[str, Any]:
         ctx = ctx or {}
         self.called: dict[str, list[Any]] = {}
+        brain = getattr(self.client, "mode", "?")
+        model = getattr(self.client, "model", brain)
+        _AGENT_LOG.info("LLMAgent.run agent=%s brain=%s model=%s max_steps=%s", self.name, brain, model, self.max_steps)
         system = f"You are the {self.title} in a TB genomic drug-resistance research workflow (A.G.E.N.T. Playbook). {self.system_prompt}\n\n{GUARDRAILS_TEXT}"
         tools = [t.spec() for t in self.tools] + [{"name": "submit", "description": self.submit_description, "input_schema": self.submit_schema}]
         messages: list[dict[str, Any]] = [{"role": "user", "content": task + ("\n\nContext (JSON):\n" + json.dumps(ctx, default=str) if ctx else "")}]
         self.log.trace(self.name, "task", {"task": task, "mode": self.client.mode})
         by_name = {t.name: t for t in self.tools}
         for step in range(self.max_steps):
+            _AGENT_LOG.info("LLMAgent.step agent=%s step=%s/%s", self.name, step + 1, self.max_steps)
             blocks = self.client.complete(self.name, system, messages, tools)
             for b in blocks:
                 if b["type"] == "text" and b["text"].strip():
@@ -121,6 +129,7 @@ class LLMAgent(BaseAgent):
                     out: Any = {"error": f"Unknown tool {u['name']}"}
                 else:
                     try:
+                        _AGENT_LOG.info("LLMAgent.tool agent=%s tool=%s input_keys=%s", self.name, u["name"], list(u["input"].keys()))
                         out = tool.fn(**u["input"])
                     except Exception as e:  # tool failures are data for the agent, not crashes
                         out = {"error": f"{type(e).__name__}: {e}"}

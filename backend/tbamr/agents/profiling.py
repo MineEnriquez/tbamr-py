@@ -9,6 +9,7 @@ from typing import Any
 
 from ..core.decisions import Outcome
 from ..core.models import RULES, Sample
+from ..logutil import logged
 from ..tools.tbprofiler import TBProfilerRunner
 from .base import RuleAgent
 
@@ -22,6 +23,7 @@ class ProfilingTasker(RuleAgent):
         super().__init__(log)
         self.runner = runner or TBProfilerRunner()
 
+    @logged("tbamr.agents")
     def queue(self, samples: list[Sample]) -> int:
         n = 0
         for s in samples:
@@ -31,6 +33,7 @@ class ProfilingTasker(RuleAgent):
         self.decide("—", Outcome.INFO, RULES["prof"], f"{n} QC-passed run(s) queued for TB-Profiler. Tools on this machine: {self.runner.available()}.", stage=4)
         return n
 
+    @logged("tbamr.agents")
     def apply_result(self, s: Sample, parsed: dict[str, Any], source: str, raw: dict[str, Any] | None = None) -> None:
         if raw is not None:
             self.log.put_raw("tbprofiler", s.run, raw)
@@ -44,10 +47,12 @@ class ProfilingTasker(RuleAgent):
         self.decide(s.run, Outcome.PROCEED, RULES["prof"], "TB-Profiler result recorded: " + s.profiling_note,
                     f"file {s.profile_meta.get('file', '')}; median depth {s.profile_meta.get('median_depth')}", stage=4)
 
+    @logged("tbamr.agents")
     def fail(self, s: Sample, error: str) -> None:
         s.profiling, s.profiling_note = "Failed", error
         self.decide(s.run, Outcome.ESCALATE, RULES["prof"], "TB-Profiler did not complete: " + s.profiling_note, stage=4)
 
+    @logged("tbamr.agents")
     def run_one(self, s: Sample) -> dict[str, Any]:
         res = self.runner.run(s.run)
         if res.get("ok"):

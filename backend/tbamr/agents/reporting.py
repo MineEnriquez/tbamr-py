@@ -12,6 +12,7 @@ from typing import Any
 from ..core.decisions import Outcome
 from ..core.geo import WORLDWIDE, country_of, place_label
 from ..core.models import RULES, PipelineState
+from ..logutil import logged
 from ..tools.tbprofiler import DRUG_NAMES
 from .base import RuleAgent
 
@@ -25,6 +26,7 @@ class ReportingOrchestrator(RuleAgent):
         super().__init__(log)
         self.client = client
 
+    @logged("tbamr.agents")
     def build(self, st: PipelineState, version: int) -> dict[str, Any]:
         cohort = [s for s in st.samples if s.in_cohort and s.eligibility == "Verified"]
         qc = [s for s in cohort if s.qc == "Pass"]
@@ -88,6 +90,7 @@ class ReportingOrchestrator(RuleAgent):
         no_region = 0 if worldwide else len(groups.get("not recorded", []))
         return rows, kind, no_region
 
+    @logged("tbamr.agents")
     def draft_summary(self, report: dict[str, Any]) -> str:
         brief = {k: report[k] for k in ("counts", "drugs", "top_mutations", "lineages", "limitations")}
         system = ("You draft plain-language summaries of TB genomic resistance evidence reports for researchers. Use only the numbers given, "

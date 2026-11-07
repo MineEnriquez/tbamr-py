@@ -641,3 +641,4 @@ def test_definitions_describe_what_the_pipeline_does(orch):
     assert "Kept in the cohort" in rules["missing_dst"] and not st.sample("DEMO-R02").dst and st.sample("DEMO-R02").profiling == "Done"
     # duplicates: the first run is kept, the later one excluded when the agent confirms (R01 kept, R07 excluded)
     assert "first run seen" in rules["duplicates"] and st.sample("DEMO-R01").eligibility == "Verified" and st.sample("DEMO-R07").eligibility == "Excluded"
+

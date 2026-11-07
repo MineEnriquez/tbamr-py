@@ -135,6 +135,14 @@ class _Cache:
         """get-or-compute idiom. If the namespace is disabled or Mongo is down, just computes fn()."""
         hit = self.get(ns, payload)
         if hit is not None:
+            if isinstance(payload, dict):
+                if ns == "claude":
+                    log.info(
+                        "LLM cache hit method=%s agent=%s model=%s",
+                        payload.get("m"), payload.get("agent"), payload.get("model"),
+                    )
+                elif ns in ("ena", "pmc", "tbprofiler"):
+                    log.info("cache hit namespace=%s method=%s", ns, payload.get("m"))
             return hit
         value = fn()
         if value is not None:

@@ -74,7 +74,11 @@ def _install_handler() -> None:
     if root.level > logging.INFO:
         root.setLevel(logging.INFO)
     # Uvicorn/fastapi loggers propagate=False by default; flip them on so our handler sees them.
-    for name in ("uvicorn", "uvicorn.access", "uvicorn.error", "fastapi", "httpx"):
+    for name in (
+        "uvicorn", "uvicorn.access", "uvicorn.error", "fastapi", "httpx",
+        "tbamr", "tbamr.orchestrator", "tbamr.agents", "tbamr.llm", "tbamr.cache",
+        "tbamr.tools.ena", "tbamr.tools.tbprofiler", "tbamr.profiling",
+    ):
         lg = logging.getLogger(name)
         lg.propagate = True
         if lg.level == 0:

@@ -11,6 +11,7 @@ from typing import Any
 from ..core.decisions import Outcome
 from ..core.geo import resolve_target
 from ..core.models import RULES
+from ..logutil import logged
 from .base import LLMAgent
 
 # The playbook's four required definitions, worded as the rules in this codebase actually apply them.
@@ -92,6 +93,7 @@ class ScopeGuardian(LLMAgent):
         return {"blocking": sorted(set(blocking)), "gaps": gaps, "warnings": warnings,
                 "asks_comparison_across_places": bool(sub.get("asks_comparison_across_places")), "target": target}
 
+    @logged("tbamr.agents")
     def review(self, question: str, country: str, target_drugs: list[str], cohort_target: int, region: str = "") -> dict[str, Any]:
         target = resolve_target(question, country, region)
         ctx = {"question": question, "country": country, "region": region, "target": target, "target_drugs": target_drugs, "cohort_target": cohort_target,

@@ -12,6 +12,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from ..logutil import logged
+
 from ..stores.cache import cache
 
 DRUG_ALIAS = {
@@ -142,6 +144,7 @@ class TBProfilerRunner:
             "docker": self._docker_ok(),
         }
 
+    @logged("tbamr.tools.tbprofiler")
     def run(self, run_accession: str, timeout: int = 7200) -> dict[str, Any]:
         # NoSQL cache in front of the subprocess: if we've successfully profiled this run before
         # (on any machine, from any workdir), reuse it. Only cache successes — never a failure dict.
@@ -154,6 +157,7 @@ class TBProfilerRunner:
             cache.set("tbprofiler", {"m": "run", "acc": run_accession}, result)
         return result
 
+    @logged("tbamr.tools.tbprofiler")
     def _run(self, run_accession: str, timeout: int = 7200) -> dict[str, Any]:
         avail = self.available()
         if not avail["fasterq-dump"]:

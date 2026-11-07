@@ -6,6 +6,7 @@ approve, but every judgment call inside a stage belongs to an agent or a human.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 from collections import Counter
@@ -22,9 +23,12 @@ from ..agents.verification import VerificationTasker
 from ..tools.demo import DST as DEMO_DST
 from ..tools.demo import demo_tbprofiler_failure, demo_tbprofiler_json
 from ..tools.tbprofiler import parse_result
+from ..logutil import logged
 from .decisions import Decision, DecisionLog, Outcome
 from .geo import search_country
 from .models import GATES, ROLES, RULES, STAGES, THRESHOLDS, PipelineState, Sample
+
+_LOG = logging.getLogger("tbamr.orchestrator")
 
 
 class PermissionDenied(Exception):
@@ -202,6 +206,7 @@ class Orchestrator:
             self._set(n + 1, "ready")
 
     # ------------------------------------------------------------------ stages
+    @logged("tbamr.orchestrator")
     def run_stage(self, n: int) -> dict[str, Any]:
         with self.lock:
             status = self._status(n)
@@ -214,8 +219,12 @@ class Orchestrator:
             finally:
                 self.busy = None
                 self.save()
+            brain = getattr(self.client, "mode", "?")
+            model = getattr(self.client, "model", brain)
+            _LOG.info("Stage %s finished brain=%s model=%s", n, brain, model)
             return out
 
+    @logged("tbamr.orchestrator")
     def _s1(self):
         st = self.state
         self.orch("—", Outcome.INFO, RULES["scope"], "Handing the research scope to the Scope Guardian.", 1)
@@ -227,6 +236,7 @@ class Orchestrator:
         self._set(1, "wait")
         return st.scope
 
+    @logged("tbamr.orchestrator")
     def _s2(self):
         st = self.state
         if not st.country:
@@ -255,6 +265,7 @@ class Orchestrator:
         self._set(2, "wait")
         return {"candidates": len(st.samples), "checks": st.cohort_checks}
 
+    @logged("tbamr.orchestrator")
     def _add_rows(self, rows: list[dict[str, Any]]) -> list[Sample]:
         known = {s.run for s in self.state.samples}
         new = []
@@ -273,15 +284,18 @@ class Orchestrator:
             known.add(s.run)
         return new
 
+    @logged("tbamr.orchestrator")
     def _cohort_checks(self, total: int) -> list[dict[str, Any]]:
         asks = bool(self.state.scope.get("asks_comparison_across_places"))
         return self.agents["verification"].cohort_checks(self.state.samples, asks, total)
 
+    @logged("tbamr.orchestrator")
     def _s3(self):
         res = self.agents["qc"].assess(self.state.samples)
         self._set(3, "wait")
         return res
 
+    @logged("tbamr.orchestrator")
     def _s4(self):
         n = self.agents["profiling"].queue(self.state.samples)
         if self.demo:  # simulate the analyst importing TB-Profiler files (some runs fail, some have no file yet)
@@ -296,11 +310,13 @@ class Orchestrator:
         self._set(4, "wait")
         return {"queued": n}
 
+    @logged("tbamr.orchestrator")
     def _s5(self):
         res = self.agents["evidence"].evaluate(self.state.samples)
         self._complete(5)
         return res
 
+    @logged("tbamr.orchestrator")
     def _s6(self):
         prev = self.state.report["version"] if self.state.report else 0
         self.state.report = self.agents["reporting"].build(self.state, prev + 1)
@@ -309,6 +325,7 @@ class Orchestrator:
         return self.state.report
 
     # ------------------------------------------------------------------ human gates
+    @logged("tbamr.orchestrator")
     def approve_scope(self, role: str, person: str) -> None:
         with self.lock:
             self.require(role, GATES["scope"])
@@ -322,6 +339,7 @@ class Orchestrator:
             self._complete(1)
             self.save()
 
+    @logged("tbamr.orchestrator")
     def resolve_hold(self, role: str, person: str, run: str, decision: str, rationale: str) -> None:
         with self.lock:
             self.require(role, GATES["cohort"])
@@ -344,6 +362,7 @@ class Orchestrator:
                 self._revalidate(s)
             self.save()
 
+    @logged("tbamr.orchestrator")
     def approve_cohort(self, role: str, person: str) -> None:
         with self.lock:
             self.require(role, GATES["cohort"])
@@ -359,6 +378,7 @@ class Orchestrator:
             self._complete(2)
             self.save()
 
+    @logged("tbamr.orchestrator")
     def confirm_qc(self, role: str, person: str) -> None:
         with self.lock:
             self.require(role, ["analyst"])
@@ -369,6 +389,7 @@ class Orchestrator:
             self._complete(3)
             self.save()
 
+    @logged("tbamr.orchestrator")
     def resolve_qc(self, role: str, person: str, run: str, decision: str, rationale: str) -> None:
         with self.lock:
             self.require(role, ["analyst"])
@@ -381,6 +402,7 @@ class Orchestrator:
             self._revalidate(s)
             self.save()
 
+    @logged("tbamr.orchestrator")
     def import_results(self, role: str, person: str, files: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]:
         with self.lock:
             self.require(role, ["analyst"])
@@ -403,6 +425,7 @@ class Orchestrator:
             self.save()
             return {"imported": ok, "skipped": skipped}
 
+    @logged("tbamr.orchestrator")
     def run_profiler(self, role: str, person: str, runs: list[str]) -> dict[str, Any]:
         """Run TB-Profiler locally in a bounded thread pool so several samples profile at once.
 
@@ -482,6 +505,7 @@ class Orchestrator:
         threading.Thread(target=work, daemon=True).start()
         return {"started": runs, "concurrency": concurrency, "threads_per_sample": self.agents["profiling"].runner.threads}
 
+    @logged("tbamr.orchestrator")
     def close_profiling(self, role: str, person: str) -> None:
         with self.lock:
             self.require(role, GATES["profiling_batch"])
@@ -493,6 +517,7 @@ class Orchestrator:
             self._complete(4)
             self.save()
 
+    @logged("tbamr.orchestrator")
     def review(self, role: str, person: str, fid: str, decision: str, rationale: str) -> None:
         with self.lock:
             self.require(role, ["tbexpert"])
@@ -509,6 +534,7 @@ class Orchestrator:
                 self.state.report["superseded"] = True
             self.save()
 
+    @logged("tbamr.orchestrator")
     def release(self, role: str, person: str, kind: str) -> None:
         with self.lock:
             self.require(role, GATES["release"])
@@ -532,6 +558,7 @@ class Orchestrator:
             from ..stores.results import save_release
             save_release(self.state, rep, {**gate, "person": person, "role": role})
 
+    @logged("tbamr.orchestrator")
     def draft_summary(self) -> str:
         if not self.state.report:
             raise StageError("No report yet.")
@@ -540,6 +567,7 @@ class Orchestrator:
         self.save()
         return text
 
+    @logged("tbamr.orchestrator")
     def reopen_scope(self) -> None:
         """Reset the pipeline back to Stage 1 ready so the researcher can edit scope without a full
         pipeline reset. Clears downstream work (samples, cohort checks, gates, report) because
@@ -557,6 +585,7 @@ class Orchestrator:
             self.save()
             self.orch("—", Outcome.INFO, RULES["scope"], "Scope reopened; downstream state cleared, decision history preserved.", 1)
 
+    @logged("tbamr.orchestrator")
     def save_summary(self, text: str) -> str:
         """Save a human-edited plain-language summary. Trusts the editor; they're the author now."""
         if not self.state.report:
@@ -569,6 +598,7 @@ class Orchestrator:
     # ------------------------------------------------------------------ overrides (two-person rule)
     ORDER = {"eligibility": {"Verified": 0, "Hold": 1, "Excluded": 2}, "qc": {"Pass": 0, "Escalated": 1, "Hold": 1, "Excluded": 2}}
 
+    @logged("tbamr.orchestrator")
     def override(self, role: str, person: str, run: str, field: str, to: str, rationale: str) -> dict[str, Any]:
         with self.lock:
             owners = GATES["cohort"] if field == "eligibility" else ["analyst"]
@@ -588,6 +618,7 @@ class Orchestrator:
             self.save()
             return {"applied": False, "pending": p}
 
+    @logged("tbamr.orchestrator")
     def cosign(self, role: str, person: str, override_id: str) -> None:
         with self.lock:
             p = next((x for x in self.pending_overrides if x["id"] == override_id), None)
@@ -601,6 +632,7 @@ class Orchestrator:
             self._apply_override(self._sample(p["run"]), p["field"], p["from"], p["to"], p["rationale"],
                                  [f"{ROLES[p['role']]} ({p['person']})", f"{ROLES[role]} ({person})"])
 
+    @logged("tbamr.orchestrator")
     def _apply_override(self, s: Sample, field: str, frm: str, to: str, rationale: str, signers: list[str]) -> None:
         setattr(s, field, to)
         setattr(s, field + "_note", f"Override: {rationale}")
@@ -611,6 +643,7 @@ class Orchestrator:
         self._revalidate(s)
         self.save()
 
+    @logged("tbamr.orchestrator")
     def _revalidate(self, s: Sample) -> None:
         self.orch(s.run, Outcome.INFO, RULES["rpt"], "Re-validation: downstream results for this run are recomputed.")
         if self.state.report:

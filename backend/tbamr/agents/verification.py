@@ -18,6 +18,7 @@ from typing import Any
 from ..core.decisions import Outcome
 from ..core.geo import region_matches, region_of
 from ..core.models import RULES, Sample
+from ..logutil import logged
 from .base import LLMAgent, Tool
 
 
@@ -57,6 +58,7 @@ class VerificationTasker(LLMAgent):
         ]
 
     # 1. rule pre-checks -----------------------------------------------------------
+    @logged("tbamr.agents")
     def precheck(self, samples: list[Sample], country: str, region: str = "") -> list[tuple[Sample, str]]:
         """Classify each run. If `country` is a real country, the research is scoped to that country and
         runs whose ENA country field names a different place are excluded; missing-country goes to
@@ -102,6 +104,7 @@ class VerificationTasker(LLMAgent):
             props.append({"run": p["run"], "outcome": outcome, "rationale": p.get("rationale", ""), "evidence": p.get("evidence", "")})
         return {"proposals": props}
 
+    @logged("tbamr.agents")
     def verify(self, samples: list[Sample], country: str, region: str = "") -> dict[str, Any]:
         ambiguous = self.precheck(samples, country, region)
         proposals: dict[str, dict[str, Any]] = {}
@@ -127,6 +130,7 @@ class VerificationTasker(LLMAgent):
                 "excluded": sum(s.eligibility == "Excluded" for s in samples)}
 
     # 4. cohort checks (rules) -----------------------------------------------------
+    @logged("tbamr.agents")
     def cohort_checks(self, samples: list[Sample], asks_places: bool, total_in_ena: int) -> list[dict[str, Any]]:
         v = [s for s in samples if s.eligibility == "Verified"]
         checks: list[dict[str, Any]] = []
