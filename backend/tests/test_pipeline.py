@@ -220,21 +220,23 @@ def test_tbprofiler_parser_v4_and_v6():
     assert b["mutations"][0]["grade"] == 2 and b["lineage"] == "4.1.2" and b["meta"]["tool"] == "TB-Profiler 4.4.0"
 
 
-def test_ena_paging_with_mock_transport():
+def test_ena_search_is_one_request_without_offset():
+    """The ENA Portal API rejects `offset` with HTTP 400, so the search must be a single request with the full limit."""
     calls = []
 
     def handler(req: httpx.Request):
         calls.append(dict(req.url.params))
         if req.url.path.endswith("/count"):
             return httpx.Response(200, text="250")
-        off, lim = int(req.url.params["offset"]), int(req.url.params["limit"])
-        n = max(0, min(lim, 250 - off))
-        return httpx.Response(200, json=[{"run_accession": f"SRR{off + i}"} for i in range(n)])
+        if "offset" in req.url.params:
+            return httpx.Response(400, json={"message": "Unsupported param offset"})
+        return httpx.Response(200, json=[{"run_accession": f"SRR{i}"} for i in range(min(250, int(req.url.params["limit"]) or 250))])
 
     tools = DataTools(httpx.Client(transport=httpx.MockTransport(handler)))
     res = tools.ena_search_runs("Indonesia", limit=500, page_size=100)
     assert res["returned"] == 250 and res["total_in_ena"] == 250
-    assert [c.get("offset") for c in calls if "offset" in c] == ["0", "100", "200"]
+    searches = [c for c in calls if "query" in c and "limit" in c]
+    assert len(searches) == 1 and searches[0]["limit"] == "500" and "offset" not in searches[0]
 
 
 # ---------------------------------------------------------------- API
