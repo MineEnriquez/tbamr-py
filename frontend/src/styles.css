@@ -11,30 +11,33 @@
   --shadow-md:0 4px 12px rgb(27 36 48 / .08), 0 1px 2px rgb(27 36 48 / .05);
   --shadow-lg:0 16px 40px rgb(27 36 48 / .14), 0 2px 8px rgb(27 36 48 / .06);
   --radius:8px;
+  --shadow-lift:0 14px 32px rgb(15 50 110 / .22), 0 4px 10px rgb(15 50 110 / .12), 0 0 0 1px var(--blue);
   --f-display:"IBM Plex Sans","Segoe UI",system-ui,sans-serif; --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme=light]){
-  --bg:#0b1420; --surface:#131d2c; --surface-2:#1b2638; --ink:#e6ecf3; --muted:#8894a4; --line:#2b3648;
-  --accent:#ffffff; --accent-ink:#0a0a0a; --accent-soft:#1b2638; --blue:#5e9cf6;
-  --ok:#4ec593; --ok-bg:#1b3828; --hold:#e3b254; --hold-bg:#3a2d12; --ex:#8894a4; --ex-bg:#1b2638;
-  --retry:#5e9cf6; --retry-bg:#16294a; --esc:#f07469; --esc-bg:#3b1b17; --pend:#a996ec; --pend-bg:#241a3c;
-  --grid:rgba(200,215,235,.055);
-  --canvas-bg:#0f1824; --canvas-line:#243043; --canvas-grid:rgba(200,215,235,.045);
-  --shadow-sm:0 1px 2px rgb(0 0 0 / .32), 0 1px 2px rgb(0 0 0 / .25);
-  --shadow-md:0 6px 16px rgb(0 0 0 / .4), 0 2px 4px rgb(0 0 0 / .28);
-  --shadow-lg:0 30px 70px rgb(0 0 0 / .6), 0 4px 12px rgb(0 0 0 / .38);
+  --bg:#0f1318; --surface:#171c23; --surface-2:#1e252e; --ink:#e3e8ee; --muted:#98a3b1; --line:#2d3641;
+  --accent:#2f6fc4; --accent-ink:#ffffff; --accent-soft:#1a2636; --blue:#5c9cf0;
+  --ok:#4bb37a; --ok-bg:#16301f; --hold:#d6a64a; --hold-bg:#33270f; --ex:#98a3b1; --ex-bg:#1e252e;
+  --retry:#5c9cf0; --retry-bg:#152a45; --esc:#ec6f62; --esc-bg:#3a1a17; --pend:#a58bea; --pend-bg:#251d3d;
+  --grid:transparent;
+  --canvas-bg:#0f1318; --canvas-line:#2d3641; --canvas-grid:rgba(220,230,240,.03);
+  --shadow-sm:0 1px 2px rgb(0 0 0 / .4);
+  --shadow-md:0 4px 12px rgb(0 0 0 / .45), 0 1px 2px rgb(0 0 0 / .3);
+  --shadow-lg:0 16px 40px rgb(0 0 0 / .55), 0 2px 8px rgb(0 0 0 / .35);
+  --shadow-lift:0 14px 32px rgb(0 0 0 / .6), 0 0 22px rgb(92 156 240 / .28), 0 0 0 1px var(--blue);
   color-scheme:dark}}
 :root[data-theme=dark]{
-  --bg:#0b1420; --surface:#131d2c; --surface-2:#1b2638; --ink:#e6ecf3; --muted:#8894a4; --line:#2b3648;
-  --accent:#ffffff; --accent-ink:#0a0a0a; --accent-soft:#1b2638; --blue:#5e9cf6;
-  --ok:#4ec593; --ok-bg:#1b3828; --hold:#e3b254; --hold-bg:#3a2d12; --ex:#8894a4; --ex-bg:#1b2638;
-  --retry:#5e9cf6; --retry-bg:#16294a; --esc:#f07469; --esc-bg:#3b1b17; --pend:#a996ec; --pend-bg:#241a3c;
-  --grid:rgba(200,215,235,.055);
-  --canvas-bg:#0f1824; --canvas-line:#243043; --canvas-grid:rgba(200,215,235,.045);
-  --shadow-sm:0 1px 2px rgb(0 0 0 / .32), 0 1px 2px rgb(0 0 0 / .25);
-  --shadow-md:0 6px 16px rgb(0 0 0 / .4), 0 2px 4px rgb(0 0 0 / .28);
-  --shadow-lg:0 30px 70px rgb(0 0 0 / .6), 0 4px 12px rgb(0 0 0 / .38);
+  --bg:#0f1318; --surface:#171c23; --surface-2:#1e252e; --ink:#e3e8ee; --muted:#98a3b1; --line:#2d3641;
+  --accent:#2f6fc4; --accent-ink:#ffffff; --accent-soft:#1a2636; --blue:#5c9cf0;
+  --ok:#4bb37a; --ok-bg:#16301f; --hold:#d6a64a; --hold-bg:#33270f; --ex:#98a3b1; --ex-bg:#1e252e;
+  --retry:#5c9cf0; --retry-bg:#152a45; --esc:#ec6f62; --esc-bg:#3a1a17; --pend:#a58bea; --pend-bg:#251d3d;
+  --grid:transparent;
+  --canvas-bg:#0f1318; --canvas-line:#2d3641; --canvas-grid:rgba(220,230,240,.03);
+  --shadow-sm:0 1px 2px rgb(0 0 0 / .4);
+  --shadow-md:0 4px 12px rgb(0 0 0 / .45), 0 1px 2px rgb(0 0 0 / .3);
+  --shadow-lg:0 16px 40px rgb(0 0 0 / .55), 0 2px 8px rgb(0 0 0 / .35);
+  --shadow-lift:0 14px 32px rgb(0 0 0 / .6), 0 0 22px rgb(92 156 240 / .28), 0 0 0 1px var(--blue);
   color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);background-image:radial-gradient(var(--grid) 1px, transparent 1px);background-size:22px 22px;background-attachment:fixed;color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
@@ -85,7 +88,7 @@ textarea{width:100%;min-height:56px;resize:vertical}
 .seg.data button{font-weight:600}
 .seg.data button[aria-selected=true]{cursor:default}
 .seg.data.demo button[aria-selected=true]{background:var(--accent)}
-.seg.data.live button[aria-selected=true]{background:var(--ok)}
+.seg.data.live button[aria-selected=true]{background:color-mix(in srgb,var(--ok) 78%,black);color:#fff}
 .seg.data button:disabled{opacity:.55;cursor:not-allowed}
 .seg.data button:not([aria-selected=true]):not(:disabled):hover{background:var(--surface-2)}
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
@@ -245,7 +248,7 @@ footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);paddi
 .rawtable{max-height:60vh;overflow:auto}.rawtable td{font-size:.76rem;white-space:nowrap}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .seg button{background:var(--surface);color:var(--ink);border:0;padding:5px 12px;cursor:pointer;font:inherit;font-size:.84rem}
-.seg button[aria-selected=true]{background:var(--blue);color:#fff}
+.seg button[aria-selected=true]{background:var(--accent);color:var(--accent-ink)}
 
 /* workflow canvas - mermaid-style flowchart: thin outlines, light type, airy spacing. Container auto-sizes to fit the floating chip above every card and the tooltip that drops below it on hover. */
 .flow{background:transparent;border:none;padding:4px 0;display:flex;flex-direction:column;gap:16px;box-shadow:none;overflow:visible}
@@ -254,7 +257,7 @@ footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);paddi
 .fnode{flex:1 1 0;min-width:96px;max-width:180px;position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px 10px 18px;margin-top:0;text-align:center;cursor:pointer;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:10px;justify-content:center;transition:border-color .15s, box-shadow .15s}
 .fnode:hover,.fnode:focus-visible{border-color:var(--blue);box-shadow:var(--shadow-md);transform:translateY(-2px);z-index:6}
 /* Stage cards get a deeper, blue-tinted lift on hover so the active target is unmistakable. */
-.fnode.stage:hover,.fnode.stage:focus-visible{box-shadow:0 14px 32px rgb(15 50 110 / .22), 0 4px 10px rgb(15 50 110 / .12), 0 0 0 1px var(--blue);transform:translateY(-4px)}
+.fnode.stage:hover,.fnode.stage:focus-visible{box-shadow:var(--shadow-lift);transform:translateY(-4px)}
 .fnode.stage{min-height:170px}
 /* floating pill chip that sits above the card, outside the rectangle */
 .fnode .fcap{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:500 .66rem/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:inline-flex;gap:7px;align-items:center;white-space:nowrap;z-index:2}
