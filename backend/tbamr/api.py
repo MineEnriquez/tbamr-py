@@ -162,6 +162,8 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         st = O().state
         if st.stage_status["1"] != "ready":
             raise HTTPException(409, "The scope can only be edited before the Guardian runs. Use /api/scope/reopen to go back.")
+        if s.question.strip() != (st.question or "").strip():
+            st.revision_rounds = 0  # the researcher wrote their own question: it is no longer the Guardian's wording
         st.question, st.country, st.region, st.target_drugs, st.cohort_target = s.question, s.country, s.region, s.target_drugs, s.cohort_target
         O().save()
         return {"ok": True}

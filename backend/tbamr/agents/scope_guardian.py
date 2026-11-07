@@ -35,6 +35,7 @@ REQUIRED_GAPS = [
 ]
 
 
+MAX_REVISIONS = 2  # after this many adopted rewordings the Guardian no longer proposes another
 MAX_WARNINGS = 4  # model warnings shown; rule notes (target, run time) are added on top
 
 
@@ -55,7 +56,10 @@ class ScopeGuardian(LLMAgent):
         "DST, public genomes as a convenience sample). Return no warnings rather than generic ones. "
         "If the question promises more than public genomes can answer (e.g. 'associated with', 'patterns', prevalence, "
         "comparisons the target can't support), give `revised_question`: one sentence the data can answer, keeping the "
-        "researcher's intent, target and drugs. Leave it empty when the question is already answerable. "
+        "researcher's intent, target and drugs. Your wording must describe observed counts and agreement with DST, never "
+        "association or causation ('associated with', 'co-occur', 'linked to', 'patterns'). Leave it empty when the question "
+        "is already answerable. If `revision_rounds` > 0 the question is a wording you proposed earlier: leave "
+        "`revised_question` empty unless it is still clearly unanswerable; style or small improvements are not a reason. "
         "You propose; the researcher approves."
     )
     max_steps = 3
@@ -109,14 +113,18 @@ class ScopeGuardian(LLMAgent):
                 warnings.insert(0, extra)
         revised = " ".join(str(sub.get("revised_question") or "").split())
         if revised and revised.lower() == " ".join(str(ctx.get("question", "")).split()).lower():
-            revised = ""  # identical to the researcher's own wording: nothing to propose
+            revised = ""  # identical to the current wording: nothing to propose
+        if revised and int(ctx.get("revision_rounds") or 0) >= MAX_REVISIONS:
+            logging.getLogger("tbamr.agents.scope_guardian").info("revised question suppressed: %d rewording(s) already adopted", ctx["revision_rounds"])
+            revised = ""  # backstop: the rewording loop always ends
         return {"blocking": sorted(set(blocking)), "gaps": gaps, "warnings": warnings, "revised_question": revised,
                 "asks_comparison_across_places": bool(sub.get("asks_comparison_across_places")), "target": target}
 
     @logged("tbamr.agents")
-    def review(self, question: str, country: str, target_drugs: list[str], cohort_target: int, region: str = "") -> dict[str, Any]:
+    def review(self, question: str, country: str, target_drugs: list[str], cohort_target: int, region: str = "",
+               revision_rounds: int = 0) -> dict[str, Any]:
         target = resolve_target(question, country, region)
-        ctx = {"question": question, "country": country, "region": region, "target": target, "target_drugs": target_drugs, "cohort_target": cohort_target,
+        ctx = {"question": question, "country": country, "region": region, "revision_rounds": revision_rounds, "target": target, "target_drugs": target_drugs, "cohort_target": cohort_target,
                "required_policy_gaps": [{"key": k, "gap": g, "applied": p} for k, g, p in REQUIRED_GAPS]}
         res = self.run("Review this research scope and submit your assessment.", ctx)
         if res.get("ok"):

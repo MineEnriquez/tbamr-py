@@ -788,3 +788,32 @@ def test_tests_never_reach_the_real_claude_api(tmp_path):
     c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "b.db"))))
     assert c.post("/api/reset", params={"data": "demo"}).status_code == 200
     assert c.get("/api/state").json()["mode"]["brain"] == "replay"
+
+
+def test_rewording_loop_always_ends(tmp_path):
+    """Even a Guardian that rewords every time stops being offered after MAX_REVISIONS adopted rewordings."""
+    from tbamr.agents.scope_guardian import MAX_REVISIONS
+    seen = []
+    def always_reword(messages):
+        seen.append(messages[0]["content"])
+        n = len(seen)
+        return [{"type": "tool_use", "name": "submit", "input": {"blocking": [], "gaps": [], "warnings": [], "asks_comparison_across_places": False,
+                                                              "revised_question": f"Rifampicin mutation counts in Indonesia, version {n}?"}}]
+    o = build_orchestrator("demo", "replay", str(tmp_path / "l.db"))
+    o.agents["scope_guardian"].client = ReplayClient({"scope_guardian": always_reword})
+    o.state.question, o.state.country = "Which mutations are associated with resistance in Indonesia?", "Indonesia"
+    for round_ in range(MAX_REVISIONS):
+        o.run_stage(1)
+        assert o.state.scope["revised_question"], f"round {round_ + 1} should still offer a rewording"
+        o.adopt_revised_question("pi", "Ana")
+        assert o.state.revision_rounds == round_ + 1
+    o.run_stage(1)
+    assert o.state.scope["revised_question"] == "" and '"revision_rounds": 2' in seen[-1]
+
+
+def test_editing_the_question_resets_the_rewording_count(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "e.db"))
+    c = TestClient(create_app(o))
+    o.state.revision_rounds = 2
+    c.post("/api/scope", json={"question": "My own new question about rifampicin in Indonesia?", "country": "Indonesia"})
+    assert o.state.revision_rounds == 0

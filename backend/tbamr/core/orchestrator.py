@@ -229,7 +229,8 @@ class Orchestrator:
     def _s1(self):
         st = self.state
         self.orch("—", Outcome.INFO, RULES["scope"], "Handing the research scope to the Scope Guardian.", 1)
-        st.scope = self.agents["scope_guardian"].review(st.question, st.country, st.target_drugs, st.cohort_target, st.region)
+        st.scope = self.agents["scope_guardian"].review(st.question, st.country, st.target_drugs, st.cohort_target, st.region,
+                                                         revision_rounds=st.revision_rounds)
         target = st.scope.get("target") or {}
         if target.get("country") and not target.get("problem"):
             st.country = target["country"]  # canonical INSDC name or "Worldwide"; downstream agents read st.country
@@ -360,6 +361,7 @@ class Orchestrator:
             self.human(role, person, "SCOPE", Outcome.OVERRIDE, RULES["scope"],
                        f"Research question revised to the Scope Guardian's wording. Before: {old} | After: {revised}", 1)
             self.state.question = revised
+            self.state.revision_rounds += 1
         self.reopen_scope()
         return revised
 
