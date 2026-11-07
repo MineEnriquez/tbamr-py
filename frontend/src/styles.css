@@ -55,6 +55,11 @@ button,select,input,textarea{font:inherit;color:inherit}
 select,input,textarea{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 9px}
 textarea{width:100%;min-height:56px;resize:vertical}
 .top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
+/* Frozen header row: title and the Acting as / Your name / Colors / Reset controls stay visible while scrolling.
+ * The box-shadow + clip-path pair extends its background edge to edge (the wrap is centred and max-width'd)
+ * without covering the page sideways. z-index sits below the drawer (21), toast (30) and modal (31). */
+.top{position:sticky;top:0;z-index:15;background:var(--bg);margin-top:-18px;padding:14px 0 12px;
+  border-bottom:1px solid var(--line);box-shadow:0 0 0 100vmax var(--bg);clip-path:inset(0 -100vmax)}
 .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
 .ctl{display:flex;flex-direction:column;gap:3px}
 .ctl label,.ctl .lbl{font-size:.72rem;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
