@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 
 import httpx
 import pytest
@@ -482,3 +484,15 @@ def test_explicit_worldwide_searches_without_a_country_filter(tmp_path):
     calls = [t for t in o.log.traces("discovery") if t["kind"] == "tool_call"]
     assert all('country="Worldwide' not in json.dumps(t["payload"]) for t in calls)
     assert o.state.sample("DEMO-R06").eligibility == "Verified"  # origin is informational for worldwide
+
+
+# ---------------------------------------------------------------- test isolation (issue #20)
+def test_resets_never_touch_databases_in_the_working_directory(tmp_path, monkeypatch):
+    """Resetting to live and back (what the Demo/Live picker does) must not open or create tbamr-*.db in the cwd,
+    where the developer's real pipeline databases live."""
+    monkeypatch.chdir(tmp_path)
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "start.db"))))
+    for mode in ("live", "demo"):
+        assert c.post("/api/reset", params={"data": mode}).status_code == 200
+    assert not list(tmp_path.glob("tbamr-*.db")), "a reset opened a database in the working directory"
+    assert os.environ["TBAMR_DB"].startswith(tempfile.gettempdir())
