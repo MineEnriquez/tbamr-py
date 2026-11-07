@@ -12,7 +12,8 @@ from tbamr.core.decisions import Decision, DecisionLog, GuardrailViolation, Outc
 from tbamr.core.models import Finding, Sample
 from tbamr.core.orchestrator import PermissionDenied, StageError
 from tbamr.llm.client import ReplayClient
-from tbamr.tools.demo import DemoDataTools
+from tbamr.core.geo import resolve_target
+from tbamr.tools.demo import SCENARIOS, DemoDataTools
 from tbamr.tools.ena import DataTools
 from tbamr.tools.tbprofiler import parse_result
 
@@ -47,10 +48,10 @@ def test_agents_cannot_use_human_outcomes():
 def test_full_demo_flow(orch):
     rep = run_to_report(orch)
     st = orch.state
-    assert {s.run for s in st.samples if s.eligibility == "Excluded"} == {"DEMO-R06", "DEMO-R07", "DEMO-R08"}
-    assert {s.run for s in st.samples if s.eligibility == "Hold"} == {"DEMO-R15", "DEMO-R16"}
+    assert {s.run for s in st.samples if s.eligibility == "Excluded"} == {"DEMO-R06", "DEMO-R07", "DEMO-R08", "DEMO-R18", "DEMO-R19", "DEMO-R23", "DEMO-R24"}
+    assert {s.run for s in st.samples if s.eligibility == "Hold"} == {"DEMO-R15", "DEMO-R16", "DEMO-R20", "DEMO-R21", "DEMO-R22"}
     assert st.sample("DEMO-R04").qc == "Escalated"  # 27x borderline
-    assert rep["counts"]["analysed"] == 10
+    assert rep["counts"] == {"candidates": 42, "verified": 30, "qc_passed": 26, "analysed": 24}
     assert [d["drug"] for d in rep["drugs"]][:2] == ["RIF", "INH"]
     pending = {(f["run"], f["variant"]) for f in rep["unresolved"]}
     assert ("DEMO-R14", "rpoB p.Ser450Leu") in pending  # low depth
@@ -113,6 +114,30 @@ def test_import_and_review(orch):
     assert "dr_variants" in raw["data"]
     orch.review("tbexpert", "Dewi", f.fid, "Needs more data", "Request deeper sequencing")
     assert orch.state.report["superseded"] is True
+
+
+def test_every_demo_scenario_reaches_its_expected_outcome(orch):
+    """The demo data is a scenario catalogue (tools/demo.py SCENARIOS); each run must land where it says."""
+    run_to_report(orch)
+    problems = []
+    for run, sc in SCENARIOS.items():
+        s = orch.state.sample(run)
+        assert s, f"{run} was not discovered"
+        got = {"elig": s.eligibility, "qc": s.qc or None, "prof": s.profiling or None}
+        problems += [f"{run} ({sc['what']}): {k} expected {v}, got {got[k]}" for k, v in sc["expect"].items() if k != "review" and got[k] != v]
+        reviews = {f"{f.gene} {f.change}": f.review for f in s.findings}
+        problems += [f"{run} ({sc['what']}): {v} expected {want}, got {reviews.get(v)}" for v, want in sc["expect"].get("review", {}).items() if reviews.get(v) != want]
+    assert not problems, "\n".join(problems)
+    assert {s.run for s in orch.state.samples} == set(SCENARIOS), "every demo run needs a documented scenario"
+
+
+def test_demo_report_covers_discordance_and_extra_drugs(orch):
+    rep = run_to_report(orch)
+    by = {d["drug"]: d for d in rep["drugs"]}
+    assert {"FLQ", "BDQ", "LZD", "PZA", "EMB", "STM", "AMK", "ETO"} <= set(by)
+    assert by["RIF"]["dst_n"] > by["RIF"]["concordant"]  # R09 (genotype R, DST S) and R38 (genotype S, DST R) disagree
+    assert orch.state.sample("DEMO-R31").profile_meta["db"] == "not in file"  # TB-Profiler 4.x layout
+    assert orch.state.sample("DEMO-R41").lineage == "La1.8.BCG"
 
 
 # ---------------------------------------------------------------- agentic behaviour + guardrails
@@ -214,6 +239,8 @@ def test_ena_paging_with_mock_transport():
 def test_api_flow(tmp_path):
     app = create_app(build_orchestrator("demo", "replay", str(tmp_path / "a.db")))
     c = TestClient(app)
+    assert c.get("/api/scope/target", params={"question": "Resistance patterns"}).json()["problem"]  # no silent worldwide
+    assert c.post("/api/scope", json={"question": "Resistance patterns", "country": "Indonesia"}).status_code == 200
     assert c.post("/api/stages/1/run").status_code == 200
     assert c.post("/api/gates/scope", json={"role": "analyst"}).status_code == 403
     raw = c.get("/api/raw/scope/guardian", params={"role": "pi", "person": "Ana"}).json()
@@ -287,6 +314,7 @@ def test_executions_capture_structured_results(tmp_path, monkeypatch):
     orch.state.country = "Indonesia"
     app = create_app(orch)
     c = TestClient(app)
+    assert c.post("/api/scope", json={"question": "Resistance patterns", "country": "Indonesia"}).status_code == 200
     assert c.post("/api/stages/1/run").status_code == 200
     execs = c.get("/api/executions").json()
     stage1 = next(e for e in execs if e["trigger"] == "Stage 1")
@@ -404,3 +432,53 @@ def test_report_article_404s_when_no_report_exists(orch):
     c = TestClient(create_app(orch))
     r = c.get("/api/report/1/article.html")
     assert r.status_code == 404 and "Stage 6" in r.json()["detail"]
+
+
+# ---------------------------------------------------------------- target population (worldwide only when asked)
+@pytest.mark.parametrize("question,field,country,blocked", [
+    ("Which rifampicin mutations are common in Mycobacterium tuberculosis genomes?", "", "", True),  # nothing named: no silent worldwide
+    ("Rifampicin resistance in Indonesia", "", "Indonesia", False),  # named in the question
+    ("Rifampicin resistance patterns", "vietnam", "Viet Nam", False),  # alias canonicalised to the INSDC name
+    ("Rifampicin resistance worldwide", "", "Worldwide", False),  # explicit worldwide
+    ("Rifampicin resistance patterns", "Worldwide", "Worldwide", False),
+    ("Rifampicin resistance in sub-Saharan Africa", "", "", True),  # region only: not filterable
+    ("Compare Kenya and Uganda", "", "", True),  # several countries
+    ("Rifampicin resistance in Kenya", "Indonesia", "", True),  # field contradicts the question
+    ("Rifampicin resistance patterns", "Indonesa", "", True),  # unrecognised name
+    ("Resistance in Papua New Guinea", "", "Papua New Guinea", False),  # longest name wins over "Guinea"
+])
+def test_target_population_resolution(question, field, country, blocked):
+    t = resolve_target(question, field)
+    assert bool(t["problem"]) is blocked and t["country"] == country
+
+
+def test_stage1_blocks_without_a_clear_target(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "g.db"))
+    o.state.question, o.state.country = "Which mutations explain rifampicin resistance?", ""
+    o.run_stage(1)
+    assert any("No target population" in b for b in o.state.scope["blocking"])
+    o.raw_view("scope", "guardian", "pi", "Ana")
+    with pytest.raises(StageError):
+        o.approve_scope("pi", "Ana")
+
+
+def test_question_country_becomes_the_search_scope(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "q.db"))
+    o.state.question, o.state.country = "Which mutations explain rifampicin resistance in Indonesia?", ""
+    o.run_stage(1)
+    assert o.state.country == "Indonesia" and o.state.scope["target"]["source"] == "question"
+    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.run_stage(2)
+    assert o.state.sample("DEMO-R06").eligibility == "Excluded"  # Viet Nam is outside the resolved scope
+
+
+def test_explicit_worldwide_searches_without_a_country_filter(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "w.db"))
+    o.state.question, o.state.country = "Global patterns of rifampicin resistance", ""
+    o.run_stage(1)
+    assert o.state.country == "Worldwide" and not o.state.scope["blocking"]
+    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.run_stage(2)
+    calls = [t for t in o.log.traces("discovery") if t["kind"] == "tool_call"]
+    assert all('country="Worldwide' not in json.dumps(t["payload"]) for t in calls)
+    assert o.state.sample("DEMO-R06").eligibility == "Verified"  # origin is informational for worldwide

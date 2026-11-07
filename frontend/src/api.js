@@ -17,6 +17,7 @@ export const api = {
   raw: (kind, key, who) => call('GET', `/raw/${encodeURIComponent(kind)}/${encodeURIComponent(key)}`, undefined, who),
   receipts: (who) => call('GET', '/raw/receipts', undefined, who),
   setScope: (s) => call('POST', '/scope', s),
+  scopeTarget: (question, country) => call('GET', '/scope/target', undefined, { question, country }),
   reopenScope: () => call('POST', '/scope/reopen'),
   run: (n) => call('POST', `/stages/${n}/run`),
   gate: (name, who) => call('POST', `/gates/${name}`, who),

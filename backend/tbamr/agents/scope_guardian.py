@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..core.decisions import Outcome
+from ..core.geo import resolve_target
 from ..core.models import RULES
 from .base import LLMAgent
 
@@ -30,10 +31,9 @@ class ScopeGuardian(LLMAgent):
     description = "Checks the research question, proposes definitions for the playbook's gaps and flags what the data may not support."
     system_prompt = (
         "Review the researcher's scope. Identify blocking gaps (missing question, drugs or numbers). "
-        "Geographic scope MUST be clear — EITHER the country field is set, OR the question itself names a country "
-        "(e.g. 'in Indonesia'), region ('in sub-Saharan Africa'), or 'worldwide/global' explicitly. If neither is "
-        "true, add it to blocking: 'Geographic scope is not specified — set a country or state it in the question "
-        "(e.g. \"worldwide\").' Propose concrete definitions for the playbook's policy gaps, and warn about parts "
+        "The target population has already been resolved by rule and is given as `target` in the context: either one "
+        "country, or worldwide because the researcher asked for it explicitly. Never widen or change it. If the target "
+        "has a `problem`, it is already blocking. Propose concrete definitions for the playbook's policy gaps, and warn about parts "
         "of the question that public genomes may not support (prevalence, clinical use, comparisons across places). "
         "You propose; the researcher approves."
     )
@@ -60,25 +60,30 @@ class ScopeGuardian(LLMAgent):
             blocking.append("Research question is empty.")
         if not ctx.get("target_drugs"):
             blocking.append("No target drugs selected.")
-        # Geographic scope must come from the country field OR be stated in the question itself.
-        q = str(ctx.get("question", "")).lower()
-        country = str(ctx.get("country", "")).strip()
-        geo_in_q = any(w in q for w in ("worldwide", "global", "globally", " in ", "across ", "within "))
-        if not country and not geo_in_q:
-            blocking.append('Geographic scope is not specified — set a country or state it in the question (e.g. "worldwide").')
-        return {"blocking": sorted(set(blocking)), "gaps": gaps, "warnings": list(sub.get("warnings") or []),
-                "asks_comparison_across_places": bool(sub.get("asks_comparison_across_places"))}
+        # Target population (rule, not model): one country, or worldwide only when explicitly asked for.
+        target = ctx.get("target") or resolve_target(ctx.get("question"), ctx.get("country"))
+        if target["problem"]:
+            blocking.append(target["problem"])
+        warnings = list(sub.get("warnings") or [])
+        if target.get("notice") and target["notice"] not in warnings:
+            warnings.insert(0, target["notice"])
+        return {"blocking": sorted(set(blocking)), "gaps": gaps, "warnings": warnings,
+                "asks_comparison_across_places": bool(sub.get("asks_comparison_across_places")), "target": target}
 
     def review(self, question: str, country: str, target_drugs: list[str], cohort_target: int) -> dict[str, Any]:
-        ctx = {"question": question, "country": country, "target_drugs": target_drugs, "cohort_target": cohort_target,
+        target = resolve_target(question, country)
+        ctx = {"question": question, "country": country, "target": target, "target_drugs": target_drugs, "cohort_target": cohort_target,
                "required_policy_gaps": [{"key": k, "gap": g} for k, g, _ in REQUIRED_GAPS]}
         res = self.run("Review this research scope and submit your assessment.", ctx)
         if not res.get("ok"):
-            res = {"blocking": [], "gaps": [{"key": k, "gap": g, "proposal": p} for k, g, p in REQUIRED_GAPS],
-                   "warnings": ["The Guardian could not complete its review; a human should check the scope."], "asks_comparison_across_places": False}
+            res = {"blocking": [target["problem"]] if target["problem"] else [], "gaps": [{"key": k, "gap": g, "proposal": p} for k, g, p in REQUIRED_GAPS],
+                   "warnings": ([target["notice"]] if target.get("notice") else []) + ["The Guardian could not complete its review; a human should check the scope."], "asks_comparison_across_places": False,
+                   "target": target}
         self.log.put_raw("scope", "guardian", {"input": ctx, "result": res, "brain": self.client.mode})
         outcome = Outcome.HOLD if res["blocking"] else Outcome.ESCALATE
+        where = (f"Target population: {target['country']} (from the {target['source']})." if not target["problem"]
+                 else f"Target population unclear: {target['problem']}")
         self.decide("SCOPE", outcome, RULES["scope"],
-                    f"{len(res['blocking'])} blocking gap(s); {len(res['gaps'])} definitions proposed; {len(res['warnings'])} warning(s). Researcher approval needed.",
+                    f"{where} {len(res['blocking'])} blocking gap(s); {len(res['gaps'])} definitions proposed; {len(res['warnings'])} warning(s). Researcher approval needed.",
                     stage=1)
         return res
