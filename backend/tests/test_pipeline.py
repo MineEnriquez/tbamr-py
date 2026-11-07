@@ -51,7 +51,7 @@ def test_full_demo_flow(orch):
     assert {s.run for s in st.samples if s.eligibility == "Excluded"} == {"DEMO-R06", "DEMO-R07", "DEMO-R08", "DEMO-R18", "DEMO-R19", "DEMO-R23", "DEMO-R24"}
     assert {s.run for s in st.samples if s.eligibility == "Hold"} == {"DEMO-R15", "DEMO-R16", "DEMO-R20", "DEMO-R21", "DEMO-R22"}
     assert st.sample("DEMO-R04").qc == "Escalated"  # 27x borderline
-    assert rep["counts"] == {"candidates": 42, "verified": 30, "qc_passed": 26, "analysed": 24}
+    assert rep["counts"] == {"candidates": 43, "verified": 31, "qc_passed": 27, "analysed": 25}
     assert [d["drug"] for d in rep["drugs"]][:2] == ["RIF", "INH"]
     pending = {(f["run"], f["variant"]) for f in rep["unresolved"]}
     assert ("DEMO-R14", "rpoB p.Ser450Leu") in pending  # low depth
