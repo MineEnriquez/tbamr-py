@@ -1,0 +1,6212 @@
+{
+ "high_burden": [
+  "Angola",
+  "Bangladesh",
+  "Brazil",
+  "Central African Republic",
+  "China",
+  "Democratic Republic of the Congo",
+  "Ethiopia",
+  "Gabon",
+  "India",
+  "Indonesia",
+  "Kenya",
+  "Lesotho",
+  "Liberia",
+  "Mongolia",
+  "Mozambique",
+  "Myanmar",
+  "Namibia",
+  "Nigeria",
+  "North Korea",
+  "Pakistan",
+  "Papua New Guinea",
+  "Philippines",
+  "Republic of the Congo",
+  "Sierra Leone",
+  "South Africa",
+  "Tanzania",
+  "Thailand",
+  "Uganda",
+  "Viet Nam",
+  "Zambia"
+ ],
+ "watchlist": [
+  "Cambodia",
+  "Russia",
+  "Zimbabwe"
+ ],
+ "countries": {
+  "Angola": {
+   "iso": "AO",
+   "regions": [
+    {
+     "name": "Bengo",
+     "code": "AO-BGO",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Benguela",
+     "code": "AO-BGU",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Bié",
+     "code": "AO-BIE",
+     "type": "Province",
+     "aliases": [
+      "Bie"
+     ]
+    },
+    {
+     "name": "Cabinda",
+     "code": "AO-CAB",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Cuando Cubango",
+     "code": "AO-CCU",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Cuanza-Norte",
+     "code": "AO-CNO",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Cuanza-Sul",
+     "code": "AO-CUS",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Cunene",
+     "code": "AO-CNN",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Huambo",
+     "code": "AO-HUA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Huíla",
+     "code": "AO-HUI",
+     "type": "Province",
+     "aliases": [
+      "Huila"
+     ]
+    },
+    {
+     "name": "Luanda",
+     "code": "AO-LUA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Lunda-Norte",
+     "code": "AO-LNO",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Lunda-Sul",
+     "code": "AO-LSU",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Malange",
+     "code": "AO-MAL",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Moxico",
+     "code": "AO-MOX",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Namibe",
+     "code": "AO-NAM",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Uíge",
+     "code": "AO-UIG",
+     "type": "Province",
+     "aliases": [
+      "Uige"
+     ]
+    },
+    {
+     "name": "Zaire",
+     "code": "AO-ZAI",
+     "type": "Province",
+     "aliases": []
+    }
+   ]
+  },
+  "Bangladesh": {
+   "iso": "BD",
+   "regions": [
+    {
+     "name": "Barishal",
+     "code": "BD-A",
+     "type": "Division",
+     "aliases": [
+      "Barisal"
+     ]
+    },
+    {
+     "name": "Chattogram",
+     "code": "BD-B",
+     "type": "Division",
+     "aliases": [
+      "Chittagong"
+     ]
+    },
+    {
+     "name": "Dhaka",
+     "code": "BD-C",
+     "type": "Division",
+     "aliases": [
+      "Dacca"
+     ]
+    },
+    {
+     "name": "Khulna",
+     "code": "BD-D",
+     "type": "Division",
+     "aliases": []
+    },
+    {
+     "name": "Mymensingh",
+     "code": "BD-H",
+     "type": "Division",
+     "aliases": []
+    },
+    {
+     "name": "Rajshahi",
+     "code": "BD-E",
+     "type": "Division",
+     "aliases": []
+    },
+    {
+     "name": "Rangpur",
+     "code": "BD-F",
+     "type": "Division",
+     "aliases": []
+    },
+    {
+     "name": "Sylhet",
+     "code": "BD-G",
+     "type": "Division",
+     "aliases": []
+    }
+   ]
+  },
+  "Brazil": {
+   "iso": "BR",
+   "regions": [
+    {
+     "name": "Acre",
+     "code": "BR-AC",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Alagoas",
+     "code": "BR-AL",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Amapá",
+     "code": "BR-AP",
+     "type": "State",
+     "aliases": [
+      "Amapa"
+     ]
+    },
+    {
+     "name": "Amazonas",
+     "code": "BR-AM",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Bahia",
+     "code": "BR-BA",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Ceará",
+     "code": "BR-CE",
+     "type": "State",
+     "aliases": [
+      "Ceara"
+     ]
+    },
+    {
+     "name": "Distrito Federal",
+     "code": "BR-DF",
+     "type": "Federal district",
+     "aliases": []
+    },
+    {
+     "name": "Espírito Santo",
+     "code": "BR-ES",
+     "type": "State",
+     "aliases": [
+      "Espirito Santo"
+     ]
+    },
+    {
+     "name": "Goiás",
+     "code": "BR-GO",
+     "type": "State",
+     "aliases": [
+      "Goias"
+     ]
+    },
+    {
+     "name": "Maranhão",
+     "code": "BR-MA",
+     "type": "State",
+     "aliases": [
+      "Maranhao"
+     ]
+    },
+    {
+     "name": "Mato Grosso",
+     "code": "BR-MT",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Mato Grosso do Sul",
+     "code": "BR-MS",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Minas Gerais",
+     "code": "BR-MG",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Pará",
+     "code": "BR-PA",
+     "type": "State",
+     "aliases": [
+      "Para"
+     ]
+    },
+    {
+     "name": "Paraíba",
+     "code": "BR-PB",
+     "type": "State",
+     "aliases": [
+      "Paraiba"
+     ]
+    },
+    {
+     "name": "Paraná",
+     "code": "BR-PR",
+     "type": "State",
+     "aliases": [
+      "Parana"
+     ]
+    },
+    {
+     "name": "Pernambuco",
+     "code": "BR-PE",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Piauí",
+     "code": "BR-PI",
+     "type": "State",
+     "aliases": [
+      "Piaui"
+     ]
+    },
+    {
+     "name": "Rio de Janeiro",
+     "code": "BR-RJ",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Rio Grande do Norte",
+     "code": "BR-RN",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Rio Grande do Sul",
+     "code": "BR-RS",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Rondônia",
+     "code": "BR-RO",
+     "type": "State",
+     "aliases": [
+      "Rondonia"
+     ]
+    },
+    {
+     "name": "Roraima",
+     "code": "BR-RR",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Santa Catarina",
+     "code": "BR-SC",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "São Paulo",
+     "code": "BR-SP",
+     "type": "State",
+     "aliases": [
+      "Sao Paulo"
+     ]
+    },
+    {
+     "name": "Sergipe",
+     "code": "BR-SE",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Tocantins",
+     "code": "BR-TO",
+     "type": "State",
+     "aliases": []
+    }
+   ]
+  },
+  "Central African Republic": {
+   "iso": "CF",
+   "regions": [
+    {
+     "name": "Bamingui-Bangoran",
+     "code": "CF-BB",
+     "type": "Prefecture",
+     "aliases": []
+    },
+    {
+     "name": "Bangui",
+     "code": "CF-BGF",
+     "type": "Commune",
+     "aliases": []
+    },
+    {
+     "name": "Basse-Kotto",
+     "code": "CF-BK",
+     "type": "Prefecture",
+     "aliases": []
+    },
+    {
+     "name": "Gribingui",
+     "code": "CF-KB",
+     "type": "Economic prefecture",
+     "aliases": []
+    },
+    {
+     "name": "Haut-Mbomou",
+     "code": "CF-HM",
+     "type": "Prefecture",
+     "aliases": []
+    },
+    {
+     "name": "Haute-Kotto",
+     "code": "CF-HK",
+     "type": "Prefecture",
+     "aliases": []
+    },
+    {
+     "name": "Haute-Sangha / Mambéré-Kadéï",
+     "code": "CF-HS",
+     "type": "Prefecture",
+     "aliases": [
+      "Haute-Sangha / Mambere-Kadei"
+     ]
+    },
+    {
+     "name": "Kémo-Gribingui",
+     "code": "CF-KG",
+     "type": "Prefecture",
+     "aliases": [
+      "Kemo-Gribingui"
+     ]
+    },
+    {
+     "name": "Lobaye",
+     "code": "CF-LB",
+     "type": "Prefecture",
+     "aliases": []
+    },
+    {
+     "name": "Mbomou",
+     "code": "CF-MB",
+     "type": "Prefecture",
+     "aliases": []
+    },
+    {
+     "name": "Nana-Mambéré",
+     "code": "CF-NM",
+     "type": "Prefecture",
+     "aliases": [
+      "Nana-Mambere"
+     ]
+    },
+    {
+     "name": "Ombella-Mpoko",
+     "code": "CF-MP",
+     "type": "Prefecture",
+     "aliases": []
+    },
+    {
+     "name": "Ouaka",
+     "code": "CF-UK",
+     "type": "Prefecture",
+     "aliases": []
+    },
+    {
+     "name": "Ouham",
+     "code": "CF-AC",
+     "type": "Prefecture",
+     "aliases": []
+    },
+    {
+     "name": "Ouham-Pendé",
+     "code": "CF-OP",
+     "type": "Prefecture",
+     "aliases": [
+      "Ouham-Pende"
+     ]
+    },
+    {
+     "name": "Sangha",
+     "code": "CF-SE",
+     "type": "Economic prefecture",
+     "aliases": []
+    },
+    {
+     "name": "Vakaga",
+     "code": "CF-VK",
+     "type": "Prefecture",
+     "aliases": []
+    }
+   ]
+  },
+  "China": {
+   "iso": "CN",
+   "regions": [
+    {
+     "name": "Anhui",
+     "code": "CN-AH",
+     "type": "Province",
+     "aliases": [
+      "Anhui Sheng"
+     ]
+    },
+    {
+     "name": "Beijing",
+     "code": "CN-BJ",
+     "type": "Municipality",
+     "aliases": [
+      "Beijing Shi"
+     ]
+    },
+    {
+     "name": "Chongqing",
+     "code": "CN-CQ",
+     "type": "Municipality",
+     "aliases": [
+      "Chongqing Shi"
+     ]
+    },
+    {
+     "name": "Fujian",
+     "code": "CN-FJ",
+     "type": "Province",
+     "aliases": [
+      "Fujian Sheng"
+     ]
+    },
+    {
+     "name": "Gansu",
+     "code": "CN-GS",
+     "type": "Province",
+     "aliases": [
+      "Gansu Sheng"
+     ]
+    },
+    {
+     "name": "Guangdong",
+     "code": "CN-GD",
+     "type": "Province",
+     "aliases": [
+      "Guangdong Sheng"
+     ]
+    },
+    {
+     "name": "Guangxi",
+     "code": "CN-GX",
+     "type": "Autonomous region",
+     "aliases": [
+      "Guangxi Zhuangzu Zizhiqu"
+     ]
+    },
+    {
+     "name": "Guizhou",
+     "code": "CN-GZ",
+     "type": "Province",
+     "aliases": [
+      "Guizhou Sheng"
+     ]
+    },
+    {
+     "name": "Hainan",
+     "code": "CN-HI",
+     "type": "Province",
+     "aliases": [
+      "Hainan Sheng"
+     ]
+    },
+    {
+     "name": "Hebei",
+     "code": "CN-HE",
+     "type": "Province",
+     "aliases": [
+      "Hebei Sheng"
+     ]
+    },
+    {
+     "name": "Heilongjiang",
+     "code": "CN-HL",
+     "type": "Province",
+     "aliases": [
+      "Heilongjiang Sheng"
+     ]
+    },
+    {
+     "name": "Henan",
+     "code": "CN-HA",
+     "type": "Province",
+     "aliases": [
+      "Henan Sheng"
+     ]
+    },
+    {
+     "name": "Hong Kong",
+     "code": "CN-HK",
+     "type": "Special administrative region",
+     "aliases": [
+      "Hong Kong SAR"
+     ]
+    },
+    {
+     "name": "Hubei",
+     "code": "CN-HB",
+     "type": "Province",
+     "aliases": [
+      "Hubei Sheng"
+     ]
+    },
+    {
+     "name": "Hunan",
+     "code": "CN-HN",
+     "type": "Province",
+     "aliases": [
+      "Hunan Sheng"
+     ]
+    },
+    {
+     "name": "Inner Mongolia",
+     "code": "CN-NM",
+     "type": "Autonomous region",
+     "aliases": [
+      "Nei Mongol Zizhiqu"
+     ]
+    },
+    {
+     "name": "Jiangsu",
+     "code": "CN-JS",
+     "type": "Province",
+     "aliases": [
+      "Jiangsu Sheng"
+     ]
+    },
+    {
+     "name": "Jiangxi",
+     "code": "CN-JX",
+     "type": "Province",
+     "aliases": [
+      "Jiangxi Sheng"
+     ]
+    },
+    {
+     "name": "Jilin",
+     "code": "CN-JL",
+     "type": "Province",
+     "aliases": [
+      "Jilin Sheng"
+     ]
+    },
+    {
+     "name": "Liaoning",
+     "code": "CN-LN",
+     "type": "Province",
+     "aliases": [
+      "Liaoning Sheng"
+     ]
+    },
+    {
+     "name": "Macau",
+     "code": "CN-MO",
+     "type": "Special administrative region",
+     "aliases": [
+      "Macao SAR"
+     ]
+    },
+    {
+     "name": "Ningxia",
+     "code": "CN-NX",
+     "type": "Autonomous region",
+     "aliases": [
+      "Ningxia Huizu Zizhiqu"
+     ]
+    },
+    {
+     "name": "Qinghai",
+     "code": "CN-QH",
+     "type": "Province",
+     "aliases": [
+      "Qinghai Sheng"
+     ]
+    },
+    {
+     "name": "Shaanxi",
+     "code": "CN-SN",
+     "type": "Province",
+     "aliases": [
+      "Shaanxi Sheng"
+     ]
+    },
+    {
+     "name": "Shandong",
+     "code": "CN-SD",
+     "type": "Province",
+     "aliases": [
+      "Shandong Sheng"
+     ]
+    },
+    {
+     "name": "Shanghai",
+     "code": "CN-SH",
+     "type": "Municipality",
+     "aliases": [
+      "Shanghai Shi"
+     ]
+    },
+    {
+     "name": "Shanxi",
+     "code": "CN-SX",
+     "type": "Province",
+     "aliases": [
+      "Shanxi Sheng"
+     ]
+    },
+    {
+     "name": "Sichuan",
+     "code": "CN-SC",
+     "type": "Province",
+     "aliases": [
+      "Sichuan Sheng"
+     ]
+    },
+    {
+     "name": "Taiwan",
+     "code": "CN-TW",
+     "type": "Province",
+     "aliases": [
+      "Taiwan Sheng"
+     ]
+    },
+    {
+     "name": "Tianjin",
+     "code": "CN-TJ",
+     "type": "Municipality",
+     "aliases": [
+      "Tianjin Shi"
+     ]
+    },
+    {
+     "name": "Tibet",
+     "code": "CN-XZ",
+     "type": "Autonomous region",
+     "aliases": [
+      "Xizang Zizhiqu"
+     ]
+    },
+    {
+     "name": "Xinjiang",
+     "code": "CN-XJ",
+     "type": "Autonomous region",
+     "aliases": [
+      "Xinjiang Uygur Zizhiqu"
+     ]
+    },
+    {
+     "name": "Yunnan",
+     "code": "CN-YN",
+     "type": "Province",
+     "aliases": [
+      "Yunnan Sheng"
+     ]
+    },
+    {
+     "name": "Zhejiang",
+     "code": "CN-ZJ",
+     "type": "Province",
+     "aliases": [
+      "Zhejiang Sheng"
+     ]
+    }
+   ]
+  },
+  "Republic of the Congo": {
+   "iso": "CG",
+   "regions": [
+    {
+     "name": "Bouenza",
+     "code": "CG-11",
+     "type": "Department",
+     "aliases": []
+    },
+    {
+     "name": "Brazzaville",
+     "code": "CG-BZV",
+     "type": "Department",
+     "aliases": []
+    },
+    {
+     "name": "Cuvette",
+     "code": "CG-8",
+     "type": "Department",
+     "aliases": []
+    },
+    {
+     "name": "Cuvette-Ouest",
+     "code": "CG-15",
+     "type": "Department",
+     "aliases": []
+    },
+    {
+     "name": "Kouilou",
+     "code": "CG-5",
+     "type": "Department",
+     "aliases": []
+    },
+    {
+     "name": "Lékoumou",
+     "code": "CG-2",
+     "type": "Department",
+     "aliases": [
+      "Lekoumou"
+     ]
+    },
+    {
+     "name": "Likouala",
+     "code": "CG-7",
+     "type": "Department",
+     "aliases": []
+    },
+    {
+     "name": "Niari",
+     "code": "CG-9",
+     "type": "Department",
+     "aliases": []
+    },
+    {
+     "name": "Plateaux",
+     "code": "CG-14",
+     "type": "Department",
+     "aliases": []
+    },
+    {
+     "name": "Pointe-Noire",
+     "code": "CG-16",
+     "type": "Department",
+     "aliases": []
+    },
+    {
+     "name": "Pool",
+     "code": "CG-12",
+     "type": "Department",
+     "aliases": []
+    },
+    {
+     "name": "Sangha",
+     "code": "CG-13",
+     "type": "Department",
+     "aliases": []
+    }
+   ]
+  },
+  "North Korea": {
+   "iso": "KP",
+   "regions": [
+    {
+     "name": "Hamkyeongnamto",
+     "code": "KP-08",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Hamkyeongpukto",
+     "code": "KP-09",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Hwanghainamto",
+     "code": "KP-05",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Hwanghaipukto",
+     "code": "KP-06",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Jakangto",
+     "code": "KP-04",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Kaeseong",
+     "code": "KP-15",
+     "type": "Metropolitan city",
+     "aliases": []
+    },
+    {
+     "name": "Kangweonto",
+     "code": "KP-07",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nampho",
+     "code": "KP-14",
+     "type": "Metropolitan city",
+     "aliases": []
+    },
+    {
+     "name": "Phyeongannamto",
+     "code": "KP-02",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Phyeonganpukto",
+     "code": "KP-03",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Pyongyang",
+     "code": "KP-01",
+     "type": "Capital city",
+     "aliases": [
+      "Phyeongyang"
+     ]
+    },
+    {
+     "name": "Raseon",
+     "code": "KP-13",
+     "type": "Special city",
+     "aliases": []
+    },
+    {
+     "name": "Ryangkangto",
+     "code": "KP-10",
+     "type": "Province",
+     "aliases": []
+    }
+   ]
+  },
+  "Democratic Republic of the Congo": {
+   "iso": "CD",
+   "regions": [
+    {
+     "name": "Bas-Uélé",
+     "code": "CD-BU",
+     "type": "Province",
+     "aliases": [
+      "Bas-Uele"
+     ]
+    },
+    {
+     "name": "Équateur",
+     "code": "CD-EQ",
+     "type": "Province",
+     "aliases": [
+      "Equateur"
+     ]
+    },
+    {
+     "name": "Haut-Katanga",
+     "code": "CD-HK",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Haut-Lomami",
+     "code": "CD-HL",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Haut-Uélé",
+     "code": "CD-HU",
+     "type": "Province",
+     "aliases": [
+      "Haut-Uele"
+     ]
+    },
+    {
+     "name": "Ituri",
+     "code": "CD-IT",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Kasaï",
+     "code": "CD-KS",
+     "type": "Province",
+     "aliases": [
+      "Kasai"
+     ]
+    },
+    {
+     "name": "Kasaï Central",
+     "code": "CD-KC",
+     "type": "Province",
+     "aliases": [
+      "Kasai Central"
+     ]
+    },
+    {
+     "name": "Kasaï Oriental",
+     "code": "CD-KE",
+     "type": "Province",
+     "aliases": [
+      "Kasai Oriental"
+     ]
+    },
+    {
+     "name": "Kinshasa",
+     "code": "CD-KN",
+     "type": "City",
+     "aliases": []
+    },
+    {
+     "name": "Kongo Central",
+     "code": "CD-BC",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Kwango",
+     "code": "CD-KG",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Kwilu",
+     "code": "CD-KL",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Lomami",
+     "code": "CD-LO",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Lualaba",
+     "code": "CD-LU",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Mai-Ndombe",
+     "code": "CD-MN",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Maniema",
+     "code": "CD-MA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Mongala",
+     "code": "CD-MO",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nord-Kivu",
+     "code": "CD-NK",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nord-Ubangi",
+     "code": "CD-NU",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Sankuru",
+     "code": "CD-SA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Sud-Kivu",
+     "code": "CD-SK",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Sud-Ubangi",
+     "code": "CD-SU",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Tanganyika",
+     "code": "CD-TA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Tshopo",
+     "code": "CD-TO",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Tshuapa",
+     "code": "CD-TU",
+     "type": "Province",
+     "aliases": []
+    }
+   ]
+  },
+  "Ethiopia": {
+   "iso": "ET",
+   "regions": [
+    {
+     "name": "Addis Ababa",
+     "code": "ET-AA",
+     "type": "Administration",
+     "aliases": [
+      "Addis Abeba"
+     ]
+    },
+    {
+     "name": "Afar",
+     "code": "ET-AF",
+     "type": "Regional state",
+     "aliases": []
+    },
+    {
+     "name": "Amhara",
+     "code": "ET-AM",
+     "type": "Regional state",
+     "aliases": [
+      "Amara"
+     ]
+    },
+    {
+     "name": "Benishangul-Gumuz",
+     "code": "ET-BE",
+     "type": "Regional state",
+     "aliases": [
+      "Benshangul-Gumaz"
+     ]
+    },
+    {
+     "name": "Central Ethiopia",
+     "code": null,
+     "type": "Region",
+     "aliases": [
+      "Central Ethiopia Regional State"
+     ],
+     "note": "Created after the ISO 3166-2 data was last updated."
+    },
+    {
+     "name": "Dire Dawa",
+     "code": "ET-DD",
+     "type": "Administration",
+     "aliases": []
+    },
+    {
+     "name": "Gambela",
+     "code": "ET-GA",
+     "type": "Regional state",
+     "aliases": [
+      "Gambela Peoples"
+     ]
+    },
+    {
+     "name": "Harari",
+     "code": "ET-HA",
+     "type": "Regional state",
+     "aliases": [
+      "Harari People"
+     ]
+    },
+    {
+     "name": "Oromia",
+     "code": "ET-OR",
+     "type": "Regional state",
+     "aliases": []
+    },
+    {
+     "name": "Sidama",
+     "code": "ET-SI",
+     "type": "Regional state",
+     "aliases": []
+    },
+    {
+     "name": "Somali",
+     "code": "ET-SO",
+     "type": "Regional state",
+     "aliases": []
+    },
+    {
+     "name": "South Ethiopia",
+     "code": null,
+     "type": "Region",
+     "aliases": [
+      "South Ethiopia Regional State"
+     ],
+     "note": "Created after the ISO 3166-2 data was last updated."
+    },
+    {
+     "name": "South West Ethiopia Peoples",
+     "code": "ET-SW",
+     "type": "Regional state",
+     "aliases": [
+      "Southwest Ethiopia Peoples"
+     ]
+    },
+    {
+     "name": "Southern Nations, Nationalities and Peoples (SNNPR)",
+     "code": "ET-SN",
+     "type": "Regional state",
+     "aliases": [
+      "SNNP",
+      "SNNPR",
+      "Southern Nations, Nationalities and Peoples"
+     ]
+    },
+    {
+     "name": "Tigray",
+     "code": "ET-TI",
+     "type": "Regional state",
+     "aliases": [
+      "Tigrai"
+     ]
+    }
+   ]
+  },
+  "Gabon": {
+   "iso": "GA",
+   "regions": [
+    {
+     "name": "Estuaire",
+     "code": "GA-1",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Haut-Ogooué",
+     "code": "GA-2",
+     "type": "Province",
+     "aliases": [
+      "Haut-Ogooue"
+     ]
+    },
+    {
+     "name": "Moyen-Ogooué",
+     "code": "GA-3",
+     "type": "Province",
+     "aliases": [
+      "Moyen-Ogooue"
+     ]
+    },
+    {
+     "name": "Ngounié",
+     "code": "GA-4",
+     "type": "Province",
+     "aliases": [
+      "Ngounie"
+     ]
+    },
+    {
+     "name": "Nyanga",
+     "code": "GA-5",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Ogooué-Ivindo",
+     "code": "GA-6",
+     "type": "Province",
+     "aliases": [
+      "Ogooue-Ivindo"
+     ]
+    },
+    {
+     "name": "Ogooué-Lolo",
+     "code": "GA-7",
+     "type": "Province",
+     "aliases": [
+      "Ogooue-Lolo"
+     ]
+    },
+    {
+     "name": "Ogooué-Maritime",
+     "code": "GA-8",
+     "type": "Province",
+     "aliases": [
+      "Ogooue-Maritime"
+     ]
+    },
+    {
+     "name": "Woleu-Ntem",
+     "code": "GA-9",
+     "type": "Province",
+     "aliases": []
+    }
+   ]
+  },
+  "India": {
+   "iso": "IN",
+   "regions": [
+    {
+     "name": "Andaman and Nicobar Islands",
+     "code": "IN-AN",
+     "type": "Union territory",
+     "aliases": []
+    },
+    {
+     "name": "Andhra Pradesh",
+     "code": "IN-AP",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Arunachal Pradesh",
+     "code": "IN-AR",
+     "type": "State",
+     "aliases": [
+      "Arunāchal Pradesh"
+     ]
+    },
+    {
+     "name": "Assam",
+     "code": "IN-AS",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Bihar",
+     "code": "IN-BR",
+     "type": "State",
+     "aliases": [
+      "Bihār"
+     ]
+    },
+    {
+     "name": "Chandigarh",
+     "code": "IN-CH",
+     "type": "Union territory",
+     "aliases": [
+      "Chandīgarh"
+     ]
+    },
+    {
+     "name": "Chhattisgarh",
+     "code": "IN-CG",
+     "type": "State",
+     "aliases": [
+      "Chhattīsgarh"
+     ]
+    },
+    {
+     "name": "Dadra and Nagar Haveli and Daman and Diu",
+     "code": "IN-DH",
+     "type": "Union territory",
+     "aliases": [
+      "Dādra and Nagar Haveli and Damān and Diu"
+     ]
+    },
+    {
+     "name": "Delhi",
+     "code": "IN-DL",
+     "type": "Union territory",
+     "aliases": [
+      "NCT of Delhi",
+      "New Delhi"
+     ]
+    },
+    {
+     "name": "Goa",
+     "code": "IN-GA",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Gujarat",
+     "code": "IN-GJ",
+     "type": "State",
+     "aliases": [
+      "Gujarāt"
+     ]
+    },
+    {
+     "name": "Haryana",
+     "code": "IN-HR",
+     "type": "State",
+     "aliases": [
+      "Haryāna"
+     ]
+    },
+    {
+     "name": "Himachal Pradesh",
+     "code": "IN-HP",
+     "type": "State",
+     "aliases": [
+      "Himāchal Pradesh"
+     ]
+    },
+    {
+     "name": "Jammu and Kashmir",
+     "code": "IN-JK",
+     "type": "Union territory",
+     "aliases": [
+      "Jammu and Kashmīr"
+     ]
+    },
+    {
+     "name": "Jharkhand",
+     "code": "IN-JH",
+     "type": "State",
+     "aliases": [
+      "Jhārkhand"
+     ]
+    },
+    {
+     "name": "Karnataka",
+     "code": "IN-KA",
+     "type": "State",
+     "aliases": [
+      "Karnātaka"
+     ]
+    },
+    {
+     "name": "Kerala",
+     "code": "IN-KL",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Ladakh",
+     "code": "IN-LA",
+     "type": "Union territory",
+     "aliases": [
+      "Ladākh"
+     ]
+    },
+    {
+     "name": "Lakshadweep",
+     "code": "IN-LD",
+     "type": "Union territory",
+     "aliases": []
+    },
+    {
+     "name": "Madhya Pradesh",
+     "code": "IN-MP",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Maharashtra",
+     "code": "IN-MH",
+     "type": "State",
+     "aliases": [
+      "Mahārāshtra"
+     ]
+    },
+    {
+     "name": "Manipur",
+     "code": "IN-MN",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Meghalaya",
+     "code": "IN-ML",
+     "type": "State",
+     "aliases": [
+      "Meghālaya"
+     ]
+    },
+    {
+     "name": "Mizoram",
+     "code": "IN-MZ",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Nagaland",
+     "code": "IN-NL",
+     "type": "State",
+     "aliases": [
+      "Nāgāland"
+     ]
+    },
+    {
+     "name": "Odisha",
+     "code": "IN-OD",
+     "type": "State",
+     "aliases": [
+      "Orissa"
+     ]
+    },
+    {
+     "name": "Puducherry",
+     "code": "IN-PY",
+     "type": "Union territory",
+     "aliases": []
+    },
+    {
+     "name": "Punjab",
+     "code": "IN-PB",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Rajasthan",
+     "code": "IN-RJ",
+     "type": "State",
+     "aliases": [
+      "Rājasthān"
+     ]
+    },
+    {
+     "name": "Sikkim",
+     "code": "IN-SK",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Tamil Nadu",
+     "code": "IN-TN",
+     "type": "State",
+     "aliases": [
+      "Tamil Nādu"
+     ]
+    },
+    {
+     "name": "Telangana",
+     "code": "IN-TS",
+     "type": "State",
+     "aliases": [
+      "Telangāna"
+     ]
+    },
+    {
+     "name": "Tripura",
+     "code": "IN-TR",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Uttar Pradesh",
+     "code": "IN-UP",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Uttarakhand",
+     "code": "IN-UK",
+     "type": "State",
+     "aliases": [
+      "Uttaranchal",
+      "Uttarākhand"
+     ]
+    },
+    {
+     "name": "West Bengal",
+     "code": "IN-WB",
+     "type": "State",
+     "aliases": []
+    }
+   ]
+  },
+  "Indonesia": {
+   "iso": "ID",
+   "regions": [
+    {
+     "name": "Aceh",
+     "code": "ID-AC",
+     "type": "Province",
+     "aliases": [
+      "Nanggroe Aceh Darussalam"
+     ]
+    },
+    {
+     "name": "Bali",
+     "code": "ID-BA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Bangka Belitung Islands",
+     "code": "ID-BB",
+     "type": "Province",
+     "aliases": [
+      "Kepulauan Bangka Belitung"
+     ]
+    },
+    {
+     "name": "Banten",
+     "code": "ID-BT",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Bengkulu",
+     "code": "ID-BE",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Central Java",
+     "code": "ID-JT",
+     "type": "Province",
+     "aliases": [
+      "Jawa Tengah"
+     ]
+    },
+    {
+     "name": "Central Kalimantan",
+     "code": "ID-KT",
+     "type": "Province",
+     "aliases": [
+      "Kalimantan Tengah"
+     ]
+    },
+    {
+     "name": "Central Papua",
+     "code": "ID-PT",
+     "type": "Province",
+     "aliases": [
+      "Papua Tengah"
+     ]
+    },
+    {
+     "name": "Central Sulawesi",
+     "code": "ID-ST",
+     "type": "Province",
+     "aliases": [
+      "Sulawesi Tengah"
+     ]
+    },
+    {
+     "name": "East Java",
+     "code": "ID-JI",
+     "type": "Province",
+     "aliases": [
+      "Jawa Timur"
+     ]
+    },
+    {
+     "name": "East Kalimantan",
+     "code": "ID-KI",
+     "type": "Province",
+     "aliases": [
+      "Kalimantan Timur"
+     ]
+    },
+    {
+     "name": "East Nusa Tenggara",
+     "code": "ID-NT",
+     "type": "Province",
+     "aliases": [
+      "Nusa Tenggara Timur"
+     ]
+    },
+    {
+     "name": "Gorontalo",
+     "code": "ID-GO",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Highland Papua",
+     "code": "ID-PE",
+     "type": "Province",
+     "aliases": [
+      "Papua Pengunungan"
+     ]
+    },
+    {
+     "name": "Jakarta",
+     "code": "ID-JK",
+     "type": "Capital district",
+     "aliases": [
+      "DKI Jakarta",
+      "Jakarta Raya"
+     ]
+    },
+    {
+     "name": "Jambi",
+     "code": "ID-JA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Lampung",
+     "code": "ID-LA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Maluku",
+     "code": "ID-MA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "North Kalimantan",
+     "code": "ID-KU",
+     "type": "Province",
+     "aliases": [
+      "Kalimantan Utara"
+     ]
+    },
+    {
+     "name": "North Maluku",
+     "code": "ID-MU",
+     "type": "Province",
+     "aliases": [
+      "Maluku Utara"
+     ]
+    },
+    {
+     "name": "North Sulawesi",
+     "code": "ID-SA",
+     "type": "Province",
+     "aliases": [
+      "Sulawesi Utara"
+     ]
+    },
+    {
+     "name": "North Sumatra",
+     "code": "ID-SU",
+     "type": "Province",
+     "aliases": [
+      "Sumatera Utara"
+     ]
+    },
+    {
+     "name": "Papua",
+     "code": "ID-PA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Riau",
+     "code": "ID-RI",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Riau Islands",
+     "code": "ID-KR",
+     "type": "Province",
+     "aliases": [
+      "Kepulauan Riau"
+     ]
+    },
+    {
+     "name": "South Kalimantan",
+     "code": "ID-KS",
+     "type": "Province",
+     "aliases": [
+      "Kalimantan Selatan"
+     ]
+    },
+    {
+     "name": "South Papua",
+     "code": "ID-PS",
+     "type": "Province",
+     "aliases": [
+      "Papua Selatan"
+     ]
+    },
+    {
+     "name": "South Sulawesi",
+     "code": "ID-SN",
+     "type": "Province",
+     "aliases": [
+      "Sulawesi Selatan"
+     ]
+    },
+    {
+     "name": "South Sumatra",
+     "code": "ID-SS",
+     "type": "Province",
+     "aliases": [
+      "Sumatera Selatan"
+     ]
+    },
+    {
+     "name": "Southeast Sulawesi",
+     "code": "ID-SG",
+     "type": "Province",
+     "aliases": [
+      "Sulawesi Tenggara"
+     ]
+    },
+    {
+     "name": "Southwest Papua",
+     "code": "ID-PD",
+     "type": "Province",
+     "aliases": [
+      "Papua Barat Daya"
+     ]
+    },
+    {
+     "name": "West Java",
+     "code": "ID-JB",
+     "type": "Province",
+     "aliases": [
+      "Jawa Barat"
+     ]
+    },
+    {
+     "name": "West Kalimantan",
+     "code": "ID-KB",
+     "type": "Province",
+     "aliases": [
+      "Kalimantan Barat"
+     ]
+    },
+    {
+     "name": "West Nusa Tenggara",
+     "code": "ID-NB",
+     "type": "Province",
+     "aliases": [
+      "Nusa Tenggara Barat"
+     ]
+    },
+    {
+     "name": "West Papua",
+     "code": "ID-PB",
+     "type": "Province",
+     "aliases": [
+      "Papua Barat"
+     ]
+    },
+    {
+     "name": "West Sulawesi",
+     "code": "ID-SR",
+     "type": "Province",
+     "aliases": [
+      "Sulawesi Barat"
+     ]
+    },
+    {
+     "name": "West Sumatra",
+     "code": "ID-SB",
+     "type": "Province",
+     "aliases": [
+      "Sumatera Barat"
+     ]
+    },
+    {
+     "name": "Yogyakarta",
+     "code": "ID-YO",
+     "type": "Special region",
+     "aliases": [
+      "DI Yogyakarta",
+      "Jogjakarta"
+     ]
+    }
+   ]
+  },
+  "Kenya": {
+   "iso": "KE",
+   "regions": [
+    {
+     "name": "Baringo",
+     "code": "KE-01",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Bomet",
+     "code": "KE-02",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Bungoma",
+     "code": "KE-03",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Busia",
+     "code": "KE-04",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Elgeyo/Marakwet",
+     "code": "KE-05",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Embu",
+     "code": "KE-06",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Garissa",
+     "code": "KE-07",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Homa Bay",
+     "code": "KE-08",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Isiolo",
+     "code": "KE-09",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Kajiado",
+     "code": "KE-10",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Kakamega",
+     "code": "KE-11",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Kericho",
+     "code": "KE-12",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Kiambu",
+     "code": "KE-13",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Kilifi",
+     "code": "KE-14",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Kirinyaga",
+     "code": "KE-15",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Kisii",
+     "code": "KE-16",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Kisumu",
+     "code": "KE-17",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Kitui",
+     "code": "KE-18",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Kwale",
+     "code": "KE-19",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Laikipia",
+     "code": "KE-20",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Lamu",
+     "code": "KE-21",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Machakos",
+     "code": "KE-22",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Makueni",
+     "code": "KE-23",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Mandera",
+     "code": "KE-24",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Marsabit",
+     "code": "KE-25",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Meru",
+     "code": "KE-26",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Migori",
+     "code": "KE-27",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Mombasa",
+     "code": "KE-28",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Murang'a",
+     "code": "KE-29",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Nairobi City",
+     "code": "KE-30",
+     "type": "County",
+     "aliases": [
+      "Nairobi"
+     ]
+    },
+    {
+     "name": "Nakuru",
+     "code": "KE-31",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Nandi",
+     "code": "KE-32",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Narok",
+     "code": "KE-33",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Nyamira",
+     "code": "KE-34",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Nyandarua",
+     "code": "KE-35",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Nyeri",
+     "code": "KE-36",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Samburu",
+     "code": "KE-37",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Siaya",
+     "code": "KE-38",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Taita/Taveta",
+     "code": "KE-39",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Tana River",
+     "code": "KE-40",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Tharaka-Nithi",
+     "code": "KE-41",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Trans Nzoia",
+     "code": "KE-42",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Turkana",
+     "code": "KE-43",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Uasin Gishu",
+     "code": "KE-44",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Vihiga",
+     "code": "KE-45",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Wajir",
+     "code": "KE-46",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "West Pokot",
+     "code": "KE-47",
+     "type": "County",
+     "aliases": []
+    }
+   ]
+  },
+  "Lesotho": {
+   "iso": "LS",
+   "regions": [
+    {
+     "name": "Berea",
+     "code": "LS-D",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Botha-Bothe",
+     "code": "LS-B",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Leribe",
+     "code": "LS-C",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Mafeteng",
+     "code": "LS-E",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Maseru",
+     "code": "LS-A",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Mohale's Hoek",
+     "code": "LS-F",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Mokhotlong",
+     "code": "LS-J",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Qacha's Nek",
+     "code": "LS-H",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Quthing",
+     "code": "LS-G",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Thaba-Tseka",
+     "code": "LS-K",
+     "type": "District",
+     "aliases": []
+    }
+   ]
+  },
+  "Liberia": {
+   "iso": "LR",
+   "regions": [
+    {
+     "name": "Bomi",
+     "code": "LR-BM",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Bong",
+     "code": "LR-BG",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Gbarpolu",
+     "code": "LR-GP",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Grand Bassa",
+     "code": "LR-GB",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Grand Cape Mount",
+     "code": "LR-CM",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Grand Gedeh",
+     "code": "LR-GG",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Grand Kru",
+     "code": "LR-GK",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Lofa",
+     "code": "LR-LO",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Margibi",
+     "code": "LR-MG",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Maryland",
+     "code": "LR-MY",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Montserrado",
+     "code": "LR-MO",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Nimba",
+     "code": "LR-NI",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "River Cess",
+     "code": "LR-RI",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "River Gee",
+     "code": "LR-RG",
+     "type": "County",
+     "aliases": []
+    },
+    {
+     "name": "Sinoe",
+     "code": "LR-SI",
+     "type": "County",
+     "aliases": []
+    }
+   ]
+  },
+  "Mongolia": {
+   "iso": "MN",
+   "regions": [
+    {
+     "name": "Arhangay",
+     "code": "MN-073",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Bayan-Olgiy",
+     "code": "MN-071",
+     "type": "Province",
+     "aliases": [
+      "Bayan-Ölgiy"
+     ]
+    },
+    {
+     "name": "Bayanhongor",
+     "code": "MN-069",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Bulgan",
+     "code": "MN-067",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Darhan uul",
+     "code": "MN-037",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Dornod",
+     "code": "MN-061",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Dornogovi",
+     "code": "MN-063",
+     "type": "Province",
+     "aliases": [
+      "Dornogovĭ"
+     ]
+    },
+    {
+     "name": "Dundgovi",
+     "code": "MN-059",
+     "type": "Province",
+     "aliases": [
+      "Dundgovĭ"
+     ]
+    },
+    {
+     "name": "Dzavhan",
+     "code": "MN-057",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Govi-Altay",
+     "code": "MN-065",
+     "type": "Province",
+     "aliases": [
+      "Govĭ-Altay"
+     ]
+    },
+    {
+     "name": "Govi-Sumber",
+     "code": "MN-064",
+     "type": "Province",
+     "aliases": [
+      "Govĭ-Sümber"
+     ]
+    },
+    {
+     "name": "Hentiy",
+     "code": "MN-039",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Hovd",
+     "code": "MN-043",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Hovsgol",
+     "code": "MN-041",
+     "type": "Province",
+     "aliases": [
+      "Hövsgöl"
+     ]
+    },
+    {
+     "name": "Omnogovi",
+     "code": "MN-053",
+     "type": "Province",
+     "aliases": [
+      "Ömnögovĭ"
+     ]
+    },
+    {
+     "name": "Orhon",
+     "code": "MN-035",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Ovorhangay",
+     "code": "MN-055",
+     "type": "Province",
+     "aliases": [
+      "Övörhangay"
+     ]
+    },
+    {
+     "name": "Selenge",
+     "code": "MN-049",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Suhbaatar",
+     "code": "MN-051",
+     "type": "Province",
+     "aliases": [
+      "Sühbaatar"
+     ]
+    },
+    {
+     "name": "Tov",
+     "code": "MN-047",
+     "type": "Province",
+     "aliases": [
+      "Töv"
+     ]
+    },
+    {
+     "name": "Ulaanbaatar",
+     "code": "MN-1",
+     "type": "Capital city",
+     "aliases": []
+    },
+    {
+     "name": "Uvs",
+     "code": "MN-046",
+     "type": "Province",
+     "aliases": []
+    }
+   ]
+  },
+  "Mozambique": {
+   "iso": "MZ",
+   "regions": [
+    {
+     "name": "Cabo Delgado",
+     "code": "MZ-P",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Gaza",
+     "code": "MZ-G",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Inhambane",
+     "code": "MZ-I",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Manica",
+     "code": "MZ-B",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Maputo (city)",
+     "code": "MZ-MPM",
+     "type": "City",
+     "aliases": [
+      "Maputo"
+     ]
+    },
+    {
+     "name": "Maputo (province)",
+     "code": "MZ-L",
+     "type": "Province",
+     "aliases": [
+      "Maputo"
+     ]
+    },
+    {
+     "name": "Nampula",
+     "code": "MZ-N",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Niassa",
+     "code": "MZ-A",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Sofala",
+     "code": "MZ-S",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Tete",
+     "code": "MZ-T",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Zambézia",
+     "code": "MZ-Q",
+     "type": "Province",
+     "aliases": [
+      "Zambezia"
+     ]
+    }
+   ]
+  },
+  "Myanmar": {
+   "iso": "MM",
+   "regions": [
+    {
+     "name": "Ayeyarwady",
+     "code": "MM-07",
+     "type": "Region",
+     "aliases": [
+      "Irrawaddy"
+     ]
+    },
+    {
+     "name": "Bago",
+     "code": "MM-02",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Chin",
+     "code": "MM-14",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Kachin",
+     "code": "MM-11",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Kayah",
+     "code": "MM-12",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Kayin",
+     "code": "MM-13",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Magway",
+     "code": "MM-03",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Mandalay",
+     "code": "MM-04",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Mon",
+     "code": "MM-15",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Nay Pyi Taw",
+     "code": "MM-18",
+     "type": "Union territory",
+     "aliases": [
+      "Naypyidaw"
+     ]
+    },
+    {
+     "name": "Rakhine",
+     "code": "MM-16",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Sagaing",
+     "code": "MM-01",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Shan",
+     "code": "MM-17",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Tanintharyi",
+     "code": "MM-05",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Yangon",
+     "code": "MM-06",
+     "type": "Region",
+     "aliases": [
+      "Rangoon"
+     ]
+    }
+   ]
+  },
+  "Namibia": {
+   "iso": "NA",
+   "regions": [
+    {
+     "name": "Erongo",
+     "code": "NA-ER",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Hardap",
+     "code": "NA-HA",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Kavango East",
+     "code": "NA-KE",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Kavango West",
+     "code": "NA-KW",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Khomas",
+     "code": "NA-KH",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Kunene",
+     "code": "NA-KU",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Ohangwena",
+     "code": "NA-OW",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Omaheke",
+     "code": "NA-OH",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Omusati",
+     "code": "NA-OS",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Oshana",
+     "code": "NA-ON",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Oshikoto",
+     "code": "NA-OT",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Otjozondjupa",
+     "code": "NA-OD",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Zambezi",
+     "code": "NA-CA",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "ǁKaras",
+     "code": "NA-KA",
+     "type": "Region",
+     "aliases": [
+      "//Karas",
+      "Karas"
+     ]
+    }
+   ]
+  },
+  "Nigeria": {
+   "iso": "NG",
+   "regions": [
+    {
+     "name": "Abia",
+     "code": "NG-AB",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Abuja Federal Capital Territory",
+     "code": "NG-FC",
+     "type": "Capital territory",
+     "aliases": []
+    },
+    {
+     "name": "Adamawa",
+     "code": "NG-AD",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Akwa Ibom",
+     "code": "NG-AK",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Anambra",
+     "code": "NG-AN",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Bauchi",
+     "code": "NG-BA",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Bayelsa",
+     "code": "NG-BY",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Benue",
+     "code": "NG-BE",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Borno",
+     "code": "NG-BO",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Cross River",
+     "code": "NG-CR",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Delta",
+     "code": "NG-DE",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Ebonyi",
+     "code": "NG-EB",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Edo",
+     "code": "NG-ED",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Ekiti",
+     "code": "NG-EK",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Enugu",
+     "code": "NG-EN",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Gombe",
+     "code": "NG-GO",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Imo",
+     "code": "NG-IM",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Jigawa",
+     "code": "NG-JI",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Kaduna",
+     "code": "NG-KD",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Kano",
+     "code": "NG-KN",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Katsina",
+     "code": "NG-KT",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Kebbi",
+     "code": "NG-KE",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Kogi",
+     "code": "NG-KO",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Kwara",
+     "code": "NG-KW",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Lagos",
+     "code": "NG-LA",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Nasarawa",
+     "code": "NG-NA",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Niger",
+     "code": "NG-NI",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Ogun",
+     "code": "NG-OG",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Ondo",
+     "code": "NG-ON",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Osun",
+     "code": "NG-OS",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Oyo",
+     "code": "NG-OY",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Plateau",
+     "code": "NG-PL",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Rivers",
+     "code": "NG-RI",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Sokoto",
+     "code": "NG-SO",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Taraba",
+     "code": "NG-TA",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Yobe",
+     "code": "NG-YO",
+     "type": "State",
+     "aliases": []
+    },
+    {
+     "name": "Zamfara",
+     "code": "NG-ZA",
+     "type": "State",
+     "aliases": []
+    }
+   ]
+  },
+  "Pakistan": {
+   "iso": "PK",
+   "regions": [
+    {
+     "name": "Azad Jammu and Kashmir",
+     "code": "PK-JK",
+     "type": "Pakistan administered area",
+     "aliases": []
+    },
+    {
+     "name": "Balochistan",
+     "code": "PK-BA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Gilgit-Baltistan",
+     "code": "PK-GB",
+     "type": "Pakistan administered area",
+     "aliases": []
+    },
+    {
+     "name": "Islamabad",
+     "code": "PK-IS",
+     "type": "Federal capital territory",
+     "aliases": []
+    },
+    {
+     "name": "Khyber Pakhtunkhwa",
+     "code": "PK-KP",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Punjab",
+     "code": "PK-PB",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Sindh",
+     "code": "PK-SD",
+     "type": "Province",
+     "aliases": []
+    }
+   ]
+  },
+  "Papua New Guinea": {
+   "iso": "PG",
+   "regions": [
+    {
+     "name": "Bougainville",
+     "code": "PG-NSB",
+     "type": "Autonomous region",
+     "aliases": []
+    },
+    {
+     "name": "Central",
+     "code": "PG-CPM",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Chimbu",
+     "code": "PG-CPK",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "East New Britain",
+     "code": "PG-EBR",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "East Sepik",
+     "code": "PG-ESW",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Eastern Highlands",
+     "code": "PG-EHG",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Enga",
+     "code": "PG-EPW",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Gulf",
+     "code": "PG-GPK",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Hela",
+     "code": "PG-HLA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Jiwaka",
+     "code": "PG-JWK",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Madang",
+     "code": "PG-MPM",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Manus",
+     "code": "PG-MRL",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Milne Bay",
+     "code": "PG-MBA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Morobe",
+     "code": "PG-MPL",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "National Capital District (Port Moresby)",
+     "code": "PG-NCD",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "New Ireland",
+     "code": "PG-NIK",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Northern",
+     "code": "PG-NPP",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Southern Highlands",
+     "code": "PG-SHM",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "West New Britain",
+     "code": "PG-WBK",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "West Sepik",
+     "code": "PG-SAN",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Western",
+     "code": "PG-WPD",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Western Highlands",
+     "code": "PG-WHM",
+     "type": "Province",
+     "aliases": []
+    }
+   ]
+  },
+  "Philippines": {
+   "iso": "PH",
+   "regions": [
+    {
+     "name": "Bangsamoro (BARMM)",
+     "code": "PH-14",
+     "type": "Region",
+     "aliases": [
+      "ARMM",
+      "Autonomous Region in Muslim Mindanao (ARMM)",
+      "Bangsamoro"
+     ]
+    },
+    {
+     "name": "Bicol (Region V)",
+     "code": "PH-05",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Cagayan Valley (Region II)",
+     "code": "PH-02",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Calabarzon (Region IV-A)",
+     "code": "PH-40",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Caraga (Region XIII)",
+     "code": "PH-13",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Central Luzon (Region III)",
+     "code": "PH-03",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Central Visayas (Region VII)",
+     "code": "PH-07",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Cordillera Administrative Region (CAR)",
+     "code": "PH-15",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Davao (Region XI)",
+     "code": "PH-11",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Eastern Visayas (Region VIII)",
+     "code": "PH-08",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Ilocos (Region I)",
+     "code": "PH-01",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Mimaropa (Region IV-B)",
+     "code": "PH-41",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "National Capital Region",
+     "code": "PH-00",
+     "type": "Region",
+     "aliases": [
+      "Metro Manila",
+      "NCR"
+     ]
+    },
+    {
+     "name": "Northern Mindanao (Region X)",
+     "code": "PH-10",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Soccsksargen (Region XII)",
+     "code": "PH-12",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Western Visayas (Region VI)",
+     "code": "PH-06",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Zamboanga Peninsula (Region IX)",
+     "code": "PH-09",
+     "type": "Region",
+     "aliases": []
+    }
+   ]
+  },
+  "Sierra Leone": {
+   "iso": "SL",
+   "regions": [
+    {
+     "name": "Eastern",
+     "code": "SL-E",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "North Western",
+     "code": "SL-NW",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Northern",
+     "code": "SL-N",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Southern",
+     "code": "SL-S",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Western Area (Freetown)",
+     "code": "SL-W",
+     "type": "Area",
+     "aliases": []
+    }
+   ]
+  },
+  "South Africa": {
+   "iso": "ZA",
+   "regions": [
+    {
+     "name": "Eastern Cape",
+     "code": "ZA-EC",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Free State",
+     "code": "ZA-FS",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Gauteng",
+     "code": "ZA-GP",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "KwaZulu-Natal",
+     "code": "ZA-KZN",
+     "type": "Province",
+     "aliases": [
+      "Kwazulu-Natal"
+     ]
+    },
+    {
+     "name": "Limpopo",
+     "code": "ZA-LP",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Mpumalanga",
+     "code": "ZA-MP",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "North-West",
+     "code": "ZA-NW",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Northern Cape",
+     "code": "ZA-NC",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Western Cape",
+     "code": "ZA-WC",
+     "type": "Province",
+     "aliases": []
+    }
+   ]
+  },
+  "Thailand": {
+   "iso": "TH",
+   "regions": [
+    {
+     "name": "Amnat Charoen",
+     "code": "TH-37",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Ang Thong",
+     "code": "TH-15",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Bangkok",
+     "code": "TH-10",
+     "type": "Metropolitan administration",
+     "aliases": [
+      "Bangkok Metropolis",
+      "Krung Thep",
+      "Krung Thep Maha Nakhon"
+     ]
+    },
+    {
+     "name": "Bueng Kan",
+     "code": "TH-38",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Buri Ram",
+     "code": "TH-31",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Chachoengsao",
+     "code": "TH-24",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Chai Nat",
+     "code": "TH-18",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Chaiyaphum",
+     "code": "TH-36",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Chanthaburi",
+     "code": "TH-22",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Chiang Mai",
+     "code": "TH-50",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Chiang Rai",
+     "code": "TH-57",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Chon Buri",
+     "code": "TH-20",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Chumphon",
+     "code": "TH-86",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Kalasin",
+     "code": "TH-46",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Kamphaeng Phet",
+     "code": "TH-62",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Kanchanaburi",
+     "code": "TH-71",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Khon Kaen",
+     "code": "TH-40",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Krabi",
+     "code": "TH-81",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Lampang",
+     "code": "TH-52",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Lamphun",
+     "code": "TH-51",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Loei",
+     "code": "TH-42",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Lop Buri",
+     "code": "TH-16",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Mae Hong Son",
+     "code": "TH-58",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Maha Sarakham",
+     "code": "TH-44",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Mukdahan",
+     "code": "TH-49",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nakhon Nayok",
+     "code": "TH-26",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nakhon Pathom",
+     "code": "TH-73",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nakhon Phanom",
+     "code": "TH-48",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nakhon Ratchasima",
+     "code": "TH-30",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nakhon Sawan",
+     "code": "TH-60",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nakhon Si Thammarat",
+     "code": "TH-80",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nan",
+     "code": "TH-55",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Narathiwat",
+     "code": "TH-96",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nong Bua Lam Phu",
+     "code": "TH-39",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nong Khai",
+     "code": "TH-43",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nonthaburi",
+     "code": "TH-12",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Pathum Thani",
+     "code": "TH-13",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Pattani",
+     "code": "TH-94",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Phangnga",
+     "code": "TH-82",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Phatthalung",
+     "code": "TH-93",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Phatthaya",
+     "code": "TH-S",
+     "type": "Special administrative city",
+     "aliases": []
+    },
+    {
+     "name": "Phayao",
+     "code": "TH-56",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Phetchabun",
+     "code": "TH-67",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Phetchaburi",
+     "code": "TH-76",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Phichit",
+     "code": "TH-66",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Phitsanulok",
+     "code": "TH-65",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Phra Nakhon Si Ayutthaya",
+     "code": "TH-14",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Phrae",
+     "code": "TH-54",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Phuket",
+     "code": "TH-83",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Prachin Buri",
+     "code": "TH-25",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Prachuap Khiri Khan",
+     "code": "TH-77",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Ranong",
+     "code": "TH-85",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Ratchaburi",
+     "code": "TH-70",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Rayong",
+     "code": "TH-21",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Roi Et",
+     "code": "TH-45",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Sa Kaeo",
+     "code": "TH-27",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Sakon Nakhon",
+     "code": "TH-47",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Samut Prakan",
+     "code": "TH-11",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Samut Sakhon",
+     "code": "TH-74",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Samut Songkhram",
+     "code": "TH-75",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Saraburi",
+     "code": "TH-19",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Satun",
+     "code": "TH-91",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Si Sa Ket",
+     "code": "TH-33",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Sing Buri",
+     "code": "TH-17",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Songkhla",
+     "code": "TH-90",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Sukhothai",
+     "code": "TH-64",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Suphan Buri",
+     "code": "TH-72",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Surat Thani",
+     "code": "TH-84",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Surin",
+     "code": "TH-32",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Tak",
+     "code": "TH-63",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Trang",
+     "code": "TH-92",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Trat",
+     "code": "TH-23",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Ubon Ratchathani",
+     "code": "TH-34",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Udon Thani",
+     "code": "TH-41",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Uthai Thani",
+     "code": "TH-61",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Uttaradit",
+     "code": "TH-53",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Yala",
+     "code": "TH-95",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Yasothon",
+     "code": "TH-35",
+     "type": "Province",
+     "aliases": []
+    }
+   ]
+  },
+  "Uganda": {
+   "iso": "UG",
+   "regions": [
+    {
+     "name": "Abim",
+     "code": "UG-314",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Adjumani",
+     "code": "UG-301",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Agago",
+     "code": "UG-322",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Alebtong",
+     "code": "UG-323",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Amolatar",
+     "code": "UG-315",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Amudat",
+     "code": "UG-324",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Amuria",
+     "code": "UG-216",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Amuru",
+     "code": "UG-316",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Apac",
+     "code": "UG-302",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Arua",
+     "code": "UG-303",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Budaka",
+     "code": "UG-217",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Bududa",
+     "code": "UG-218",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Bugiri",
+     "code": "UG-201",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Bugweri",
+     "code": "UG-235",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Buhweju",
+     "code": "UG-420",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Buikwe",
+     "code": "UG-117",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Bukedea",
+     "code": "UG-219",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Bukomansibi",
+     "code": "UG-118",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Bukwo",
+     "code": "UG-220",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Bulambuli",
+     "code": "UG-225",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Buliisa",
+     "code": "UG-416",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Bundibugyo",
+     "code": "UG-401",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Bunyangabu",
+     "code": "UG-430",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Bushenyi",
+     "code": "UG-402",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Busia",
+     "code": "UG-202",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Butaleja",
+     "code": "UG-221",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Butambala",
+     "code": "UG-119",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Butebo",
+     "code": "UG-233",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Buvuma",
+     "code": "UG-120",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Buyende",
+     "code": "UG-226",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Dokolo",
+     "code": "UG-317",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Gomba",
+     "code": "UG-121",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Gulu",
+     "code": "UG-304",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Hoima",
+     "code": "UG-403",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Ibanda",
+     "code": "UG-417",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Iganga",
+     "code": "UG-203",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Isingiro",
+     "code": "UG-418",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Jinja",
+     "code": "UG-204",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kaabong",
+     "code": "UG-318",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kabale",
+     "code": "UG-404",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kabarole",
+     "code": "UG-405",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kaberamaido",
+     "code": "UG-213",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kagadi",
+     "code": "UG-427",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kakumiro",
+     "code": "UG-428",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kalaki",
+     "code": "UG-237",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kalangala",
+     "code": "UG-101",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kaliro",
+     "code": "UG-222",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kalungu",
+     "code": "UG-122",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kampala",
+     "code": "UG-102",
+     "type": "City",
+     "aliases": []
+    },
+    {
+     "name": "Kamuli",
+     "code": "UG-205",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kamwenge",
+     "code": "UG-413",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kanungu",
+     "code": "UG-414",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kapchorwa",
+     "code": "UG-206",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kapelebyong",
+     "code": "UG-236",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Karenga",
+     "code": "UG-335",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kasanda",
+     "code": "UG-126",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kasese",
+     "code": "UG-406",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Katakwi",
+     "code": "UG-207",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kayunga",
+     "code": "UG-112",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kazo",
+     "code": "UG-433",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kibaale",
+     "code": "UG-407",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kiboga",
+     "code": "UG-103",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kibuku",
+     "code": "UG-227",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kikuube",
+     "code": "UG-432",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kiruhura",
+     "code": "UG-419",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kiryandongo",
+     "code": "UG-421",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kisoro",
+     "code": "UG-408",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kitagwenda",
+     "code": "UG-434",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kitgum",
+     "code": "UG-305",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Koboko",
+     "code": "UG-319",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kole",
+     "code": "UG-325",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kotido",
+     "code": "UG-306",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kumi",
+     "code": "UG-208",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kwania",
+     "code": "UG-333",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kween",
+     "code": "UG-228",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kyankwanzi",
+     "code": "UG-123",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kyegegwa",
+     "code": "UG-422",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kyenjojo",
+     "code": "UG-415",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Kyotera",
+     "code": "UG-125",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Lamwo",
+     "code": "UG-326",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Lira",
+     "code": "UG-307",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Luuka",
+     "code": "UG-229",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Luwero",
+     "code": "UG-104",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Lwengo",
+     "code": "UG-124",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Lyantonde",
+     "code": "UG-114",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Madi-Okollo",
+     "code": "UG-336",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Manafwa",
+     "code": "UG-223",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Maracha",
+     "code": "UG-320",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Masaka",
+     "code": "UG-105",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Masindi",
+     "code": "UG-409",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Mayuge",
+     "code": "UG-214",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Mbale",
+     "code": "UG-209",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Mbarara",
+     "code": "UG-410",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Mitooma",
+     "code": "UG-423",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Mityana",
+     "code": "UG-115",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Moroto",
+     "code": "UG-308",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Moyo",
+     "code": "UG-309",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Mpigi",
+     "code": "UG-106",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Mubende",
+     "code": "UG-107",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Mukono",
+     "code": "UG-108",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Nabilatuk",
+     "code": "UG-334",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Nakapiripirit",
+     "code": "UG-311",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Nakaseke",
+     "code": "UG-116",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Nakasongola",
+     "code": "UG-109",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Namayingo",
+     "code": "UG-230",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Namisindwa",
+     "code": "UG-234",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Namutumba",
+     "code": "UG-224",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Napak",
+     "code": "UG-327",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Nebbi",
+     "code": "UG-310",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Ngora",
+     "code": "UG-231",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Ntoroko",
+     "code": "UG-424",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Ntungamo",
+     "code": "UG-411",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Nwoya",
+     "code": "UG-328",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Obongi",
+     "code": "UG-337",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Omoro",
+     "code": "UG-331",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Otuke",
+     "code": "UG-329",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Oyam",
+     "code": "UG-321",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Pader",
+     "code": "UG-312",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Pakwach",
+     "code": "UG-332",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Pallisa",
+     "code": "UG-210",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Rakai",
+     "code": "UG-110",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Rubanda",
+     "code": "UG-429",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Rubirizi",
+     "code": "UG-425",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Rukiga",
+     "code": "UG-431",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Rukungiri",
+     "code": "UG-412",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Rwampara",
+     "code": "UG-435",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Sembabule",
+     "code": "UG-111",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Serere",
+     "code": "UG-232",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Sheema",
+     "code": "UG-426",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Sironko",
+     "code": "UG-215",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Soroti",
+     "code": "UG-211",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Tororo",
+     "code": "UG-212",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Wakiso",
+     "code": "UG-113",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Yumbe",
+     "code": "UG-313",
+     "type": "District",
+     "aliases": []
+    },
+    {
+     "name": "Zombo",
+     "code": "UG-330",
+     "type": "District",
+     "aliases": []
+    }
+   ]
+  },
+  "Tanzania": {
+   "iso": "TZ",
+   "regions": [
+    {
+     "name": "Arusha",
+     "code": "TZ-01",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Coast",
+     "code": "TZ-19",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Dar es Salaam",
+     "code": "TZ-02",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Dodoma",
+     "code": "TZ-03",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Geita",
+     "code": "TZ-27",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Iringa",
+     "code": "TZ-04",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Kagera",
+     "code": "TZ-05",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Katavi",
+     "code": "TZ-28",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Kigoma",
+     "code": "TZ-08",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Kilimanjaro",
+     "code": "TZ-09",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Lindi",
+     "code": "TZ-12",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Manyara",
+     "code": "TZ-26",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Mara",
+     "code": "TZ-13",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Mbeya",
+     "code": "TZ-14",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Morogoro",
+     "code": "TZ-16",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Mtwara",
+     "code": "TZ-17",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Mwanza",
+     "code": "TZ-18",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Njombe",
+     "code": "TZ-29",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Pemba North",
+     "code": "TZ-06",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Pemba South",
+     "code": "TZ-10",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Rukwa",
+     "code": "TZ-20",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Ruvuma",
+     "code": "TZ-21",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Shinyanga",
+     "code": "TZ-22",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Simiyu",
+     "code": "TZ-30",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Singida",
+     "code": "TZ-23",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Songwe",
+     "code": "TZ-31",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Tabora",
+     "code": "TZ-24",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Tanga",
+     "code": "TZ-25",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Zanzibar North",
+     "code": "TZ-07",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Zanzibar South",
+     "code": "TZ-11",
+     "type": "Region",
+     "aliases": []
+    },
+    {
+     "name": "Zanzibar West",
+     "code": "TZ-15",
+     "type": "Region",
+     "aliases": []
+    }
+   ]
+  },
+  "Viet Nam": {
+   "iso": "VN",
+   "regions": [
+    {
+     "name": "An Giang",
+     "code": "VN-44",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Bà Rịa - Vũng Tàu",
+     "code": "VN-43",
+     "type": "Province",
+     "aliases": [
+      "Ba Ria - Vung Tau"
+     ]
+    },
+    {
+     "name": "Bắc Giang",
+     "code": "VN-54",
+     "type": "Province",
+     "aliases": [
+      "Bac Giang"
+     ]
+    },
+    {
+     "name": "Bắc Kạn",
+     "code": "VN-53",
+     "type": "Province",
+     "aliases": [
+      "Bac Kan"
+     ]
+    },
+    {
+     "name": "Bạc Liêu",
+     "code": "VN-55",
+     "type": "Province",
+     "aliases": [
+      "Bac Lieu"
+     ]
+    },
+    {
+     "name": "Bắc Ninh",
+     "code": "VN-56",
+     "type": "Province",
+     "aliases": [
+      "Bac Ninh"
+     ]
+    },
+    {
+     "name": "Bến Tre",
+     "code": "VN-50",
+     "type": "Province",
+     "aliases": [
+      "Ben Tre"
+     ]
+    },
+    {
+     "name": "Bình Dương",
+     "code": "VN-57",
+     "type": "Province",
+     "aliases": [
+      "Binh Duong"
+     ]
+    },
+    {
+     "name": "Bình Phước",
+     "code": "VN-58",
+     "type": "Province",
+     "aliases": [
+      "Binh Phuoc"
+     ]
+    },
+    {
+     "name": "Bình Thuận",
+     "code": "VN-40",
+     "type": "Province",
+     "aliases": [
+      "Binh Thuan"
+     ]
+    },
+    {
+     "name": "Bình Định",
+     "code": "VN-31",
+     "type": "Province",
+     "aliases": [
+      "Binh Đinh"
+     ]
+    },
+    {
+     "name": "Cà Mau",
+     "code": "VN-59",
+     "type": "Province",
+     "aliases": [
+      "Ca Mau"
+     ]
+    },
+    {
+     "name": "Cần Thơ",
+     "code": "VN-CT",
+     "type": "Municipality",
+     "aliases": [
+      "Can Tho"
+     ]
+    },
+    {
+     "name": "Cao Bằng",
+     "code": "VN-04",
+     "type": "Province",
+     "aliases": [
+      "Cao Bang"
+     ]
+    },
+    {
+     "name": "Gia Lai",
+     "code": "VN-30",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Hà Giang",
+     "code": "VN-03",
+     "type": "Province",
+     "aliases": [
+      "Ha Giang"
+     ]
+    },
+    {
+     "name": "Hà Nam",
+     "code": "VN-63",
+     "type": "Province",
+     "aliases": [
+      "Ha Nam"
+     ]
+    },
+    {
+     "name": "Hà Nội",
+     "code": "VN-HN",
+     "type": "Municipality",
+     "aliases": [
+      "Ha Noi",
+      "Hanoi"
+     ]
+    },
+    {
+     "name": "Hà Tĩnh",
+     "code": "VN-23",
+     "type": "Province",
+     "aliases": [
+      "Ha Tinh"
+     ]
+    },
+    {
+     "name": "Hải Dương",
+     "code": "VN-61",
+     "type": "Province",
+     "aliases": [
+      "Hai Duong"
+     ]
+    },
+    {
+     "name": "Hải Phòng",
+     "code": "VN-HP",
+     "type": "Municipality",
+     "aliases": [
+      "Hai Phong",
+      "Haiphong"
+     ]
+    },
+    {
+     "name": "Hậu Giang",
+     "code": "VN-73",
+     "type": "Province",
+     "aliases": [
+      "Hau Giang"
+     ]
+    },
+    {
+     "name": "Hồ Chí Minh",
+     "code": "VN-SG",
+     "type": "Municipality",
+     "aliases": [
+      "Ho Chi Minh",
+      "Ho Chi Minh City",
+      "Saigon"
+     ]
+    },
+    {
+     "name": "Hòa Bình",
+     "code": "VN-14",
+     "type": "Province",
+     "aliases": [
+      "Hoa Binh"
+     ]
+    },
+    {
+     "name": "Hưng Yên",
+     "code": "VN-66",
+     "type": "Province",
+     "aliases": [
+      "Hung Yen"
+     ]
+    },
+    {
+     "name": "Khánh Hòa",
+     "code": "VN-34",
+     "type": "Province",
+     "aliases": [
+      "Khanh Hoa"
+     ]
+    },
+    {
+     "name": "Kiến Giang",
+     "code": "VN-47",
+     "type": "Province",
+     "aliases": [
+      "Kien Giang"
+     ]
+    },
+    {
+     "name": "Kon Tum",
+     "code": "VN-28",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Lai Châu",
+     "code": "VN-01",
+     "type": "Province",
+     "aliases": [
+      "Lai Chau"
+     ]
+    },
+    {
+     "name": "Lâm Đồng",
+     "code": "VN-35",
+     "type": "Province",
+     "aliases": [
+      "Lam Đong"
+     ]
+    },
+    {
+     "name": "Lạng Sơn",
+     "code": "VN-09",
+     "type": "Province",
+     "aliases": [
+      "Lang Son"
+     ]
+    },
+    {
+     "name": "Lào Cai",
+     "code": "VN-02",
+     "type": "Province",
+     "aliases": [
+      "Lao Cai"
+     ]
+    },
+    {
+     "name": "Long An",
+     "code": "VN-41",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Nam Định",
+     "code": "VN-67",
+     "type": "Province",
+     "aliases": [
+      "Nam Đinh"
+     ]
+    },
+    {
+     "name": "Nghệ An",
+     "code": "VN-22",
+     "type": "Province",
+     "aliases": [
+      "Nghe An"
+     ]
+    },
+    {
+     "name": "Ninh Bình",
+     "code": "VN-18",
+     "type": "Province",
+     "aliases": [
+      "Ninh Binh"
+     ]
+    },
+    {
+     "name": "Ninh Thuận",
+     "code": "VN-36",
+     "type": "Province",
+     "aliases": [
+      "Ninh Thuan"
+     ]
+    },
+    {
+     "name": "Phú Thọ",
+     "code": "VN-68",
+     "type": "Province",
+     "aliases": [
+      "Phu Tho"
+     ]
+    },
+    {
+     "name": "Phú Yên",
+     "code": "VN-32",
+     "type": "Province",
+     "aliases": [
+      "Phu Yen"
+     ]
+    },
+    {
+     "name": "Quảng Bình",
+     "code": "VN-24",
+     "type": "Province",
+     "aliases": [
+      "Quang Binh"
+     ]
+    },
+    {
+     "name": "Quảng Nam",
+     "code": "VN-27",
+     "type": "Province",
+     "aliases": [
+      "Quang Nam"
+     ]
+    },
+    {
+     "name": "Quảng Ngãi",
+     "code": "VN-29",
+     "type": "Province",
+     "aliases": [
+      "Quang Ngai"
+     ]
+    },
+    {
+     "name": "Quảng Ninh",
+     "code": "VN-13",
+     "type": "Province",
+     "aliases": [
+      "Quang Ninh"
+     ]
+    },
+    {
+     "name": "Quảng Trị",
+     "code": "VN-25",
+     "type": "Province",
+     "aliases": [
+      "Quang Tri"
+     ]
+    },
+    {
+     "name": "Sóc Trăng",
+     "code": "VN-52",
+     "type": "Province",
+     "aliases": [
+      "Soc Trang"
+     ]
+    },
+    {
+     "name": "Sơn La",
+     "code": "VN-05",
+     "type": "Province",
+     "aliases": [
+      "Son La"
+     ]
+    },
+    {
+     "name": "Tây Ninh",
+     "code": "VN-37",
+     "type": "Province",
+     "aliases": [
+      "Tay Ninh"
+     ]
+    },
+    {
+     "name": "Thái Bình",
+     "code": "VN-20",
+     "type": "Province",
+     "aliases": [
+      "Thai Binh"
+     ]
+    },
+    {
+     "name": "Thái Nguyên",
+     "code": "VN-69",
+     "type": "Province",
+     "aliases": [
+      "Thai Nguyen"
+     ]
+    },
+    {
+     "name": "Thanh Hóa",
+     "code": "VN-21",
+     "type": "Province",
+     "aliases": [
+      "Thanh Hoa"
+     ]
+    },
+    {
+     "name": "Thừa Thiên-Huế",
+     "code": "VN-26",
+     "type": "Province",
+     "aliases": [
+      "Thua Thien-Hue"
+     ]
+    },
+    {
+     "name": "Tiền Giang",
+     "code": "VN-46",
+     "type": "Province",
+     "aliases": [
+      "Tien Giang"
+     ]
+    },
+    {
+     "name": "Trà Vinh",
+     "code": "VN-51",
+     "type": "Province",
+     "aliases": [
+      "Tra Vinh"
+     ]
+    },
+    {
+     "name": "Tuyên Quang",
+     "code": "VN-07",
+     "type": "Province",
+     "aliases": [
+      "Tuyen Quang"
+     ]
+    },
+    {
+     "name": "Vĩnh Long",
+     "code": "VN-49",
+     "type": "Province",
+     "aliases": [
+      "Vinh Long"
+     ]
+    },
+    {
+     "name": "Vĩnh Phúc",
+     "code": "VN-70",
+     "type": "Province",
+     "aliases": [
+      "Vinh Phuc"
+     ]
+    },
+    {
+     "name": "Yên Bái",
+     "code": "VN-06",
+     "type": "Province",
+     "aliases": [
+      "Yen Bai"
+     ]
+    },
+    {
+     "name": "Đà Nẵng",
+     "code": "VN-DN",
+     "type": "Municipality",
+     "aliases": [
+      "Da Nang",
+      "Danang",
+      "Đa Nang"
+     ]
+    },
+    {
+     "name": "Đắk Lắk",
+     "code": "VN-33",
+     "type": "Province",
+     "aliases": [
+      "Đak Lak"
+     ]
+    },
+    {
+     "name": "Đắk Nông",
+     "code": "VN-72",
+     "type": "Province",
+     "aliases": [
+      "Đak Nong"
+     ]
+    },
+    {
+     "name": "Điện Biên",
+     "code": "VN-71",
+     "type": "Province",
+     "aliases": [
+      "Đien Bien"
+     ]
+    },
+    {
+     "name": "Đồng Nai",
+     "code": "VN-39",
+     "type": "Province",
+     "aliases": [
+      "Đong Nai"
+     ]
+    },
+    {
+     "name": "Đồng Tháp",
+     "code": "VN-45",
+     "type": "Province",
+     "aliases": [
+      "Đong Thap"
+     ]
+    }
+   ]
+  },
+  "Zambia": {
+   "iso": "ZM",
+   "regions": [
+    {
+     "name": "Central",
+     "code": "ZM-02",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Copperbelt",
+     "code": "ZM-08",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Eastern",
+     "code": "ZM-03",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Luapula",
+     "code": "ZM-04",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Lusaka",
+     "code": "ZM-09",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Muchinga",
+     "code": "ZM-10",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "North-Western",
+     "code": "ZM-06",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Northern",
+     "code": "ZM-05",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Southern",
+     "code": "ZM-07",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Western",
+     "code": "ZM-01",
+     "type": "Province",
+     "aliases": []
+    }
+   ]
+  },
+  "Cambodia": {
+   "iso": "KH",
+   "regions": [
+    {
+     "name": "Banteay Meanchey",
+     "code": "KH-1",
+     "type": "Province",
+     "aliases": [
+      "Banteay Mean Choay",
+      "Banteay Mean Choăy"
+     ]
+    },
+    {
+     "name": "Battambang",
+     "code": "KH-2",
+     "type": "Province",
+     "aliases": [
+      "Baat Dambang"
+     ]
+    },
+    {
+     "name": "Kampong Cham",
+     "code": "KH-3",
+     "type": "Province",
+     "aliases": [
+      "Kampong Chaam"
+     ]
+    },
+    {
+     "name": "Kampong Chhnang",
+     "code": "KH-4",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Kampong Speu",
+     "code": "KH-5",
+     "type": "Province",
+     "aliases": [
+      "Kampong Spueu"
+     ]
+    },
+    {
+     "name": "Kampong Thom",
+     "code": "KH-6",
+     "type": "Province",
+     "aliases": [
+      "Kampong Thum"
+     ]
+    },
+    {
+     "name": "Kampot",
+     "code": "KH-7",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Kandal",
+     "code": "KH-8",
+     "type": "Province",
+     "aliases": [
+      "Kandaal"
+     ]
+    },
+    {
+     "name": "Kep",
+     "code": "KH-23",
+     "type": "Province",
+     "aliases": [
+      "Kaeb"
+     ]
+    },
+    {
+     "name": "Koh Kong",
+     "code": "KH-9",
+     "type": "Province",
+     "aliases": [
+      "Kaoh Kong"
+     ]
+    },
+    {
+     "name": "Kratie",
+     "code": "KH-10",
+     "type": "Province",
+     "aliases": [
+      "Kracheh"
+     ]
+    },
+    {
+     "name": "Mondulkiri",
+     "code": "KH-11",
+     "type": "Province",
+     "aliases": [
+      "Mondol Kiri"
+     ]
+    },
+    {
+     "name": "Oddar Meanchey",
+     "code": "KH-22",
+     "type": "Province",
+     "aliases": [
+      "Otdar Mean Chey"
+     ]
+    },
+    {
+     "name": "Pailin",
+     "code": "KH-24",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Phnom Penh",
+     "code": "KH-12",
+     "type": "Autonomous municipality",
+     "aliases": []
+    },
+    {
+     "name": "Preah Sihanouk",
+     "code": "KH-18",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Preah Vihear",
+     "code": "KH-13",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Prey Veng",
+     "code": "KH-14",
+     "type": "Province",
+     "aliases": [
+      "Prey Veaeng"
+     ]
+    },
+    {
+     "name": "Pursat",
+     "code": "KH-15",
+     "type": "Province",
+     "aliases": [
+      "Pousaat"
+     ]
+    },
+    {
+     "name": "Ratanakiri",
+     "code": "KH-16",
+     "type": "Province",
+     "aliases": [
+      "Rotanak Kiri"
+     ]
+    },
+    {
+     "name": "Siem Reap",
+     "code": "KH-17",
+     "type": "Province",
+     "aliases": [
+      "Siem Reab"
+     ]
+    },
+    {
+     "name": "Stung Treng",
+     "code": "KH-19",
+     "type": "Province",
+     "aliases": [
+      "Stueng Traeng"
+     ]
+    },
+    {
+     "name": "Svay Rieng",
+     "code": "KH-20",
+     "type": "Province",
+     "aliases": [
+      "Svaay Rieng"
+     ]
+    },
+    {
+     "name": "Takeo",
+     "code": "KH-21",
+     "type": "Province",
+     "aliases": [
+      "Taakaev"
+     ]
+    },
+    {
+     "name": "Tboung Khmum",
+     "code": "KH-25",
+     "type": "Province",
+     "aliases": [
+      "Tbong Khmum"
+     ]
+    }
+   ]
+  },
+  "Russia": {
+   "iso": "RU",
+   "regions": [
+    {
+     "name": "Adygeya, Respublika",
+     "code": "RU-AD",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Altay, Respublika",
+     "code": "RU-AL",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Altayskiy kray",
+     "code": "RU-ALT",
+     "type": "Administrative territory",
+     "aliases": []
+    },
+    {
+     "name": "Amurskaya oblast'",
+     "code": "RU-AMU",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Arkhangel'skaya oblast'",
+     "code": "RU-ARK",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Astrakhanskaya oblast'",
+     "code": "RU-AST",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Bashkortostan, Respublika",
+     "code": "RU-BA",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Belgorodskaya oblast'",
+     "code": "RU-BEL",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Bryanskaya oblast'",
+     "code": "RU-BRY",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Buryatiya, Respublika",
+     "code": "RU-BU",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Chechenskaya Respublika",
+     "code": "RU-CE",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Chelyabinskaya oblast'",
+     "code": "RU-CHE",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Chukotskiy avtonomnyy okrug",
+     "code": "RU-CHU",
+     "type": "Autonomous district",
+     "aliases": []
+    },
+    {
+     "name": "Chuvashskaya Respublika",
+     "code": "RU-CU",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Dagestan, Respublika",
+     "code": "RU-DA",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Ingushetiya, Respublika",
+     "code": "RU-IN",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Irkutskaya oblast'",
+     "code": "RU-IRK",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Ivanovskaya oblast'",
+     "code": "RU-IVA",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Kabardino-Balkarskaya Respublika",
+     "code": "RU-KB",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Kaliningradskaya oblast'",
+     "code": "RU-KGD",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Kalmykiya, Respublika",
+     "code": "RU-KL",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Kaluzhskaya oblast'",
+     "code": "RU-KLU",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Kamchatskiy kray",
+     "code": "RU-KAM",
+     "type": "Administrative territory",
+     "aliases": []
+    },
+    {
+     "name": "Karachayevo-Cherkesskaya Respublika",
+     "code": "RU-KC",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Kareliya, Respublika",
+     "code": "RU-KR",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Kemerovskaya oblast'",
+     "code": "RU-KEM",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Khabarovskiy kray",
+     "code": "RU-KHA",
+     "type": "Administrative territory",
+     "aliases": []
+    },
+    {
+     "name": "Khakasiya, Respublika",
+     "code": "RU-KK",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Khanty-Mansiyskiy avtonomnyy okrug",
+     "code": "RU-KHM",
+     "type": "Autonomous district",
+     "aliases": []
+    },
+    {
+     "name": "Kirovskaya oblast'",
+     "code": "RU-KIR",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Komi, Respublika",
+     "code": "RU-KO",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Kostromskaya oblast'",
+     "code": "RU-KOS",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Krasnodarskiy kray",
+     "code": "RU-KDA",
+     "type": "Administrative territory",
+     "aliases": []
+    },
+    {
+     "name": "Krasnoyarskiy kray",
+     "code": "RU-KYA",
+     "type": "Administrative territory",
+     "aliases": []
+    },
+    {
+     "name": "Kurganskaya oblast'",
+     "code": "RU-KGN",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Kurskaya oblast'",
+     "code": "RU-KRS",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Leningradskaya oblast'",
+     "code": "RU-LEN",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Lipetskaya oblast'",
+     "code": "RU-LIP",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Magadanskaya oblast'",
+     "code": "RU-MAG",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Mariy El, Respublika",
+     "code": "RU-ME",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Mordoviya, Respublika",
+     "code": "RU-MO",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Moscow",
+     "code": "RU-MOW",
+     "type": "Autonomous city",
+     "aliases": [
+      "Moskva"
+     ]
+    },
+    {
+     "name": "Moskovskaya oblast'",
+     "code": "RU-MOS",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Murmanskaya oblast'",
+     "code": "RU-MUR",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Nenetskiy avtonomnyy okrug",
+     "code": "RU-NEN",
+     "type": "Autonomous district",
+     "aliases": []
+    },
+    {
+     "name": "Nizhegorodskaya oblast'",
+     "code": "RU-NIZ",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Novgorodskaya oblast'",
+     "code": "RU-NGR",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Novosibirskaya oblast'",
+     "code": "RU-NVS",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Omskaya oblast'",
+     "code": "RU-OMS",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Orenburgskaya oblast'",
+     "code": "RU-ORE",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Orlovskaya oblast'",
+     "code": "RU-ORL",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Penzenskaya oblast'",
+     "code": "RU-PNZ",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Permskiy kray",
+     "code": "RU-PER",
+     "type": "Administrative territory",
+     "aliases": []
+    },
+    {
+     "name": "Primorskiy kray",
+     "code": "RU-PRI",
+     "type": "Administrative territory",
+     "aliases": []
+    },
+    {
+     "name": "Pskovskaya oblast'",
+     "code": "RU-PSK",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Rostovskaya oblast'",
+     "code": "RU-ROS",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Ryazanskaya oblast'",
+     "code": "RU-RYA",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Saha, Respublika",
+     "code": "RU-SA",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Saint Petersburg",
+     "code": "RU-SPE",
+     "type": "Autonomous city",
+     "aliases": [
+      "Sankt-Peterburg"
+     ]
+    },
+    {
+     "name": "Sakhalinskaya oblast'",
+     "code": "RU-SAK",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Samarskaya oblast'",
+     "code": "RU-SAM",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Saratovskaya oblast'",
+     "code": "RU-SAR",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Severnaya Osetiya, Respublika",
+     "code": "RU-SE",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Smolenskaya oblast'",
+     "code": "RU-SMO",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Stavropol'skiy kray",
+     "code": "RU-STA",
+     "type": "Administrative territory",
+     "aliases": []
+    },
+    {
+     "name": "Sverdlovskaya oblast'",
+     "code": "RU-SVE",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Tambovskaya oblast'",
+     "code": "RU-TAM",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Tatarstan, Respublika",
+     "code": "RU-TA",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Tomskaya oblast'",
+     "code": "RU-TOM",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Tul'skaya oblast'",
+     "code": "RU-TUL",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Tverskaya oblast'",
+     "code": "RU-TVE",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Tyumenskaya oblast'",
+     "code": "RU-TYU",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Tyva, Respublika",
+     "code": "RU-TY",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Udmurtskaya Respublika",
+     "code": "RU-UD",
+     "type": "Republic",
+     "aliases": []
+    },
+    {
+     "name": "Ul'yanovskaya oblast'",
+     "code": "RU-ULY",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Vladimirskaya oblast'",
+     "code": "RU-VLA",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Volgogradskaya oblast'",
+     "code": "RU-VGG",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Vologodskaya oblast'",
+     "code": "RU-VLG",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Voronezhskaya oblast'",
+     "code": "RU-VOR",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Yamalo-Nenetskiy avtonomnyy okrug",
+     "code": "RU-YAN",
+     "type": "Autonomous district",
+     "aliases": []
+    },
+    {
+     "name": "Yaroslavskaya oblast'",
+     "code": "RU-YAR",
+     "type": "Administrative region",
+     "aliases": []
+    },
+    {
+     "name": "Yevreyskaya avtonomnaya oblast'",
+     "code": "RU-YEV",
+     "type": "Autonomous region",
+     "aliases": []
+    },
+    {
+     "name": "Zabaykal'skiy kray",
+     "code": "RU-ZAB",
+     "type": "Administrative territory",
+     "aliases": []
+    }
+   ]
+  },
+  "Zimbabwe": {
+   "iso": "ZW",
+   "regions": [
+    {
+     "name": "Bulawayo",
+     "code": "ZW-BU",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Harare",
+     "code": "ZW-HA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Manicaland",
+     "code": "ZW-MA",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Mashonaland Central",
+     "code": "ZW-MC",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Mashonaland East",
+     "code": "ZW-ME",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Mashonaland West",
+     "code": "ZW-MW",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Masvingo",
+     "code": "ZW-MV",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Matabeleland North",
+     "code": "ZW-MN",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Matabeleland South",
+     "code": "ZW-MS",
+     "type": "Province",
+     "aliases": []
+    },
+    {
+     "name": "Midlands",
+     "code": "ZW-MI",
+     "type": "Province",
+     "aliases": []
+    }
+   ]
+  }
+ },
+ "sources": {
+  "lists": "WHO global lists of high burden countries for TB, 2021-2025, and the global TB watchlist (https://www.who.int/news/item/17-06-2021-who-releases-new-global-lists-of-high-burden-countries-for-tb-hiv-associated-tb-and-drug-resistant-tb)",
+  "regions": "ISO 3166-2 first-level subdivisions via pycountry 26.2.16"
+ },
+ "notes": [
+  "Region display names use the English form common in archive records where it differs from ISO; ISO names are kept as aliases.",
+  "ISO 3166-2 can lag administrative reforms (e.g. Viet Nam's 2025 provincial merger is not reflected); older names are the ones archive records use.",
+  "WHO publishes new high-burden lists every five years; update HIGH_BURDEN when the list after 2021-2025 is released."
+ ]
+}

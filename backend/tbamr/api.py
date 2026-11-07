@@ -19,8 +19,11 @@ from pydantic import BaseModel
 from .article import render_article_html
 from .core.decisions import DecisionLog, GuardrailViolation
 from .core.executions import capture_execution
+from .core.geo import country_catalogue, regions_for, resolve_target
 from .core.orchestrator import Orchestrator, PermissionDenied, StageError
 from .llm.client import make_client
+from .stores import cache as cache_module, mongo as mongo_module, results as results_module
+from .stores.cache import CACHE_NAMESPACES
 from .tools.demo import DemoDataTools
 from .tools.ena import DataTools
 
@@ -41,7 +44,7 @@ def _run_label_from_state(orch: Orchestrator) -> str:
     if rep and rep.get("version"):
         return f"Report v{rep['version']}" + (" · final" if st.gates.get("release", {}).get("kind") == "final" else "")
     if st.scope and st.gates.get("scope"):
-        loc = st.country or "worldwide"
+        loc = (f"{st.region}, {st.country}" if st.region else st.country) or "target not set"
         drugs = ", ".join(st.target_drugs or [])
         return f"Scope: {loc}" + (f" · {drugs}" if drugs else "")
     if (st.question or "").strip():
@@ -84,7 +87,8 @@ class Release(Who):
 
 class Scope(BaseModel):
     question: str
-    country: str = ""  # empty = worldwide search
+    country: str = ""  # INSDC country name or "Worldwide"; empty → must be named in the question, else Stage 1 blocks
+    region: str = ""  # optional subnational target inside the country (free text, e.g. "West Java")
     target_drugs: list[str] = ["Rifampicin", "Isoniazid"]
     cohort_target: int = 8
 
@@ -145,9 +149,24 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         st = O().state
         if st.stage_status["1"] != "ready":
             raise HTTPException(409, "The scope can only be edited before the Guardian runs. Use /api/scope/reopen to go back.")
-        st.question, st.country, st.target_drugs, st.cohort_target = s.question, s.country, s.target_drugs, s.cohort_target
+        st.question, st.country, st.region, st.target_drugs, st.cohort_target = s.question, s.country, s.region, s.target_drugs, s.cohort_target
         O().save()
         return {"ok": True}
+
+    @app.get("/api/geo/countries")
+    def geo_countries():
+        """Country options: WHO high-burden TB countries, the WHO watchlist, then all other countries."""
+        return country_catalogue()
+
+    @app.get("/api/geo/regions")
+    def geo_regions(country: str = ""):
+        """First-level regions (provinces, states, ...) for a catalogued country; [] when none are on file."""
+        return {"country": country, "regions": [{"name": r["name"], "type": r.get("type")} for r in regions_for(country)]}
+
+    @app.get("/api/scope/target")
+    def scope_target(question: str = "", country: str = "", region: str = ""):
+        """Resolve the target population the same way Stage 1 will, so the form can show it before running."""
+        return resolve_target(question, country, region)
 
     @app.post("/api/scope/reopen")
     def reopen_scope():
@@ -333,6 +352,52 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         if not row:
             raise HTTPException(404, f"No execution {execution_id}.")
         return row
+
+    # ---- Admin: Mongo + cache -------------------------------------------------
+    # Everything here is best-effort against Mongo; if Mongo is down the endpoints still return 200
+    # with `connected: false` so the admin UI can render a helpful "Mongo not reachable" state.
+    @app.get("/api/admin/mongo")
+    def mongo_status():
+        return mongo_module.status()
+
+    @app.post("/api/admin/mongo/reconnect")
+    def mongo_reconnect():
+        return mongo_module.reconnect()
+
+    @app.get("/api/admin/cache")
+    def cache_overview():
+        return {"mongo": mongo_module.status(), "caches": cache_module.cache.stats()}
+
+    class CacheToggle(BaseModel):
+        enabled: bool
+
+    @app.post("/api/admin/cache/{ns}/toggle")
+    def cache_toggle(ns: str, t: CacheToggle):
+        if ns not in CACHE_NAMESPACES:
+            raise HTTPException(404, f"Unknown cache namespace: {ns!r}")
+        cache_module.cache.set_enabled(ns, t.enabled)
+        return {"ok": True, "namespace": ns, "enabled": t.enabled}
+
+    @app.post("/api/admin/cache/{ns}/clear")
+    def cache_clear(ns: str):
+        if ns not in CACHE_NAMESPACES:
+            raise HTTPException(404, f"Unknown cache namespace: {ns!r}")
+        return {"ok": True, "namespace": ns, "deleted": cache_module.cache.clear(ns)}
+
+    @app.post("/api/admin/cache/clear-all")
+    def cache_clear_all():
+        return {"ok": True, "deleted": cache_module.cache.clear_all()}
+
+    @app.get("/api/admin/results")
+    def results_list(limit: int = 50):
+        return results_module.list_releases(limit=max(1, min(500, int(limit))))
+
+    @app.get("/api/admin/results/{release_id}")
+    def results_load(release_id: str):
+        doc = results_module.load_release(release_id)
+        if not doc:
+            raise HTTPException(404, f"No release {release_id!r} in Mongo (or Mongo is down).")
+        return doc
 
     # serve the built React app if present
     dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"

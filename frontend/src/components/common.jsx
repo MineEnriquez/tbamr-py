@@ -7,6 +7,12 @@ export function Chip({ label, kind }) {
   return <span className={`chip c-${k}`}>{label}</span>
 }
 
+/* A high-contrast badge for the role that must act. Use whenever a sentence says "Only the X can
+ * ...": the badge makes the required-human role immediately legible instead of hiding it in prose. */
+export function RoleBadge({ role, children }) {
+  return <span className={`role-badge r-${role}`}>{children || ROLE_LABEL[role] || role}</span>
+}
+
 export function actorLabel(actor) {
   if (!actor) return ''
   const [type, ...rest] = actor.split(':')

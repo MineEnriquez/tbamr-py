@@ -9,6 +9,8 @@ from typing import Any
 
 import httpx
 
+from ..stores.cache import cache
+
 ENA = "https://www.ebi.ac.uk/ena/portal/api"
 EPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
 RUN_FIELDS = "run_accession,sample_accession,study_accession,country,library_strategy,library_layout,instrument_platform,base_count,fastq_md5"
@@ -21,6 +23,9 @@ class DataTools:
 
     # ---- ENA --------------------------------------------------------------
     def ena_count(self, query: str) -> int:
+        return cache.wrap("ena", {"m": "count", "q": query}, lambda: self._ena_count(query))
+
+    def _ena_count(self, query: str) -> int:
         r = self.http.get(f"{ENA}/count", params={"result": "read_run", "query": query})
         r.raise_for_status()
         txt = r.text.strip().splitlines()
@@ -30,27 +35,30 @@ class DataTools:
             return 0
 
     def ena_search_runs(self, country: str = "", extra_query: str = "", limit: int = 500, page_size: int = 200) -> dict[str, Any]:
+        return cache.wrap(
+            "ena",
+            {"m": "search", "country": country, "extra": extra_query, "limit": limit, "page_size": page_size},
+            lambda: self._ena_search_runs(country, extra_query, limit, page_size),
+        )
+
+    def _ena_search_runs(self, country: str = "", extra_query: str = "", limit: int = 500, page_size: int = 200) -> dict[str, Any]:
         """Search M. tuberculosis read runs, optionally scoped by country. Empty, 'worldwide' or 'global'
-        (case-insensitive) all mean no country filter. Paging past the first batch."""
+        (case-insensitive) all mean no country filter.
+
+        One request with the full limit: the ENA Portal API search endpoint rejects `offset` ("Unsupported
+        param offset", HTTP 400), so paging with offsets made every search larger than one page fail outright.
+        `page_size` is kept for interface compatibility and ignored."""
         query = f'tax_tree({TB_TAXON})'
         if country and country.strip().lower() not in ("worldwide", "global", "any"):
             query += f' AND country="{country}*"'
         if extra_query:
             query += f" AND {extra_query}"
-        rows: list[dict[str, Any]] = []
-        offset = 0
-        while len(rows) < limit:
-            size = min(page_size, limit - len(rows))
-            r = self.http.get(
-                f"{ENA}/search",
-                params={"result": "read_run", "query": query, "fields": RUN_FIELDS, "format": "json", "limit": size, "offset": offset},
-            )
-            r.raise_for_status()
-            batch = r.json() if r.text.strip() else []
-            rows.extend(batch)
-            if len(batch) < size:
-                break
-            offset += size
+        r = self.http.get(
+            f"{ENA}/search",
+            params={"result": "read_run", "query": query, "fields": RUN_FIELDS, "format": "json", "limit": max(0, int(limit))},
+        )
+        r.raise_for_status()
+        rows: list[dict[str, Any]] = r.json() if r.text.strip() else []
         total = None
         try:
             total = self.ena_count(query)
@@ -60,12 +68,18 @@ class DataTools:
 
     def ena_run(self, run_accession: str) -> dict[str, Any] | None:
         """One run's record (same fields as the search)."""
+        return cache.wrap("ena", {"m": "run", "acc": run_accession}, lambda: self._ena_run(run_accession))
+
+    def _ena_run(self, run_accession: str) -> dict[str, Any] | None:
         r = self.http.get(f"{ENA}/search", params={"result": "read_run", "query": f'run_accession="{run_accession}"', "fields": RUN_FIELDS, "format": "json", "limit": 1})
         r.raise_for_status()
         rows = r.json() if r.text.strip() else []
         return rows[0] if rows else None
 
     def ena_study(self, study_accession: str) -> dict[str, Any]:
+        return cache.wrap("ena", {"m": "study", "acc": study_accession}, lambda: self._ena_study(study_accession))
+
+    def _ena_study(self, study_accession: str) -> dict[str, Any]:
         r = self.http.get(
             f"{ENA}/search",
             params={"result": "study", "query": f'study_accession="{study_accession}"', "fields": "study_accession,study_title", "format": "json"},
@@ -75,6 +89,9 @@ class DataTools:
         return rows[0] if rows else {"study_accession": study_accession, "study_title": None}
 
     def ena_file_report(self, run_accession: str) -> dict[str, Any]:
+        return cache.wrap("ena", {"m": "filereport", "acc": run_accession}, lambda: self._ena_file_report(run_accession))
+
+    def _ena_file_report(self, run_accession: str) -> dict[str, Any]:
         r = self.http.get(
             f"{ENA}/filereport",
             params={"accession": run_accession, "result": "read_run", "fields": "run_accession,fastq_ftp,fastq_md5,fastq_bytes", "format": "json"},
@@ -85,6 +102,9 @@ class DataTools:
 
     # ---- Europe PMC ---------------------------------------------------------
     def find_publications(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
+        return cache.wrap("pmc", {"m": "find", "q": query, "limit": limit}, lambda: self._find_publications(query, limit))
+
+    def _find_publications(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
         r = self.http.get(EPMC, params={"query": query, "format": "json", "resultType": "lite", "pageSize": limit})
         r.raise_for_status()
         res = r.json().get("resultList", {}).get("result", [])

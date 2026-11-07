@@ -5,6 +5,7 @@ import Team from './components/Team.jsx'
 import Pipeline from './components/Pipeline.jsx'
 import Samples, { Drawer } from './components/Samples.jsx'
 import Review from './components/Review.jsx'
+import Admin from './components/Admin.jsx'
 import Report from './components/Report.jsx'
 import Insights from './components/Insights.jsx'
 import Logs from './components/Logs.jsx'
@@ -30,7 +31,7 @@ export default function App() {
   const [version, setVersion] = useState(0)
   const [receipts, setReceipts] = useState({})
   const [rawReq, setRawReq] = useState(null)
-  const [theme, setTheme] = useState(load('tbamr.theme') || 'auto')
+  const [theme, setTheme] = useState(load('tbamr.theme') || 'light')
   const [liveTraces, setLiveTraces] = useState([])
   const timer = useRef(null)
   const traceTimer = useRef(null)
@@ -94,7 +95,7 @@ export default function App() {
   if (!snap) return <div className="wrap"><p className="muted">Loading…</p></div>
   const st = snap.state
   const pending = st.samples.flatMap(s => s.findings).filter(f => f.review === 'Pending').length
-  const tabs = [['pipeline', 'Pipeline'], ['review', 'Review queue'], ['samples', 'Samples'], ['report', 'Report'], ['team', 'Agent team'], ['insights', 'Decisions & metrics'], ['logs', 'Logs'], ['about', 'About']]
+  const tabs = [['pipeline', 'Pipeline'], ['review', 'Review queue'], ['samples', 'Samples'], ['report', 'Report'], ['team', 'Agent team'], ['insights', 'Decisions & metrics'], ['logs', 'Logs'], ['admin', 'Admin'], ['about', 'About']]
 
   return (
     <RawCtx.Provider value={raw}>
@@ -132,6 +133,7 @@ export default function App() {
         {tab === 'report' && <Report st={st} act={act} brain={snap.mode.brain} />}
         {tab === 'insights' && <Insights m={metrics} decisions={decisions} />}
         {tab === 'logs' && <Logs version={version} />}
+        {tab === 'admin' && <Admin />}
         {tab === 'about' && <About />}
       </main>
       {sel && <Drawer run={sel} st={st} pending={snap.pending_overrides} act={act} who={who} close={() => setSel(null)} version={version} />}
@@ -143,19 +145,23 @@ export default function App() {
   )
 }
 
-/* Two-state switch for the data mode. Clicking flips demo ↔ live and resets the pipeline.
- * Live mode talks to the real ENA Portal API (and uses Claude if ANTHROPIC_API_KEY is present);
- * demo mode runs offline against simulated DEMO/PRJDEMO accessions. */
+/* Data-mode picker: both options are always visible, the active one is highlighted.
+ * Choosing the other option resets the pipeline.
+ * Live mode talks to the real ENA Portal API; demo mode runs offline against simulated
+ * DEMO/PRJDEMO accessions. */
+const DATA_MODES = [
+  ['demo', 'Demo', 'Simulated DEMO/PRJDEMO accessions, works offline'],
+  ['live', 'Live · ENA', 'Real data from the ENA Portal API (needs internet)'],
+]
 function ModeSwitch({ mode, busy, onSwitch }) {
-  const live = mode === 'live'
-  const next = live ? 'demo' : 'live'
   return (
-    <button type="button" role="switch" aria-checked={live} disabled={busy}
-      className={'mode-switch ' + mode} title={`Click to switch to ${next.toUpperCase()} mode (resets the pipeline)`}
-      onClick={() => onSwitch(next)}>
-      <span className={'mode-track' + (live ? ' on' : '')}><span className="mode-knob" /></span>
-      <span className="mode-label">{live ? 'LIVE DATA · ENA' : 'DEMO DATA (simulated)'}</span>
-    </button>
+    <div className="mode-pick">
+      <span className="lbl" id="data-l">Data</span>
+      <div className={'seg data ' + mode} role="radiogroup" aria-labelledby="data-l">{DATA_MODES.map(([k, l, d]) =>
+        <button key={k} type="button" role="radio" aria-checked={mode === k} aria-selected={mode === k} disabled={busy}
+          title={mode === k ? `${d} (current)` : `${d}. Switching resets the pipeline.`}
+          onClick={() => mode !== k && onSwitch(k)}>{l}</button>)}</div>
+    </div>
   )
 }
 

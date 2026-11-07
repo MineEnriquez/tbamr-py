@@ -17,6 +17,9 @@ export const api = {
   raw: (kind, key, who) => call('GET', `/raw/${encodeURIComponent(kind)}/${encodeURIComponent(key)}`, undefined, who),
   receipts: (who) => call('GET', '/raw/receipts', undefined, who),
   setScope: (s) => call('POST', '/scope', s),
+  geoCountries: () => call('GET', '/geo/countries'),
+  geoRegions: (country) => call('GET', '/geo/regions', undefined, { country }),
+  scopeTarget: (question, country, region) => call('GET', '/scope/target', undefined, { question, country, region }),
   reopenScope: () => call('POST', '/scope/reopen'),
   run: (n) => call('POST', `/stages/${n}/run`),
   gate: (name, who) => call('POST', `/gates/${name}`, who),
@@ -35,4 +38,13 @@ export const api = {
   importFiles: (who, files) => { const fd = new FormData(); [...files].forEach(f => fd.append('files', f)); return call('POST', '/profiling/import', fd, who) },
   runProfiler: (b) => call('POST', '/profiling/run', b),
   reset: (data) => call('POST', '/reset', undefined, { data }),
+  // Admin: Mongo health, cache per-namespace toggle/clear, pipeline-result archive.
+  adminMongo: () => call('GET', '/admin/mongo'),
+  adminMongoReconnect: () => call('POST', '/admin/mongo/reconnect'),
+  adminCache: () => call('GET', '/admin/cache'),
+  adminCacheToggle: (ns, enabled) => call('POST', `/admin/cache/${ns}/toggle`, { enabled }),
+  adminCacheClear: (ns) => call('POST', `/admin/cache/${ns}/clear`),
+  adminCacheClearAll: () => call('POST', '/admin/cache/clear-all'),
+  adminResults: (limit = 50) => call('GET', '/admin/results', undefined, { limit }),
+  adminResult: (id) => call('GET', '/admin/results/' + id),
 }

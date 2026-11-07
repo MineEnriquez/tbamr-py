@@ -68,15 +68,28 @@ class DiscoveryAssistant(LLMAgent):
                 "search_notes": sub.get("search_notes", ""), "concerns": concerns, "total_in_ena": max([t for t in totals if t] or [0])}
 
     def discover(self, country: str, question: str, already_known: list[str] | None = None, focus: str = "",
-                 exclude_studies: list[str] | None = None) -> dict[str, Any]:
-        scope = f"from {country}" if country else "worldwide"
+                 exclude_studies: list[str] | None = None, region: str = "") -> dict[str, Any]:
+        scope = (f"from {region}, {country}" if region else f"from {country}") if country else "worldwide"
         task = (f"Find candidate M. tuberculosis WGS runs ({scope}) for this question: {question}"
                 + (f"\nFollow-up from the Orchestrator: {focus}" if focus else ""))
-        res = self.run(task, {"country": country, "already_known": already_known or [], "focus": focus,
+        if region:
+            task += (f"\nThe target is the region {region}. ENA can only be searched by country, so search {country} and return all "
+                     "candidates; the Verification Tasker checks the region in each run's location field.")
+        res = self.run(task, {"country": country, "region": region, "already_known": already_known or [], "focus": focus,
                              "exclude_studies": exclude_studies or []})
         if not res.get("ok"):
-            self.decide("—", Outcome.ESCALATE, RULES["elig"], f"Discovery did not complete: {res.get('error')}", stage=2)
-            return {"candidate_runs": [], "rows": [], "studies": [], "search_notes": "", "concerns": [res.get("error", "")], "total_in_ena": 0}
+            # The agent stopped without submitting (e.g. it used its step budget). Don't throw away what its searches
+            # found: fall back to every run its tools actually returned, the same guardrail as an empty submission,
+            # so no accession can be invented. Only when the searches themselves returned nothing is the result empty.
+            seen = [r for out in self.called.get("ena_search_runs", []) if isinstance(out, dict) for r in out.get("runs", [])]
+            if seen:
+                why = f"The Discovery agent stopped without submitting ({res.get('error')}); using the {len({r['run_accession'] for r in seen})} run(s) its searches returned."
+                res = {"ok": True, **self.validate({"candidate_runs": [], "studies": [], "search_notes": "Fallback: agent did not submit.",
+                                                    "concerns": [why]}, {"already_known": already_known or []})}
+                self.log.trace(self.name, "fallback", {"reason": why, "candidates": len(res["candidate_runs"])})
+            else:
+                self.decide("—", Outcome.ESCALATE, RULES["elig"], f"Discovery did not complete: {res.get('error')}", stage=2)
+                return {"candidate_runs": [], "rows": [], "studies": [], "search_notes": "", "concerns": [res.get("error", "")], "total_in_ena": 0}
         self.decide("—", Outcome.INFO, RULES["elig"],
                     f"Found {len(res['candidate_runs'])} candidate run(s) in {len(res['studies'])} study(ies). {res['search_notes']}".strip(),
                     evidence="; ".join(res["concerns"]), stage=2)

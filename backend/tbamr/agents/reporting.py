@@ -10,6 +10,7 @@ from collections import Counter
 from typing import Any
 
 from ..core.decisions import Outcome
+from ..core.geo import WORLDWIDE, country_of, place_label
 from ..core.models import RULES, PipelineState
 from ..tools.tbprofiler import DRUG_NAMES
 from .base import RuleAgent
@@ -44,7 +45,12 @@ class ReportingOrchestrator(RuleAgent):
         muts = Counter(f"{f.gene} {f.change}" for f in fx if f.cls != "other").most_common(10)
         lineages = Counter(s.lineage for s in analysed if s.lineage).most_common()
         pending = [f for f in fx if f.review in ("Pending", "Needs more data")]
+        by_place, place_kind, no_region = self._by_place(st, analysed, fx, drugs)
         limitations = [c["text"] for c in st.cohort_checks]
+        if no_region:
+            limitations.append(f"{no_region} of {n} analysed run(s) have no region recorded in ENA; they are listed as \"not recorded\" in the regional breakdown.")
+        if len(by_place) > 1:
+            limitations.append(f"The {place_kind} breakdown shows counts, not rates: public genomes are not sampled evenly across places, so places cannot be compared as prevalence.")
         if not n:
             limitations.append("No TB-Profiler results yet, so there are no resistance predictions.")
         limitations += ["No isolate-matched phenotypic DST is linked unless shown above; missing DST is never counted as agreement.",
@@ -53,6 +59,7 @@ class ReportingOrchestrator(RuleAgent):
             "version": version, "generated_at": time.time(), "rule_version": RULES["rpt"], "superseded": False,
             "counts": {"candidates": len(st.samples), "verified": len(cohort), "qc_passed": len(qc), "analysed": n},
             "drugs": rows, "top_mutations": muts, "lineages": lineages,
+            "target": {"country": st.country, "region": getattr(st, "region", "")}, "by_place": by_place, "place_kind": place_kind,
             "exclusions": [{"run": s.run, "status": s.eligibility if s.eligibility != "Verified" else s.qc, "reason": s.eligibility_note if s.eligibility != "Verified" else s.qc_note}
                            for s in st.samples if s.eligibility != "Verified" or (s.qc and s.qc != "Pass")],
             "unresolved": [{"run": f.sample_id, "variant": f"{f.gene} {f.change}", "drug": f.drug, "review": f.review, "reason": f.reason} for f in pending],
@@ -63,6 +70,23 @@ class ReportingOrchestrator(RuleAgent):
         }
         self.decide("—", Outcome.INFO, RULES["rpt"], f"Draft report v{version} assembled: {n} analysed of {len(cohort)} verified; {len(pending)} unresolved finding(s).", stage=6)
         return report
+
+    @staticmethod
+    def _by_place(st: PipelineState, analysed: list, fx: list, drugs: list[str]) -> tuple[list[dict[str, Any]], str, int]:
+        """Counts per place: per country for worldwide scope, otherwise per region (the catalogued region the ENA
+        location names, e.g. "Bandung, West Java" -> "West Java"; uncatalogued text is shown as recorded)."""
+        worldwide = st.country == WORLDWIDE
+        kind = "country" if worldwide else "region"
+        pred = {(f.sample_id, f.drug) for f in fx if f.cls == "tech" and f.review != "Not supported"}
+        groups: dict[str, list] = {}
+        for s in analysed:
+            key = (country_of(s.country) if worldwide else place_label(s.country, st.country)) or "not recorded"
+            groups.setdefault(key, []).append(s)
+        rows = [{"place": k, "n": len(v), "resistant": {d: sum((s.run, d) in pred for s in v) for d in drugs}}
+                for k, v in groups.items()]
+        rows.sort(key=lambda r: (r["place"] == "not recorded", -r["n"], r["place"]))
+        no_region = 0 if worldwide else len(groups.get("not recorded", []))
+        return rows, kind, no_region
 
     def draft_summary(self, report: dict[str, Any]) -> str:
         brief = {k: report[k] for k in ("counts", "drugs", "top_mutations", "lineages", "limitations")}

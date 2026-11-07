@@ -61,6 +61,7 @@ export default function Report({ st, act, brain }) {
         <div className="tw"><table><thead><tr><th>Drug</th><th className="num">Predicted resistant</th><th className="num">Uncertain / pending</th><th className="num">Reviewed</th><th className="num">Matched DST</th><th className="num">Concordance</th></tr></thead><tbody>
           {r.drugs.map(d => <tr key={d.drug}><td>{d.name}</td><td className="num">{d.predicted_resistant} / {d.n}</td><td className="num">{d.uncertain_or_pending}</td><td className="num">{d.reviewed}</td><td className="num">{d.dst_n} / {d.n}</td><td className="num">{d.dst_n ? `${d.concordant} / ${d.dst_n}` : 'n/a'}</td></tr>)}
         </tbody></table></div></div>
+      {r.by_place?.length > 0 && <ByPlace r={r} />}
       <div className="grid2" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))' }}>
         <div className="box"><h3>Most frequent mutations</h3>{r.top_mutations.length ? <ul className="clean">{r.top_mutations.map(([k, v]) => <li key={k}><span className="mono">{k}</span> — {v}</li>)}</ul> : <p className="muted">None yet.</p>}</div>
         <div className="box"><h3>Lineages</h3>{r.lineages.length ? <ul className="clean">{r.lineages.map(([k, v]) => <li key={k}><span className="mono">{k}</span> — {v}</li>)}</ul> : <p className="muted">None yet.</p>}</div>
@@ -72,5 +73,18 @@ export default function Report({ st, act, brain }) {
         {!r.exclusions.length && <tr><td colSpan={3} className="muted">None</td></tr>}</tbody></table></div></div>
       <dl className="kv box"><dt>Tools</dt><dd>{r.provenance.tools.join(', ') || '—'}</dd><dt>Databases</dt><dd>{r.provenance.databases.join(', ') || '—'}</dd><dt>Rules</dt><dd className="mono">{Object.values(r.provenance.rules).join(' · ')}</dd></dl>
     </section>
+  )
+}
+
+/* Counts per region (country-scoped) or per country (worldwide). Columns: RIF, INH, then any other
+ * drug with at least one predicted-resistant run. Counts only: places are not sampled evenly. */
+function ByPlace({ r }) {
+  const shown = r.drugs.filter(d => ['RIF', 'INH'].includes(d.drug) || r.by_place.some(p => p.resistant[d.drug] > 0))
+  const kind = r.place_kind === 'country' ? 'country' : 'region'
+  return (
+    <div><h3>Predicted resistant by {kind} <span className="muted" style={{ fontWeight: 400 }}>(counts of analysed runs; not rates)</span></h3>
+      <div className="tw"><table><thead><tr><th>{kind === 'country' ? 'Country' : 'Region (as recorded in ENA)'}</th><th className="num">Analysed</th>{shown.map(d => <th key={d.drug} className="num" title={d.name}>{d.drug}</th>)}</tr></thead><tbody>
+        {r.by_place.map(p => <tr key={p.place}><td className={p.place === 'not recorded' ? 'muted' : ''}>{p.place}</td><td className="num">{p.n}</td>{shown.map(d => <td key={d.drug} className="num">{p.resistant[d.drug] || 0}</td>)}</tr>)}
+      </tbody></table></div></div>
   )
 }
