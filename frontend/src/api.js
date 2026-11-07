@@ -31,6 +31,7 @@ export const api = {
   release: (b) => call('POST', '/release', b),
   summary: () => call('POST', '/report/summary'),
   saveSummary: (text) => call('PUT', '/report/summary', { text }),
+  reports: () => call('GET', '/reports'),
   executions: (limit = 100, runId) => call('GET', '/executions', undefined,
     runId != null ? { limit, run_id: runId } : { limit }),
   execution: (id) => call('GET', '/executions/' + id),

@@ -13,15 +13,23 @@ from ..core.geo import resolve_target
 from ..core.models import RULES
 from .base import LLMAgent
 
+# The playbook's four required definitions, worded as the rules in this codebase actually apply them.
+# These texts are what the PI approves, so they must change whenever the rules change (tests pin them).
 REQUIRED_GAPS = [
-    ("verified_origin", '"Verified geographic origin" is not defined.',
-     "If the researcher scoped the search to a country or region, Verified only when the ENA/BioSample country field names it. Worldwide searches: origin is informational, not a verification gate. Origin stated only in a publication → Hold for human confirmation."),
-    ("missing_dst", "No policy for samples without matched phenotypic DST.",
-     'Keep them in the cohort; record DST as "unavailable". Never count missing DST as agreement or disagreement.'),
-    ("duplicates", "No rule for repeated isolates (several runs from one sample).",
-     "Runs that share a BioSample accession → Hold + Escalate as possible duplicates; one run per isolate in the primary cohort."),
-    ("out_of_bounds", "Out-of-bounds conclusions are not stated.",
-     "No prevalence estimates, no clinical treatment advice, no new-mutation claims. Reports stay exploratory until reviewed."),
+    ("verified_origin", "Verified geographic origin",
+     "Scoped to a country: a run is Verified only when its ENA country field names that country; another country is "
+     "Excluded; a missing country is put on Hold for a person (a linked publication can inform that decision but never "
+     "verifies a run). Scoped to a region: the ENA location must also name the region, otherwise Hold. Worldwide: origin "
+     "is recorded but does not gate verification."),
+    ("missing_dst", "Samples without matched phenotypic DST",
+     'Kept in the cohort with DST recorded as "unavailable". Missing DST is never counted as agreement or disagreement; '
+     "concordance is reported only over runs that have DST."),
+    ("duplicates", "Repeated isolates (several runs from one BioSample)",
+     "The first run seen for a BioSample is kept. Each later run sharing it is checked by the Verification agent: Excluded "
+     "as a repeated isolate when the agent confirms it, otherwise put on Hold for a person. One run per isolate."),
+    ("out_of_bounds", "Out-of-bounds conclusions",
+     "No prevalence or incidence estimates, no clinical or treatment advice, no new-mutation claims. Regional figures are "
+     "counts, not rates. Reports stay exploratory until reviewed."),
 ]
 
 
@@ -34,7 +42,9 @@ class ScopeGuardian(LLMAgent):
         "The target population has already been resolved by rule and is given as `target` in the context: either one "
         "country (optionally one subnational region inside it), or worldwide because the researcher asked for it explicitly. "
         "Never widen or change it. If the target "
-        "has a `problem`, it is already blocking. Propose concrete definitions for the playbook's policy gaps, and warn about parts "
+        "has a `problem`, it is already blocking. The four playbook definitions are fixed by the pipeline's rules (given as "
+        "`required_policy_gaps` with their applied text); you may add a suggestion for any of them, but it is shown as a "
+        "suggestion and not applied. Warn about parts "
         "of the question that public genomes may not support (prevalence, clinical use, comparisons across places). "
         "You propose; the researcher approves."
     )
@@ -51,11 +61,21 @@ class ScopeGuardian(LLMAgent):
     }
 
     def validate(self, sub: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
-        gaps = list(sub.get("gaps") or [])
-        keys = {g.get("key") for g in gaps}
-        for key, gap, proposal in REQUIRED_GAPS:  # never let a required definition disappear
-            if key not in keys:
-                gaps.append({"key": key, "gap": gap, "proposal": proposal, "added_by": "guardrail"})
+        # Guardrail: the applied definitions always come from the rules, never from the model. The model's own wording
+        # is kept as a suggestion (shown, not applied) when it says something different.
+        proposed = {g.get("key"): g for g in (sub.get("gaps") or []) if isinstance(g, dict)}
+        gaps = []
+        for key, gap, applied in REQUIRED_GAPS:
+            m = proposed.pop(key, None) or {}
+            text = str(m.get("proposal") or "").strip()
+            g = {"key": key, "gap": gap, "proposal": applied, "applied": True}
+            if text and text != applied:
+                g["suggestion"] = text
+            gaps.append(g)
+        for g in proposed.values():  # extra gaps the model raised: suggestions only
+            if str(g.get("proposal") or g.get("gap") or "").strip():
+                gaps.append({"key": g.get("key") or "other", "gap": g.get("gap") or "Other", "proposal": "", "applied": False,
+                             "suggestion": str(g.get("proposal") or "").strip()})
         blocking = list(sub.get("blocking") or [])
         if not str(ctx.get("question", "")).strip():
             blocking.append("Research question is empty.")
@@ -75,10 +95,10 @@ class ScopeGuardian(LLMAgent):
     def review(self, question: str, country: str, target_drugs: list[str], cohort_target: int, region: str = "") -> dict[str, Any]:
         target = resolve_target(question, country, region)
         ctx = {"question": question, "country": country, "region": region, "target": target, "target_drugs": target_drugs, "cohort_target": cohort_target,
-               "required_policy_gaps": [{"key": k, "gap": g} for k, g, _ in REQUIRED_GAPS]}
+               "required_policy_gaps": [{"key": k, "gap": g, "applied": p} for k, g, p in REQUIRED_GAPS]}
         res = self.run("Review this research scope and submit your assessment.", ctx)
         if not res.get("ok"):
-            res = {"blocking": [target["problem"]] if target["problem"] else [], "gaps": [{"key": k, "gap": g, "proposal": p} for k, g, p in REQUIRED_GAPS],
+            res = {"blocking": [target["problem"]] if target["problem"] else [], "gaps": [{"key": k, "gap": g, "proposal": p, "applied": True} for k, g, p in REQUIRED_GAPS],
                    "warnings": ([target["notice"]] if target.get("notice") else []) + ["The Guardian could not complete its review; a human should check the scope."], "asks_comparison_across_places": False,
                    "target": target}
         self.log.put_raw("scope", "guardian", {"input": ctx, "result": res, "brain": self.client.mode})
@@ -87,6 +107,6 @@ class ScopeGuardian(LLMAgent):
         where = (f"Target population: {place} (from the {target['source']})." if not target["problem"]
                  else f"Target population unclear: {target['problem']}")
         self.decide("SCOPE", outcome, RULES["scope"],
-                    f"{where} {len(res['blocking'])} blocking gap(s); {len(res['gaps'])} definitions proposed; {len(res['warnings'])} warning(s). Researcher approval needed.",
+                    f"{where} {len(res['blocking'])} blocking gap(s); {len(res['gaps'])} definitions applied by rule; {len(res['warnings'])} warning(s). Researcher approval needed.",
                     stage=1)
         return res

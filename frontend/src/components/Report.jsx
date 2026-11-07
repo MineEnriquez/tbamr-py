@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import { api } from '../api.js'
-import { Chip } from './common.jsx'
+import { Chip, fmtTime } from './common.jsx'
 import { RawLink } from './Raw.jsx'
 
 marked.setOptions({ breaks: true, gfm: true })
@@ -36,6 +36,35 @@ function Summary({ r, act }) {
   )
 }
 
+function History({ currentVersion }) {
+  const [rows, setRows] = useState(null)
+  const [err, setErr] = useState(null)
+  const [open, setOpen] = useState(false)
+  const load = () => { setErr(null); api.reports().then(setRows).catch(e => setErr(e.message)) }
+  useEffect(() => { if (open && rows === null) load() }, [open])
+  useEffect(() => { if (open) load() }, [currentVersion])
+  const past = (rows || []).filter(r => String(r.version) !== String(currentVersion))
+  return (
+    <details className="box" open={open} onToggle={e => setOpen(e.target.open)}>
+      <summary><b>Report history</b> <span className="muted" style={{ fontWeight: 400 }}>· every version persisted in the database</span></summary>
+      {err && <p className="esc">{err}</p>}
+      {rows === null && !err && <p className="muted">Loading…</p>}
+      {rows && !past.length && <p className="muted">No earlier versions yet — only the current one is saved.</p>}
+      {rows && past.length > 0 && <div className="tw"><table><thead><tr><th>Version</th><th>Saved</th><th>Rule</th><th className="num">Candidates</th><th className="num">Analysed</th><th>Status</th><th></th></tr></thead><tbody>
+        {past.map(r => <tr key={r.version}>
+          <td className="mono">v{r.version}</td>
+          <td>{fmtTime(r.ts)}</td>
+          <td className="mono">{r.rule_version || '—'}</td>
+          <td className="num">{r.counts?.candidates ?? '—'}</td>
+          <td className="num">{r.counts?.analysed ?? '—'}</td>
+          <td>{r.superseded ? <Chip label="Superseded" kind="Pending" /> : <Chip label="Historic" />}</td>
+          <td><RawLink kind="report" k={String(r.version)} label="Open" /></td>
+        </tr>)}
+      </tbody></table></div>}
+    </details>
+  )
+}
+
 export default function Report({ st, act, brain }) {
   const r = st.report
   if (!r) return <div className="panel"><p className="muted">The report is assembled in Stage 6. Every number is computed by rule from the decision records.</p></div>
@@ -56,6 +85,7 @@ export default function Report({ st, act, brain }) {
       {r.superseded && <div className="box esc"><p><b>Superseded.</b> Something changed after this version; regenerate it in Stage 6.</p></div>}
       <div className="box note"><p>Computational predictions from public genomes: not laboratory-confirmed susceptibility, not a national prevalence estimate.</p></div>
       <Summary r={r} act={act} />
+      <History currentVersion={r.version} />
       <div><h3>Sample counts</h3>{bar('Total candidates', c.candidates)}{bar('Verified eligible', c.verified)}{bar('Quality Control-passed', c.qc_passed)}{bar('Profiled & evaluated', c.analysed, true)}</div>
       <div><h3>Resistance evidence by drug <span className="muted" style={{ fontWeight: 400 }}>(n = {c.analysed})</span></h3>
         <div className="tw"><table><thead><tr><th>Drug</th><th className="num">Predicted resistant</th><th className="num">Uncertain / pending</th><th className="num">Reviewed</th><th className="num">Matched DST</th><th className="num">Concordance</th></tr></thead><tbody>

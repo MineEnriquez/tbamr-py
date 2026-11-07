@@ -70,13 +70,9 @@ def scope_guardian(messages):
     places = bool(PLACES.search(q))
     if places:
         warnings.append("The question compares places; that needs verified isolates from several locations, which will be checked after discovery.")
-    gaps = [{"key": g["key"], "gap": g["gap"], "proposal": p} for g, p in zip(c.get("required_policy_gaps", []), [
-        "Verified only if the ENA/BioSample country field names the study country; publication-only origin → Hold for human confirmation.",
-        'Keep samples without DST; record DST as "unavailable", never as agreement.',
-        "Runs sharing a BioSample → Hold + Escalate as possible duplicates; one run per isolate.",
-        "No prevalence estimates, clinical advice or new-mutation claims; reports exploratory until reviewed.",
-    ])]
-    return [think(f"Read the question ({len(q)} characters) and {len(c.get('target_drugs', []))} target drug(s). Proposing the four playbook definitions; {len(warnings)} warning(s)."),
+    # The definitions are fixed by the pipeline's rules; the scripted agent accepts them as given.
+    gaps = [{"key": g["key"], "gap": g["gap"], "proposal": g.get("applied", "")} for g in c.get("required_policy_gaps", [])]
+    return [think(f"Read the question ({len(q)} characters) and {len(c.get('target_drugs', []))} target drug(s). Accepting the four playbook definitions as the rules apply them; {len(warnings)} warning(s)."),
             use("submit", blocking=[], gaps=gaps, warnings=warnings, asks_comparison_across_places=places)]
 
 
