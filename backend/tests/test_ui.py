@@ -43,24 +43,22 @@ def test_landing_defaults_to_the_start_hero(page, live_server, reset_demo):
 
 
 def test_mode_switch_toggles_demo_to_live_and_back(page, live_server, reset_demo):
-    """Clicking the data-mode toggle in the banner must flip the backend mode AND the UI label.
-    This is the exact UX the user reported as 'not working'; failing here would prove the symptom."""
+    """The Data picker in the banner shows Demo and Live side by side; choosing one must flip the backend mode
+    and move the selection."""
     page.on("dialog", lambda d: d.accept())  # auto-accept the "This resets the pipeline" confirm
     page.goto(f"{live_server}/", wait_until="networkidle")
-    switch = page.locator('button[role="switch"]')
-    assert switch.count() == 1, "mode switch should be rendered exactly once in the banner"
-    assert switch.get_attribute("aria-checked") == "false"
-    assert "DEMO" in switch.inner_text()
+    group = page.locator('[role="radiogroup"][aria-labelledby="data-l"]')
+    assert group.count() == 1, "data-mode picker should be rendered exactly once in the banner"
+    demo, live = group.get_by_role("radio", name="Demo"), group.get_by_role("radio", name="Live · ENA")
+    assert demo.get_attribute("aria-checked") == "true" and live.get_attribute("aria-checked") == "false"
 
-    switch.click()
-    page.wait_for_function("document.querySelector('button[role=switch]').getAttribute('aria-checked') === 'true'", timeout=5000)
+    live.click()
+    page.wait_for_function("document.querySelector('[aria-labelledby=data-l] [aria-checked=true]').textContent.startsWith('Live')", timeout=5000)
     assert _backend_mode(live_server) == "live"
-    assert "LIVE" in switch.inner_text()
 
-    switch.click()
-    page.wait_for_function("document.querySelector('button[role=switch]').getAttribute('aria-checked') === 'false'", timeout=5000)
+    demo.click()
+    page.wait_for_function("document.querySelector('[aria-labelledby=data-l] [aria-checked=true]').textContent === 'Demo'", timeout=5000)
     assert _backend_mode(live_server) == "demo"
-    assert "DEMO" in switch.inner_text()
 
 
 def test_scope_conflict_blocks_save_and_run(page, live_server, reset_demo):

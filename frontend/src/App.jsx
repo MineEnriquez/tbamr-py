@@ -145,19 +145,23 @@ export default function App() {
   )
 }
 
-/* Two-state switch for the data mode. Clicking flips demo ↔ live and resets the pipeline.
- * Live mode talks to the real ENA Portal API (and uses Claude if ANTHROPIC_API_KEY is present);
- * demo mode runs offline against simulated DEMO/PRJDEMO accessions. */
+/* Data-mode picker: both options are always visible, the active one is highlighted.
+ * Choosing the other option resets the pipeline.
+ * Live mode talks to the real ENA Portal API; demo mode runs offline against simulated
+ * DEMO/PRJDEMO accessions. */
+const DATA_MODES = [
+  ['demo', 'Demo', 'Simulated DEMO/PRJDEMO accessions, works offline'],
+  ['live', 'Live · ENA', 'Real data from the ENA Portal API (needs internet)'],
+]
 function ModeSwitch({ mode, busy, onSwitch }) {
-  const live = mode === 'live'
-  const next = live ? 'demo' : 'live'
   return (
-    <button type="button" role="switch" aria-checked={live} disabled={busy}
-      className={'mode-switch ' + mode} title={`Click to switch to ${next.toUpperCase()} mode (resets the pipeline)`}
-      onClick={() => onSwitch(next)}>
-      <span className={'mode-track' + (live ? ' on' : '')}><span className="mode-knob" /></span>
-      <span className="mode-label">{live ? 'LIVE DATA · ENA' : 'DEMO DATA (simulated)'}</span>
-    </button>
+    <div className="mode-pick">
+      <span className="lbl" id="data-l">Data</span>
+      <div className={'seg data ' + mode} role="radiogroup" aria-labelledby="data-l">{DATA_MODES.map(([k, l, d]) =>
+        <button key={k} type="button" role="radio" aria-checked={mode === k} aria-selected={mode === k} disabled={busy}
+          title={mode === k ? `${d} (current)` : `${d}. Switching resets the pipeline.`}
+          onClick={() => mode !== k && onSwitch(k)}>{l}</button>)}</div>
+    </div>
   )
 }
 

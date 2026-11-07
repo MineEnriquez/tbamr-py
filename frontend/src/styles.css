@@ -76,17 +76,15 @@ textarea{width:100%;min-height:56px;resize:vertical}
 .switch-small input::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:transform .12s}
 .switch-small input:checked::after{transform:translateX(12px)}
 .switch-small input:disabled{opacity:.5;cursor:not-allowed}
-/* Data-mode switch: flips demo ↔ live and resets the pipeline. Styled like a toggle so the state is unambiguous. */
-.mode-switch{display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;cursor:pointer;padding:0;font:inherit;color:inherit}
-.mode-switch:disabled{opacity:.55;cursor:not-allowed}
-.mode-switch .mode-track{width:34px;height:18px;border-radius:999px;background:color-mix(in srgb,var(--accent) 60%,transparent);position:relative;transition:background .15s}
-.mode-switch .mode-track.on{background:color-mix(in srgb,var(--ok) 70%,transparent)}
-.mode-switch .mode-knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
-.mode-switch .mode-track.on .mode-knob{transform:translateX(16px)}
-.mode-switch .mode-label{font-weight:700}
-.mode-switch.demo .mode-label{color:var(--accent)}
-.mode-switch.live .mode-label{color:var(--ok)}
-.mode-switch:not(:disabled):hover .mode-track{filter:brightness(1.05)}
+/* Data-mode picker (demo | live): segmented control so both options are always visible. */
+.mode-pick{display:inline-flex;align-items:center;gap:8px}
+.mode-pick .lbl{font-size:.72rem;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.seg.data button{font-weight:600}
+.seg.data button[aria-selected=true]{cursor:default}
+.seg.data.demo button[aria-selected=true]{background:var(--accent)}
+.seg.data.live button[aria-selected=true]{background:var(--ok)}
+.seg.data button:disabled{opacity:.55;cursor:not-allowed}
+.seg.data button:not([aria-selected=true]):not(:disabled):hover{background:var(--surface-2)}
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
 .tabs button{border:0;background:transparent;padding:9px 14px;font-family:var(--f-display);font-weight:600;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;cursor:pointer}
 .tabs button:hover{color:var(--ink)}
