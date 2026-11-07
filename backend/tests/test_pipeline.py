@@ -714,3 +714,11 @@ def test_tests_never_reach_the_real_claude_api(tmp_path):
     assert c.post("/api/reset", params={"data": "demo"}).status_code == 200
     assert c.get("/api/state").json()["mode"]["brain"] == "replay"
 
+
+
+def test_admin_cache_toggle_accepts_a_json_body(tmp_path):
+    """The Admin tab's per-namespace cache switch sends {"enabled": bool}; it used to be rejected with 422."""
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "c.db"))))
+    r = c.post("/api/admin/cache/claude/toggle", json={"enabled": False})
+    assert r.status_code == 200 and r.json() == {"ok": True, "namespace": "claude", "enabled": False}
+    assert c.post("/api/admin/cache/nope/toggle", json={"enabled": True}).status_code == 404

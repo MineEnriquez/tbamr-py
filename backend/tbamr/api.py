@@ -58,6 +58,10 @@ class Who(BaseModel):
     person: str = ""
 
 
+class CacheToggle(BaseModel):
+    enabled: bool
+
+
 class Resolve(Who):
     run: str
     decision: str
@@ -371,9 +375,6 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
     @app.get("/api/admin/cache")
     def cache_overview():
         return {"mongo": mongo_module.status(), "caches": cache_module.cache.stats()}
-
-    class CacheToggle(BaseModel):
-        enabled: bool
 
     @app.post("/api/admin/cache/{ns}/toggle")
     def cache_toggle(ns: str, t: CacheToggle):
