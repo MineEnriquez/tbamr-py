@@ -580,3 +580,19 @@ def test_resets_never_touch_databases_in_the_working_directory(tmp_path, monkeyp
         assert c.post("/api/reset", params={"data": mode}).status_code == 200
     assert not list(tmp_path.glob("tbamr-*.db")), "a reset opened a database in the working directory"
     assert os.environ["TBAMR_DB"].startswith(tempfile.gettempdir())
+
+
+def test_release_is_archived_after_it_is_recorded(orch, monkeypatch):
+    """Regression for #19: the Mongo archive must see the release decision already in the log."""
+    import tbamr.stores.results as results
+    seen = {}
+
+    def fake_save(state, report, gate):
+        seen["logged"] = any(d["outcome"] == "Approve" and "report v" in d["rationale"] for d in orch.log.all())
+        seen["gate"] = dict(state.gates.get("release", {}))
+
+    monkeypatch.setattr(results, "save_release", fake_save)
+    run_to_report(orch)
+    orch.raw_view("report", str(orch.state.report["version"]), "pi", "Ana")
+    orch.release("pi", "Ana", "draft")
+    assert seen == {"logged": True, "gate": {"by": "Ana", "role": "pi", "kind": "draft", "version": orch.state.report["version"]}}
