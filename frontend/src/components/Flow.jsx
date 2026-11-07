@@ -11,7 +11,7 @@ const GATE = {
   5: ['Review findings', 'tbexpert'],
   6: ['Release report', 'pi'],
 }
-const STATUS = { locked: 'locked', ready: 'ready', wait: 'needs you', done: 'done' }
+const STATUS = { locked: 'locked', ready: 'ready', wait: 'in progress', done: 'done' }
 const ICONS = { 1: '🎯', 2: '🔍', 3: '🧫', 4: '🧬', 5: '⚖️', 6: '📄' }
 const SHORT = { scope_guardian: 'Scope Guardian', discovery: 'Discovery', verification: 'Verification', qc: 'Quality Control', profiling: 'Profiling', evidence: 'Evidence Analyst', reporting: 'Reporting' }
 
@@ -65,7 +65,7 @@ export default function Flow({ snap, team, view, onPick, pending }) {
       </div>
       <div className="flegend">
         <span className="sw"><i className="s-done" /><span>done</span></span>
-        <span className="sw"><i className="s-wait" /><span>needs you</span></span>
+        <span className="sw"><i className="s-wait" /><span>in progress</span></span>
         <span className="sw"><i className="s-ready" /><span>ready</span></span>
         <span className="sw"><i className="s-locked" /><span>locked</span></span>
       </div>
