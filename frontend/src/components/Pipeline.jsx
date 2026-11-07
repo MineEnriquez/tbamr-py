@@ -159,7 +159,10 @@ export default function Pipeline({ snap, decisions, view, setView, act, who, bus
   const st = snap.state
   // view===0 is the Start hero (research question gets full width + big typography); views 1-6 are
   // the regular stages, which share the panel with the Live decisions feed.
-  if (view === 0) return <StartHero snap={snap} act={act} who={who} busy={busy} setView={setView} />
+  // key: the form copies the saved scope into local state when it mounts, so remount it whenever the saved
+  // scope changes (e.g. after adopting the Guardian's wording) or it would show, and could re-save, stale text.
+  const scopeKey = st => [st.stage_status['1'], st.question, st.country, st.region || '', st.cohort_target].join('|')
+  if (view === 0) return <StartHero key={scopeKey(snap.state)} snap={snap} act={act} who={who} busy={busy} setView={setView} />
   return (
     <div className="grid2">
       <Stage n={view} snap={snap} act={act} who={who} busy={busy} openSample={openSample} />
@@ -262,7 +265,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       <div className="tools">{agents.map(a => <span className="tool" key={a}>{a.replace(/_/g, ' ')}</span>)}</div>
       {busy && <div className="working" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span>Working on <b>{busy}</b>… agents are reasoning and calling tools; watch the Agent team tab for live traces.</span></div>}
       {status === 'locked' && <div className="box note"><p className="muted">This stage unlocks when the previous stage's human gate is passed.</p></div>}
-      {n === 1 && <S1 st={st} status={status} act={act} who={who} onDirtyChange={setScopeDirty} onBlockedChange={setScopeBlocked} />}
+      {n === 1 && <S1 key={[status, st.question, st.country, st.region || '', st.cohort_target].join('|')} st={st} status={status} act={act} who={who} onDirtyChange={setScopeDirty} onBlockedChange={setScopeBlocked} />}
       {n === 2 && status === 'ready' && (
         <div className="box note">
           <p><b>Run agents</b> will hand the pipeline to <b>two</b> Claude-powered agents in sequence:</p>
