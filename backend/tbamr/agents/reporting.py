@@ -89,6 +89,8 @@ class ReportingOrchestrator(RuleAgent):
                            "databases": sorted({str(s.profile_meta.get("db")) for s in analysed if s.profile_meta.get("db")}), "rules": RULES},
             "resistance_definition": RESISTANCE_DEFINITION,
             "catalogue_consistent": True,
+            "scope_warnings": [{"warning": w, **({k: v for k, v in (st.scope.get("responses") or {}).get(str(i), {}).items() if k != "ts"})}
+                               for i, w in enumerate(st.scope.get("warnings") or [])],
             "gates": st.gates, "summary_draft": None,
         }
         dbs = report["provenance"]["databases"]

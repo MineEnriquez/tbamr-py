@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import threading
+import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -228,7 +229,8 @@ class Orchestrator:
     def _s1(self):
         st = self.state
         self.orch("—", Outcome.INFO, RULES["scope"], "Handing the research scope to the Scope Guardian.", 1)
-        st.scope = self.agents["scope_guardian"].review(st.question, st.country, st.target_drugs, st.cohort_target, st.region)
+        st.scope = self.agents["scope_guardian"].review(st.question, st.country, st.target_drugs, st.cohort_target, st.region,
+                                                         revision_rounds=st.revision_rounds)
         target = st.scope.get("target") or {}
         if target.get("country") and not target.get("problem"):
             st.country = target["country"]  # canonical INSDC name or "Worldwide"; downstream agents read st.country
@@ -326,11 +328,51 @@ class Orchestrator:
 
     # ------------------------------------------------------------------ human gates
     @logged("tbamr.orchestrator")
+    def respond_warning(self, role: str, person: str, idx: int, decision: str, rationale: str = "") -> None:
+        """The PI's response to one Scope Guardian warning: accept the limit, or disagree with a rationale."""
+        with self.lock:
+            self.require(role, GATES["scope"])
+            if self._status(1) != "wait":
+                raise StageError("Warnings can only be answered while the scope is awaiting approval.")
+            warnings = self.state.scope.get("warnings") or []
+            if not 0 <= idx < len(warnings):
+                raise StageError("No such warning.")
+            if decision not in ("accept", "disagree"):
+                raise StageError("Choose Accept or Disagree.")
+            if decision == "disagree" and not rationale.strip():
+                raise StageError("Say why the warning does not apply.")
+            self.state.scope.setdefault("responses", {})[str(idx)] = {
+                "decision": decision, "rationale": rationale.strip(), "role": role, "person": person, "ts": time.time()}
+            verb = "accepted" if decision == "accept" else "disputed"
+            self.human(role, person, f"WARNING-{idx + 1}", Outcome.APPROVE if decision == "accept" else Outcome.OVERRIDE, RULES["scope"],
+                       f"Scope warning {idx + 1} {verb}: {warnings[idx][:200]}" + (f" | Rationale: {rationale.strip()}" if rationale.strip() else ""), 1)
+            self.save()
+
+    def adopt_revised_question(self, role: str, person: str) -> str:
+        """Replace the question with the Guardian's revised wording and reopen the scope for a new review round."""
+        with self.lock:
+            self.require(role, GATES["scope"])
+            if self._status(1) != "wait":
+                raise StageError("The revised wording can only be adopted while the scope is awaiting approval.")
+            revised = (self.state.scope or {}).get("revised_question") or ""
+            if not revised:
+                raise StageError("The Scope Guardian did not propose a revised question.")
+            old = self.state.question
+            self.human(role, person, "SCOPE", Outcome.OVERRIDE, RULES["scope"],
+                       f"Research question revised to the Scope Guardian's wording. Before: {old} | After: {revised}", 1)
+            self.state.question = revised
+            self.state.revision_rounds += 1
+        self.reopen_scope()
+        return revised
+
     def approve_scope(self, role: str, person: str) -> None:
         with self.lock:
             self.require(role, GATES["scope"])
             if self._status(1) != "wait":
                 raise StageError("The scope has not been reviewed yet.")
+            unanswered = [i + 1 for i in range(len(self.state.scope.get("warnings") or [])) if str(i) not in (self.state.scope.get("responses") or {})]
+            if unanswered:
+                raise StageError(f"Respond to every Scope Guardian warning first (still open: {', '.join(map(str, unanswered))}).")
             if self.state.scope.get("blocking"):
                 raise StageError("Fix the blocking gaps first.")
             ev = self.note_raw(role, person, "scope", "guardian", "the Scope Guardian's result")

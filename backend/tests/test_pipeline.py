@@ -27,8 +27,14 @@ def orch(tmp_path):
     return o
 
 
+def answer_warnings(o, decision="accept"):
+    """The PI answers every Scope Guardian warning (required before the scope can be approved)."""
+    for i in range(len(o.state.scope.get("warnings") or [])):
+        o.respond_warning("pi", "Ana", i, decision, "Accepted for this test.")
+
+
 def run_to_report(o):
-    o.run_stage(1); o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.run_stage(1); o.raw_view("scope", "guardian", "pi", "Ana"); answer_warnings(o); o.approve_scope("pi", "Ana")
     o.run_stage(2); o.raw_view("cohort", "all", "pi", "Ana"); o.approve_cohort("pi", "Ana")
     o.run_stage(3); o.raw_view("qc", "all", "analyst", "Budi"); o.confirm_qc("analyst", "Budi")
     o.run_stage(4); o.raw_view("profiling", "all", "analyst", "Budi"); o.close_profiling("analyst", "Budi")
@@ -158,7 +164,7 @@ def test_orchestrator_replans_when_cohort_cannot_answer(tmp_path):
     o.state.question = "Are there differences in resistance across regions of Indonesia?"
     o.run_stage(1)
     assert o.state.scope["asks_comparison_across_places"] is True
-    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.raw_view("scope", "guardian", "pi", "Ana"); answer_warnings(o); o.approve_scope("pi", "Ana")
     o.run_stage(2)
     outs = [d for d in o.log.all() if d["actor"] == "agent:orchestrator" and d["outcome"] == "Retry"]
     assert outs, "orchestrator should re-plan"
@@ -485,7 +491,7 @@ def test_question_country_becomes_the_search_scope(tmp_path):
     o.state.question, o.state.country = "Which mutations explain rifampicin resistance in Indonesia?", ""
     o.run_stage(1)
     assert o.state.country == "Indonesia" and o.state.scope["target"]["source"] == "question"
-    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.raw_view("scope", "guardian", "pi", "Ana"); answer_warnings(o); o.approve_scope("pi", "Ana")
     o.run_stage(2)
     assert o.state.sample("DEMO-R06").eligibility == "Excluded"  # Viet Nam is outside the resolved scope
 
@@ -495,7 +501,7 @@ def test_explicit_worldwide_searches_without_a_country_filter(tmp_path):
     o.state.question, o.state.country = "Global patterns of rifampicin resistance", ""
     o.run_stage(1)
     assert o.state.country == "Worldwide" and not o.state.scope["blocking"]
-    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.raw_view("scope", "guardian", "pi", "Ana"); answer_warnings(o); o.approve_scope("pi", "Ana")
     o.run_stage(2)
     calls = [t for t in o.log.traces("discovery") if t["kind"] == "tool_call"]
     assert all('country="Worldwide' not in json.dumps(t["payload"]) for t in calls)
@@ -618,7 +624,7 @@ def test_release_is_archived_after_it_is_recorded(orch, monkeypatch):
 def test_guardian_wording_never_replaces_the_applied_definitions():
     """The model's proposed definitions are kept as suggestions; the applied text always comes from the rules."""
     divergent = lambda m: [{"type": "tool_use", "name": "submit", "input": {"blocking": [], "warnings": [], "asks_comparison_across_places": False,
-        "gaps": [{"key": "missing_dst", "gap": "DST", "proposal": "Exclude samples without phenotypic DST."},
+        "gaps": [{"key": "missing_dst", "gap": "DST", "agrees": False, "proposal": "Exclude samples without phenotypic DST."},
                  {"key": "transmission", "gap": "Transmission", "proposal": "No transmission inference."}]}}]
     g = ScopeGuardian(DecisionLog(), ReplayClient({"scope_guardian": divergent}))
     res = g.review("Rifampicin resistance in Indonesia", "Indonesia", ["Rifampicin"], 8)
@@ -680,6 +686,137 @@ def test_worker_thread_logs_reach_the_execution(tmp_path):
         t.start(); t.join()
     ex = log.get_execution(log.list_executions(1)[0]["id"])
     assert "worker says hi" in ex["log_text"]
+
+
+# ---------------------------------------------------------------- Scope Guardian signal: no restatements, no boilerplate
+def _guardian_with(submission, cached=False):
+    class Client(ReplayClient):
+        last_call_cached = cached
+    return ScopeGuardian(DecisionLog(), Client({"scope_guardian": lambda m: [{"type": "tool_use", "name": "submit", "input": submission}]}))
+
+
+def test_guardian_shows_suggestions_only_for_proposed_changes():
+    sub = {"blocking": [], "asks_comparison_across_places": False, "warnings": [f"w{i}" for i in range(7)],
+           "gaps": [{"key": "verified_origin", "agrees": True, "proposal": "Suggestion only: keep the rule that runs are Verified ..."},
+                    {"key": "missing_dst", "agrees": False, "proposal": "Also report how many runs have DST."},
+                    {"key": "duplicates", "proposal": "Keep one run per BioSample."}]}  # no `agrees`: treated as agreement
+    res = _guardian_with(sub).review("Rifampicin resistance in Indonesia", "Indonesia", ["Rifampicin"], 8)
+    by = {g["key"]: g for g in res["gaps"]}
+    assert "suggestion" not in by["verified_origin"] and "suggestion" not in by["duplicates"]  # restatements are dropped
+    assert by["missing_dst"]["suggestion"] == "Also report how many runs have DST."
+    assert res["warnings"] == ["w0", "w1", "w2", "w3"]  # capped at 4 model warnings
+    assert res["from_cache"] is False
+
+
+def test_guardian_flags_a_cached_answer():
+    sub = {"blocking": [], "asks_comparison_across_places": False, "warnings": [], "gaps": []}
+    assert _guardian_with(sub, cached=True).review("Rifampicin resistance in Indonesia", "Indonesia", ["Rifampicin"], 8)["from_cache"] is True
+
+
+# ---------------------------------------------------------------- scope warnings become decisions; revised question loop
+def _scoped(tmp_path, question, country="Indonesia"):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "s.db"))
+    o.state.question, o.state.country = question, country
+    o.run_stage(1)
+    o.raw_view("scope", "guardian", "pi", "Ana")
+    return o
+
+
+def test_scope_cannot_be_approved_until_every_warning_is_answered(tmp_path):
+    o = _scoped(tmp_path, "Compare rifampicin resistance across regions of Indonesia")
+    n = len(o.state.scope["warnings"])
+    assert n >= 1
+    with pytest.raises(StageError, match="Respond to every Scope Guardian warning"):
+        o.approve_scope("pi", "Ana")
+    with pytest.raises(StageError, match="Say why"):
+        o.respond_warning("pi", "Ana", 0, "disagree", "  ")
+    with pytest.raises(PermissionDenied):
+        o.respond_warning("analyst", "Budi", 0, "accept")
+    o.respond_warning("pi", "Ana", 0, "disagree", "Regions are compared descriptively only.")
+    for i in range(1, n):
+        o.respond_warning("pi", "Ana", i, "accept")
+    o.approve_scope("pi", "Ana")
+    logged = [d for d in o.log.all() if d["sample_id"].startswith("WARNING-")]
+    assert len(logged) == n and {d["outcome"] for d in logged} <= {"Approve", "Override"}
+    assert any("Regions are compared descriptively only." in d["rationale"] for d in logged)
+
+
+def test_report_lists_how_each_warning_was_handled(tmp_path):
+    o = _scoped(tmp_path, "Compare rifampicin resistance across regions of Indonesia")
+    answer_warnings(o)
+    o.approve_scope("pi", "Ana")
+    o.run_stage(2); o.raw_view("cohort", "all", "pi", "Ana"); o.approve_cohort("pi", "Ana")
+    o.run_stage(3); o.raw_view("qc", "all", "analyst", "Budi"); o.confirm_qc("analyst", "Budi")
+    o.run_stage(4); o.raw_view("profiling", "all", "analyst", "Budi"); o.close_profiling("analyst", "Budi")
+    o.run_stage(5); rep = o.run_stage(6)
+    assert rep["scope_warnings"] and all(w["decision"] == "accept" and w["person"] == "Ana" for w in rep["scope_warnings"])
+
+
+def test_revised_question_can_be_adopted_and_re_reviewed(tmp_path):
+    original = "Which mutations are associated with rifampicin resistance?"
+    o = _scoped(tmp_path, original)
+    revised = o.state.scope["revised_question"]
+    assert revised and "Indonesia" in revised and "associated" not in revised
+    o.adopt_revised_question("pi", "Ana")
+    assert o.state.question == revised and o.state.stage_status["1"] == "ready" and not o.state.scope
+    d = next(d for d in o.log.all() if "Research question revised" in d["rationale"])
+    assert original in d["rationale"] and revised in d["rationale"] and d["actor"] == "human:pi:Ana"
+    o.run_stage(1)  # round 2: the sharper wording needs no further revision
+    assert o.state.scope["revised_question"] == ""
+
+
+def test_scope_decision_endpoints(tmp_path):
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "a.db"))))
+    c.post("/api/scope", json={"question": "Which mutations are associated with rifampicin resistance across regions?", "country": "Indonesia"})
+    c.post("/api/stages/1/run")
+    assert c.post("/api/scope/warnings/0", json={"role": "pi", "person": "Ana", "decision": "maybe"}).status_code == 409
+    assert c.post("/api/scope/warnings/0", json={"role": "pi", "person": "Ana", "decision": "accept"}).status_code == 200
+    r = c.post("/api/scope/revised-question", json={"role": "pi", "person": "Ana"})
+    assert r.status_code == 200 and "WHO-catalogued" in r.json()["question"]
+
+
+def test_admin_cache_toggle_accepts_a_json_body(tmp_path):
+    """The Admin tab's per-namespace cache switch sends {"enabled": bool}; it used to be rejected with 422."""
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "c.db"))))
+    r = c.post("/api/admin/cache/claude/toggle", json={"enabled": False})
+    assert r.status_code == 200 and r.json() == {"ok": True, "namespace": "claude", "enabled": False}
+    assert c.post("/api/admin/cache/nope/toggle", json={"enabled": True}).status_code == 404
+
+
+def test_tests_never_reach_the_real_claude_api(tmp_path):
+    """A reset rebuilds the app via make_client(); in tests it must stay on the scripted agents even if a key is set."""
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "b.db"))))
+    assert c.post("/api/reset", params={"data": "demo"}).status_code == 200
+    assert c.get("/api/state").json()["mode"]["brain"] == "replay"
+
+
+def test_rewording_loop_always_ends(tmp_path):
+    """Even a Guardian that rewords every time stops being offered after MAX_REVISIONS adopted rewordings."""
+    from tbamr.agents.scope_guardian import MAX_REVISIONS
+    seen = []
+    def always_reword(messages):
+        seen.append(messages[0]["content"])
+        n = len(seen)
+        return [{"type": "tool_use", "name": "submit", "input": {"blocking": [], "gaps": [], "warnings": [], "asks_comparison_across_places": False,
+                                                              "revised_question": f"Rifampicin mutation counts in Indonesia, version {n}?"}}]
+    o = build_orchestrator("demo", "replay", str(tmp_path / "l.db"))
+    o.agents["scope_guardian"].client = ReplayClient({"scope_guardian": always_reword})
+    o.state.question, o.state.country = "Which mutations are associated with resistance in Indonesia?", "Indonesia"
+    for round_ in range(MAX_REVISIONS):
+        o.run_stage(1)
+        assert o.state.scope["revised_question"], f"round {round_ + 1} should still offer a rewording"
+        o.adopt_revised_question("pi", "Ana")
+        assert o.state.revision_rounds == round_ + 1
+    o.run_stage(1)
+    assert o.state.scope["revised_question"] == "" and '"revision_rounds": 2' in seen[-1]
+
+
+def test_editing_the_question_resets_the_rewording_count(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "e.db"))
+    c = TestClient(create_app(o))
+    o.state.revision_rounds = 2
+    c.post("/api/scope", json={"question": "My own new question about rifampicin in Indonesia?", "country": "Indonesia"})
+    assert o.state.revision_rounds == 0
 
 
 # ---------------------------------------------------------------- report integrity: what the PI agreed is what the report does
