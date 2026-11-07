@@ -1,0 +1,5 @@
+# Developer-only deps. Not needed to run the app; needed to run the UI (Playwright) test suite.
+# After installing, run `playwright install chromium` once to pull the browser binary (~100 MB).
+-r requirements.txt
+playwright==1.48.0
+pytest-playwright==0.5.2

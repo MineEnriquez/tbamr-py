@@ -5,9 +5,11 @@ import Team from './components/Team.jsx'
 import Pipeline from './components/Pipeline.jsx'
 import Samples, { Drawer } from './components/Samples.jsx'
 import Review from './components/Review.jsx'
+import Admin from './components/Admin.jsx'
 import Report from './components/Report.jsx'
 import Insights from './components/Insights.jsx'
 import Logs from './components/Logs.jsx'
+import About from './components/About.jsx'
 import { RawCtx, RawViewer } from './components/Raw.jsx'
 import Flow from './components/Flow.jsx'
 
@@ -20,7 +22,7 @@ export default function App() {
   const [decisions, setDecisions] = useState([])
   const [metrics, setMetrics] = useState(null)
   const [tab, setTab] = useState('pipeline')
-  const [view, setView] = useState(1)
+  const [view, setView] = useState(0)  // view 0 = Start hero; 1-6 = pipeline stages
   const [role, setRole] = useState(load('tbamr.role') || 'pi')
   const [person, setPerson] = useState(load('tbamr.person'))
   const [sel, setSel] = useState(null)
@@ -29,7 +31,7 @@ export default function App() {
   const [version, setVersion] = useState(0)
   const [receipts, setReceipts] = useState({})
   const [rawReq, setRawReq] = useState(null)
-  const [theme, setTheme] = useState(load('tbamr.theme') || 'auto')
+  const [theme, setTheme] = useState(load('tbamr.theme') || 'light')
   const [liveTraces, setLiveTraces] = useState([])
   const timer = useRef(null)
   const traceTimer = useRef(null)
@@ -93,15 +95,17 @@ export default function App() {
   if (!snap) return <div className="wrap"><p className="muted">Loading…</p></div>
   const st = snap.state
   const pending = st.samples.flatMap(s => s.findings).filter(f => f.review === 'Pending').length
-  const tabs = [['pipeline', 'Pipeline'], ['review', 'Review queue'], ['samples', 'Samples'], ['report', 'Report'], ['team', 'Agent team'], ['insights', 'Decisions & metrics'], ['logs', 'Logs']]
+  const tabs = [['pipeline', 'Pipeline'], ['review', 'Review queue'], ['samples', 'Samples'], ['report', 'Report'], ['team', 'Agent team'], ['insights', 'Decisions & metrics'], ['logs', 'Logs'], ['admin', 'Admin'], ['about', 'About']]
 
   return (
     <RawCtx.Provider value={raw}>
     {snap.busy && <BusyBar busy={snap.busy} traces={liveTraces} />}
     <div className="wrap">
       <div className="top">
-        <div><span className="eyebrow">A.G.E.N.T. Playbook · Python agents v0.2</span><h1>TB-AMR Agent Team</h1>
-          <p className="muted">Hybrid agentic workflow for <i>M. tuberculosis</i> drug-resistance evidence: Claude agents with tools, rule agents for reproducible steps, human gates throughout.</p></div>
+        <div><h1>TB-AMR Agent Team</h1>
+          <p className="muted" style={{ fontSize: '.85rem' }}>
+            <a href="#about" onClick={e => { e.preventDefault(); setTab('about') }}>What is this?</a>
+          </p></div>
         <div className="controls">
           <div className="ctl"><label htmlFor="role">Acting as</label><select id="role" value={role} onChange={e => setRole(e.target.value)}>{Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
           <div className="ctl"><label htmlFor="person">Your name</label><input id="person" value={person} onChange={e => setPerson(e.target.value)} placeholder="e.g. Minnie" /></div>
@@ -112,9 +116,12 @@ export default function App() {
         </div>
       </div>
       <div className="banner">
-        <span className={'tag ' + snap.mode.data}>{snap.mode.data === 'demo' ? 'DEMO DATA (simulated)' : 'LIVE DATA · ENA'}</span>
+        <ModeSwitch mode={snap.mode.data} busy={!!snap.busy} onSwitch={next => {
+          if (confirm(`Switch data mode to ${next.toUpperCase()}? This resets the pipeline (previous decisions stay in the log).`)) {
+            act(() => api.reset(next), `Switched to ${next} mode`)
+          }
+        }} />
         <span className={'tag ' + snap.mode.brain}>{snap.mode.brain === 'claude' ? 'Claude agents (live reasoning)' : 'Replay agents (scripted, no API key)'}</span>
-        <span className="muted">Names are recorded with every human decision; the two-person rule needs two different names. Each decision row has an optional <b>View raw data</b> link; if you open it, the receipt is saved with your decision.</span>
       </div>
       <Flow snap={snap} team={team} view={tab === 'pipeline' ? view : null} pending={pending} onPick={n => { setView(n); setTab(n === 5 && pending ? 'review' : 'pipeline') }} />
       <nav className="tabs" role="tablist">{tabs.map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}{k === 'review' && pending ? <span className="count">{pending}</span> : null}</button>)}</nav>
@@ -126,13 +133,35 @@ export default function App() {
         {tab === 'report' && <Report st={st} act={act} brain={snap.mode.brain} />}
         {tab === 'insights' && <Insights m={metrics} decisions={decisions} />}
         {tab === 'logs' && <Logs version={version} />}
+        {tab === 'admin' && <Admin />}
+        {tab === 'about' && <About />}
       </main>
       {sel && <Drawer run={sel} st={st} pending={snap.pending_overrides} act={act} who={who} close={() => setSel(null)} version={version} />}
       {rawReq && <RawViewer key={rawReq.kind + rawReq.key} req={rawReq} who={who} onClose={() => setRawReq(null)} onViewed={loadReceipts} />}
       {toast && <div className={'toast' + (toast.err ? ' err' : '')} role="status">{toast.text}</div>}
-      <footer>{snap.mode.data === 'demo' ? 'Demo data: every accession starting DEMO/PRJDEMO is simulated. ' : 'Live data from the ENA Portal API. '}Genomic predictions are not laboratory-confirmed susceptibility and cannot estimate national prevalence.</footer>
+      <footer>{snap.mode.data === 'demo' ? 'Demo data: every accession starting DEMO/PRJDEMO is simulated.' : 'Live data from the ENA Portal API.'} <a href="#about" onClick={e => { e.preventDefault(); setTab('about') }}>About</a></footer>
     </div>
     </RawCtx.Provider>
+  )
+}
+
+/* Data-mode picker: both options are always visible, the active one is highlighted.
+ * Choosing the other option resets the pipeline.
+ * Live mode talks to the real ENA Portal API; demo mode runs offline against simulated
+ * DEMO/PRJDEMO accessions. */
+const DATA_MODES = [
+  ['demo', 'Demo', 'Simulated DEMO/PRJDEMO accessions, works offline'],
+  ['live', 'Live · ENA', 'Real data from the ENA Portal API (needs internet)'],
+]
+function ModeSwitch({ mode, busy, onSwitch }) {
+  return (
+    <div className="mode-pick">
+      <span className="lbl" id="data-l">Data</span>
+      <div className={'seg data ' + mode} role="radiogroup" aria-labelledby="data-l">{DATA_MODES.map(([k, l, d]) =>
+        <button key={k} type="button" role="radio" aria-checked={mode === k} aria-selected={mode === k} disabled={busy}
+          title={mode === k ? `${d} (current)` : `${d}. Switching resets the pipeline.`}
+          onClick={() => mode !== k && onSwitch(k)}>{l}</button>)}</div>
+    </div>
   )
 }
 

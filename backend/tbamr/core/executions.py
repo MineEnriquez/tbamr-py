@@ -18,12 +18,30 @@ import threading
 import time
 import traceback
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Any, Iterator
 
 from .decisions import DecisionLog
 
 
 _tls = threading.local()
+
+
+class ExecutionContext:
+    """Yielded by capture_execution so the wrapped block can attach a structured result.
+
+    Call `ctx.record(x)` and it stores x as the execution's result AND returns it — so the
+    endpoint handler stays a one-liner (`return ctx.record(do_work())`). Setting `ctx.result`
+    directly also works for cases where the computation is multi-step."""
+
+    __slots__ = ("buf", "result")
+
+    def __init__(self, buf: io.StringIO) -> None:
+        self.buf = buf
+        self.result: Any = None
+
+    def record(self, value: Any) -> Any:
+        self.result = value
+        return value
 
 
 class _TLSHandler(logging.Handler):
@@ -64,20 +82,25 @@ def _install_handler() -> None:
 
 
 @contextmanager
-def capture_execution(log: DecisionLog, trigger: str) -> Iterator[io.StringIO]:
-    """Capture logs emitted on this thread for the duration of the block, then persist as one execution."""
+def capture_execution(log: DecisionLog, trigger: str) -> Iterator[ExecutionContext]:
+    """Capture logs emitted on this thread for the duration of the block, then persist as one execution.
+
+    The yielded ExecutionContext lets the wrapped block attach a structured result (via ctx.record(x)
+    or ctx.result = ...). That result is stored alongside the log so the Logs tab can show what each
+    action actually produced, not only what it printed."""
     _install_handler()
     buf = io.StringIO()
     stack: list[io.StringIO] = getattr(_tls, "stack", None) or []
     if not stack:
         _tls.stack = stack
     stack.append(buf)
+    ctx = ExecutionContext(buf)
     start = time.time()
     status = "ok"
     error = ""
     logging.getLogger("tbamr.executions").info("Start: %s", trigger)
     try:
-        yield buf
+        yield ctx
     except Exception as e:
         status = "error"
         error = f"{type(e).__name__}: {e}"
@@ -88,6 +111,6 @@ def capture_execution(log: DecisionLog, trigger: str) -> Iterator[io.StringIO]:
         stack.pop()
         end = time.time()
         try:
-            log.add_execution(trigger, start, end, status, buf.getvalue(), error)
+            log.add_execution(trigger, start, end, status, buf.getvalue(), error, result=ctx.result)
         except Exception:
             pass  # never let a logging failure break the real action

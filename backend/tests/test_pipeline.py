@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 
 import httpx
 import pytest
@@ -12,7 +14,8 @@ from tbamr.core.decisions import Decision, DecisionLog, GuardrailViolation, Outc
 from tbamr.core.models import Finding, Sample
 from tbamr.core.orchestrator import PermissionDenied, StageError
 from tbamr.llm.client import ReplayClient
-from tbamr.tools.demo import DemoDataTools
+from tbamr.core.geo import INSDC_COUNTRIES, canonical_region, catalogue, region_matches, regions_for, resolve_target
+from tbamr.tools.demo import SCENARIOS, DemoDataTools
 from tbamr.tools.ena import DataTools
 from tbamr.tools.tbprofiler import parse_result
 
@@ -47,10 +50,10 @@ def test_agents_cannot_use_human_outcomes():
 def test_full_demo_flow(orch):
     rep = run_to_report(orch)
     st = orch.state
-    assert {s.run for s in st.samples if s.eligibility == "Excluded"} == {"DEMO-R06", "DEMO-R07", "DEMO-R08"}
-    assert {s.run for s in st.samples if s.eligibility == "Hold"} == {"DEMO-R15", "DEMO-R16"}
+    assert {s.run for s in st.samples if s.eligibility == "Excluded"} == {"DEMO-R06", "DEMO-R07", "DEMO-R08", "DEMO-R18", "DEMO-R19", "DEMO-R23", "DEMO-R24"}
+    assert {s.run for s in st.samples if s.eligibility == "Hold"} == {"DEMO-R15", "DEMO-R16", "DEMO-R20", "DEMO-R21", "DEMO-R22"}
     assert st.sample("DEMO-R04").qc == "Escalated"  # 27x borderline
-    assert rep["counts"]["analysed"] == 10
+    assert rep["counts"] == {"candidates": 43, "verified": 31, "qc_passed": 27, "analysed": 25}
     assert [d["drug"] for d in rep["drugs"]][:2] == ["RIF", "INH"]
     pending = {(f["run"], f["variant"]) for f in rep["unresolved"]}
     assert ("DEMO-R14", "rpoB p.Ser450Leu") in pending  # low depth
@@ -113,6 +116,30 @@ def test_import_and_review(orch):
     assert "dr_variants" in raw["data"]
     orch.review("tbexpert", "Dewi", f.fid, "Needs more data", "Request deeper sequencing")
     assert orch.state.report["superseded"] is True
+
+
+def test_every_demo_scenario_reaches_its_expected_outcome(orch):
+    """The demo data is a scenario catalogue (tools/demo.py SCENARIOS); each run must land where it says."""
+    run_to_report(orch)
+    problems = []
+    for run, sc in SCENARIOS.items():
+        s = orch.state.sample(run)
+        assert s, f"{run} was not discovered"
+        got = {"elig": s.eligibility, "qc": s.qc or None, "prof": s.profiling or None}
+        problems += [f"{run} ({sc['what']}): {k} expected {v}, got {got[k]}" for k, v in sc["expect"].items() if k != "review" and got[k] != v]
+        reviews = {f"{f.gene} {f.change}": f.review for f in s.findings}
+        problems += [f"{run} ({sc['what']}): {v} expected {want}, got {reviews.get(v)}" for v, want in sc["expect"].get("review", {}).items() if reviews.get(v) != want]
+    assert not problems, "\n".join(problems)
+    assert {s.run for s in orch.state.samples} == set(SCENARIOS), "every demo run needs a documented scenario"
+
+
+def test_demo_report_covers_discordance_and_extra_drugs(orch):
+    rep = run_to_report(orch)
+    by = {d["drug"]: d for d in rep["drugs"]}
+    assert {"FLQ", "BDQ", "LZD", "PZA", "EMB", "STM", "AMK", "ETO"} <= set(by)
+    assert by["RIF"]["dst_n"] > by["RIF"]["concordant"]  # R09 (genotype R, DST S) and R38 (genotype S, DST R) disagree
+    assert orch.state.sample("DEMO-R31").profile_meta["db"] == "not in file"  # TB-Profiler 4.x layout
+    assert orch.state.sample("DEMO-R41").lineage == "La1.8.BCG"
 
 
 # ---------------------------------------------------------------- agentic behaviour + guardrails
@@ -193,27 +220,45 @@ def test_tbprofiler_parser_v4_and_v6():
     assert b["mutations"][0]["grade"] == 2 and b["lineage"] == "4.1.2" and b["meta"]["tool"] == "TB-Profiler 4.4.0"
 
 
-def test_ena_paging_with_mock_transport():
+def test_ena_search_is_one_request_without_offset():
+    """The ENA Portal API rejects `offset` with HTTP 400, so the search must be a single request with the full limit."""
     calls = []
 
     def handler(req: httpx.Request):
         calls.append(dict(req.url.params))
         if req.url.path.endswith("/count"):
             return httpx.Response(200, text="250")
-        off, lim = int(req.url.params["offset"]), int(req.url.params["limit"])
-        n = max(0, min(lim, 250 - off))
-        return httpx.Response(200, json=[{"run_accession": f"SRR{off + i}"} for i in range(n)])
+        if "offset" in req.url.params:
+            return httpx.Response(400, json={"message": "Unsupported param offset"})
+        return httpx.Response(200, json=[{"run_accession": f"SRR{i}"} for i in range(min(250, int(req.url.params["limit"]) or 250))])
 
     tools = DataTools(httpx.Client(transport=httpx.MockTransport(handler)))
     res = tools.ena_search_runs("Indonesia", limit=500, page_size=100)
     assert res["returned"] == 250 and res["total_in_ena"] == 250
-    assert [c.get("offset") for c in calls if "offset" in c] == ["0", "100", "200"]
+    searches = [c for c in calls if "query" in c and "limit" in c]
+    assert len(searches) == 1 and searches[0]["limit"] == "500" and "offset" not in searches[0]
+
+
+def test_discovery_keeps_search_results_when_the_agent_never_submits():
+    """An agent that searches but runs out of steps without submitting must not turn into zero candidates."""
+    def policy(messages):
+        if sum(m["role"] == "assistant" for m in messages) == 0:
+            return [{"type": "tool_use", "name": "ena_search_runs", "input": {"country": "Indonesia"}}]
+        return [{"type": "text", "text": "Still thinking about more studies..."}]  # never calls submit
+
+    log = DecisionLog()
+    res = DiscoveryAssistant(log, ReplayClient({"discovery": policy}), DemoDataTools()).discover("Indonesia", "q?")
+    assert res["candidate_runs"] and all(r.startswith("DEMO-") for r in res["candidate_runs"])
+    assert any("stopped without submitting" in c for c in res["concerns"])
+    assert any(t["kind"] == "fallback" for t in log.traces("discovery"))
 
 
 # ---------------------------------------------------------------- API
 def test_api_flow(tmp_path):
     app = create_app(build_orchestrator("demo", "replay", str(tmp_path / "a.db")))
     c = TestClient(app)
+    assert c.get("/api/scope/target", params={"question": "Resistance patterns"}).json()["problem"]  # no silent worldwide
+    assert c.post("/api/scope", json={"question": "Resistance patterns", "country": "Indonesia"}).status_code == 200
     assert c.post("/api/stages/1/run").status_code == 200
     assert c.post("/api/gates/scope", json={"role": "analyst"}).status_code == 403
     raw = c.get("/api/raw/scope/guardian", params={"role": "pi", "person": "Ana"}).json()
@@ -248,3 +293,322 @@ def test_raw_data_is_backfilled_for_pipelines_started_before_it_was_saved(orch):
     cohort = orch.raw_view("cohort", "all", "pi", "Ana")
     assert all(r[0] for r in cohort["table"]["rows"])
     orch.resolve_hold("pi", "Ana", "DEMO-R15", "verify", "Checked the record")
+
+
+def test_reset_preserves_previous_runs(tmp_path, monkeypatch):
+    """A pipeline reset must close the active run and open a new one, keeping executions from
+    the previous run so the Logs tab can look back at them."""
+    db = str(tmp_path / "runs.db")
+    monkeypatch.setenv("TBAMR_DB", db)
+    app = create_app(build_orchestrator("demo", "replay", db))
+    c = TestClient(app)
+    # First pipeline run: do one action so an execution is recorded.
+    c.post("/api/stages/1/run")
+    runs_before = c.get("/api/runs").json()
+    assert len(runs_before) == 1 and runs_before[0]["active"] is True
+    first_run_id = runs_before[0]["id"]
+    first_execs = c.get("/api/executions", params={"run_id": first_run_id}).json()
+    assert any(e["trigger"] == "Stage 1" for e in first_execs)
+    # Reset. The active run should close; a new one should open; old executions should survive.
+    assert c.post("/api/reset", params={"data": "demo"}).status_code == 200
+    runs_after = c.get("/api/runs").json()
+    assert len(runs_after) == 2
+    active = [r for r in runs_after if r["active"]]
+    closed = [r for r in runs_after if not r["active"]]
+    assert len(active) == 1 and len(closed) == 1
+    assert closed[0]["id"] == first_run_id and closed[0]["ended_at"] is not None
+    # Previous run's executions are still queryable; default (no run_id) returns the new empty run.
+    prev = c.get("/api/executions", params={"run_id": first_run_id}).json()
+    assert any(e["trigger"] == "Stage 1" for e in prev)
+    assert c.get("/api/executions").json() == []
+
+
+def test_executions_capture_structured_results(tmp_path, monkeypatch):
+    """Stage runs and gate approvals should attach a structured result to their execution row, so the
+    Logs tab can show what each action produced — not just the free-text log."""
+    db = str(tmp_path / "results.db")
+    monkeypatch.setenv("TBAMR_DB", db)
+    orch = build_orchestrator("demo", "replay", db)
+    orch.state.country = "Indonesia"
+    app = create_app(orch)
+    c = TestClient(app)
+    assert c.post("/api/scope", json={"question": "Resistance patterns", "country": "Indonesia"}).status_code == 200
+    assert c.post("/api/stages/1/run").status_code == 200
+    execs = c.get("/api/executions").json()
+    stage1 = next(e for e in execs if e["trigger"] == "Stage 1")
+    assert stage1["has_result"] is True
+    detail = c.get(f"/api/executions/{stage1['id']}").json()
+    # Stage 1 returns the Guardian's scope dict — look for a recognisable key.
+    assert isinstance(detail["result"], dict) and detail["result"]  # non-empty object
+    # Approving the scope attaches a {by, role} record even though the HTTP response is just {ok: True}.
+    c.post("/api/raw/scope/guardian", params={"role": "pi", "person": "Ana"})  # mark raw as viewed
+    orch.raw_view("scope", "guardian", "pi", "Ana")
+    assert c.post("/api/gates/scope", json={"role": "pi", "person": "Ana"}).status_code == 200
+    gate_exec = next(e for e in c.get("/api/executions").json() if e["trigger"] == "Approve scope")
+    assert gate_exec["has_result"] is True
+    gate_detail = c.get(f"/api/executions/{gate_exec['id']}").json()
+    assert gate_detail["result"] == {"by": "Ana", "role": "pi"}
+
+
+def test_execution_result_handles_unserialisable_values(tmp_path):
+    """A function that returns something JSON can't handle must still produce a stored row (with an
+    error marker in result_json) rather than silently losing the entire log."""
+    from tbamr.core.executions import capture_execution
+    log = DecisionLog(str(tmp_path / "oops.db"))
+    with capture_execution(log, "weird-return") as ctx:
+        ctx.record({"when": object()})  # bare object() isn't JSON-serialisable
+    row = log.list_executions()[0]
+    assert row["trigger"] == "weird-return" and row["has_result"] is True
+    detail = log.get_execution(row["id"])
+    # default=str catches arbitrary objects, so this still parses as a dict.
+    assert isinstance(detail["result"], dict)
+
+
+def test_harness_seeds_a_completed_pipeline(tmp_path):
+    """The UI harness should produce a DB where every stage is done, the report exists, and the
+    Logs tab has a captured execution for each step. If a stage API changes shape, this breaks
+    visibly so the harness doesn't quietly rot."""
+    from tbamr.harness import seed
+    db = str(tmp_path / "tbamr-harness.db")
+    summary = seed(db)
+    assert summary["samples"] > 0 and summary["in_cohort"] > 0
+    assert summary["report_version"] == 1
+    # Reopen through the API to make sure the seeded state round-trips (as it will when uvicorn boots)
+    app = create_app(build_orchestrator("demo", "replay", db))
+    c = TestClient(app)
+    state = c.get("/api/state").json()["state"]
+    assert state["report"] is not None
+    assert state["stage_status"]["5"] == "done"
+    assert state["stage_status"]["6"] in ("wait", "done")
+    assert state["gates"].get("scope") and state["gates"].get("cohort")
+    execs = c.get("/api/executions").json()
+    triggers = [e["trigger"] for e in execs]
+    for expected in ("Stage 1", "Stage 6", "Approve scope", "Approve cohort", "Confirm QC", "Close profiling batch", "Draft report summary"):
+        assert expected in triggers, f"harness never captured {expected} (got {triggers})"
+    assert all(e["status"] == "ok" for e in execs), f"some seeded executions failed: {execs}"
+    # Every seeded execution should carry a structured result, so the Logs tab is rich out of the box.
+    assert all(e["has_result"] for e in execs), f"some seeded executions have no result: {execs}"
+
+
+def test_harness_reseed_refuses_non_harness_filenames(tmp_path):
+    """A misconfigured --reseed must never wipe tbamr-live.db or a user's custom DB."""
+    from tbamr.harness import _safe_unlink
+    bad = tmp_path / "tbamr-live.db"
+    bad.write_text("do not delete me")
+    with pytest.raises(SystemExit):
+        _safe_unlink(bad)
+    assert bad.exists()
+    # The safe case: filename contains "harness"
+    ok = tmp_path / "tbamr-harness.db"
+    ok.write_text("fine")
+    _safe_unlink(ok)
+    assert not ok.exists()
+
+
+# ---------------------------------------------------------------- publishable article
+def test_report_article_renders_all_sections_and_streams_a_pdf_print_variant(orch):
+    """A full pipeline run exposes a self-contained HTML article at /api/report/{v}/article.html,
+    with every main report section and inline SVG plots. The print=1 variant auto-triggers the
+    browser's Print dialog so users can Save-as-PDF without a server-side PDF dependency."""
+    report = run_to_report(orch)
+    assert report and report["version"] == 1
+    orch.draft_summary()  # realistic article has a plain-language summary
+    # Final release is blocked by any pending finding; "draft" always succeeds. Using draft keeps
+    # the test independent of the demo cohort's finding mix.
+    orch.release("pi", "Ana", "draft")
+    c = TestClient(create_app(orch))
+
+    r = c.get("/api/report/1/article.html")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
+    html = r.text
+    assert "<!doctype html>" in html.lower()
+    assert "Genomic resistance evidence" in html
+    # Scope context is pulled from state, not the report dict.
+    assert "Indonesia" in html
+    # Core sections are all present.
+    for h in ("Plain-language summary", "Sample counts", "Resistance evidence by drug",
+              "Most frequent mutations", "Lineages", "Limitations", "Unresolved findings",
+              "Exclusions and holds", "Provenance"):
+        assert f">{h}" in html, f"article missing section {h!r}"
+    # Status chip reflects the actual release gate.
+    assert "Exploratory draft" in html
+    # Inline SVG plots so the file is truly self-contained (no external assets).
+    assert "<svg" in html and "http://www.w3.org/2000/svg" in html
+
+    r_dl = c.get("/api/report/1/article.html", params={"download": 1})
+    assert r_dl.status_code == 200
+    assert 'attachment; filename="tbamr-report-v1.html"' in r_dl.headers.get("content-disposition", "")
+
+    r_print = c.get("/api/report/1/article.html", params={"print": 1})
+    assert r_print.status_code == 200 and "window.print()" in r_print.text
+
+    missing = c.get("/api/report/9/article.html")
+    assert missing.status_code == 404
+
+
+def test_report_article_404s_when_no_report_exists(orch):
+    c = TestClient(create_app(orch))
+    r = c.get("/api/report/1/article.html")
+    assert r.status_code == 404 and "Stage 6" in r.json()["detail"]
+
+
+# ---------------------------------------------------------------- target population (worldwide only when asked)
+@pytest.mark.parametrize("question,field,country,blocked", [
+    ("Which rifampicin mutations are common in Mycobacterium tuberculosis genomes?", "", "", True),  # nothing named: no silent worldwide
+    ("Rifampicin resistance in Indonesia", "", "Indonesia", False),  # named in the question
+    ("Rifampicin resistance patterns", "vietnam", "Viet Nam", False),  # alias canonicalised to the INSDC name
+    ("Rifampicin resistance worldwide", "", "Worldwide", False),  # explicit worldwide
+    ("Rifampicin resistance patterns", "Worldwide", "Worldwide", False),
+    ("Rifampicin resistance in sub-Saharan Africa", "", "", True),  # region only: not filterable
+    ("Compare Kenya and Uganda", "", "", True),  # several countries
+    ("Rifampicin resistance in Kenya", "Indonesia", "", True),  # field contradicts the question
+    ("Rifampicin resistance patterns", "Indonesa", "", True),  # unrecognised name
+    ("Resistance in Papua New Guinea", "", "Papua New Guinea", False),  # longest name wins over "Guinea"
+])
+def test_target_population_resolution(question, field, country, blocked):
+    t = resolve_target(question, field)
+    assert bool(t["problem"]) is blocked and t["country"] == country
+
+
+def test_stage1_blocks_without_a_clear_target(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "g.db"))
+    o.state.question, o.state.country = "Which mutations explain rifampicin resistance?", ""
+    o.run_stage(1)
+    assert any("No target population" in b for b in o.state.scope["blocking"])
+    o.raw_view("scope", "guardian", "pi", "Ana")
+    with pytest.raises(StageError):
+        o.approve_scope("pi", "Ana")
+
+
+def test_question_country_becomes_the_search_scope(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "q.db"))
+    o.state.question, o.state.country = "Which mutations explain rifampicin resistance in Indonesia?", ""
+    o.run_stage(1)
+    assert o.state.country == "Indonesia" and o.state.scope["target"]["source"] == "question"
+    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.run_stage(2)
+    assert o.state.sample("DEMO-R06").eligibility == "Excluded"  # Viet Nam is outside the resolved scope
+
+
+def test_explicit_worldwide_searches_without_a_country_filter(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "w.db"))
+    o.state.question, o.state.country = "Global patterns of rifampicin resistance", ""
+    o.run_stage(1)
+    assert o.state.country == "Worldwide" and not o.state.scope["blocking"]
+    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.run_stage(2)
+    calls = [t for t in o.log.traces("discovery") if t["kind"] == "tool_call"]
+    assert all('country="Worldwide' not in json.dumps(t["payload"]) for t in calls)
+    assert o.state.sample("DEMO-R06").eligibility == "Verified"  # origin is informational for worldwide
+
+
+# ---------------------------------------------------------------- subnational target
+@pytest.mark.parametrize("question,field,region,want,blocked", [
+    ("Resistance patterns", "Indonesia", "West Java", ("Indonesia", "West Java"), False),
+    ("Resistance patterns", "Indonesia: West Java", "", ("Indonesia", "West Java"), False),  # ENA format in the Country field
+    ("Resistance in West Java province, Indonesia", "", "", ("Indonesia", "West Java"), False),  # named in the question
+    ("Which MDR-TB mutations occur in Western Cape province?", "South Africa", "", ("South Africa", "Western Cape"), False),
+    ("Compare West Java province and Bali province", "Indonesia", "", ("Indonesia", ""), False),  # comparison: whole country
+    ("Resistance patterns", "Worldwide", "West Java", ("", ""), True),  # a region needs one country
+    ("Resistance in West Java province", "", "", ("", ""), True),  # region without a country
+    ("Resistance in Bali province", "Indonesia", "West Java", ("", ""), True),  # field and question disagree
+])
+def test_subnational_target_resolution(question, field, region, want, blocked):
+    t = resolve_target(question, field, region)
+    assert bool(t["problem"]) is blocked and (t["country"], t["region"]) == want
+
+
+def test_region_matching_is_a_whole_phrase():
+    assert region_matches("West Java", "Indonesia: West Java")
+    assert region_matches("west java province", "Indonesia:West Java")
+    assert region_matches("West Java", "Indonesia: Bandung, West Java")
+    assert not region_matches("West Java", "Indonesia: Central Java")
+    assert not region_matches("West Java", "Indonesia")
+
+
+def test_region_scope_verifies_matching_runs_and_holds_the_rest(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "r.db"))
+    o.state.question, o.state.country, o.state.region = "Which rifampicin mutations are present?", "Indonesia", "West Java"
+    rep = run_to_report(o)
+    st = o.state
+    assert st.region == "West Java" and st.scope["target"]["region"] == "West Java"
+    verified = {s.run for s in st.samples if s.eligibility == "Verified"}
+    assert verified == {"DEMO-R02", "DEMO-R13", "DEMO-R43"}  # "West Java" and "Bandung, West Java"
+    assert st.sample("DEMO-R04").eligibility == "Hold"  # Central Java: a person decides, never excluded by guesswork
+    assert "does not name the target region" in st.sample("DEMO-R04").eligibility_note
+    assert st.sample("DEMO-R06").eligibility == "Excluded"  # other country still excluded by rule
+    assert [(r["place"], r["n"]) for r in rep["by_place"]] == [("West Java", 3)] and rep["place_kind"] == "region"  # "Bandung, West Java" counted under West Java
+
+
+def test_report_breaks_country_scope_down_by_region(orch):
+    rep = run_to_report(orch)
+    rows = {r["place"]: r for r in rep["by_place"]}
+    assert rep["place_kind"] == "region" and sum(r["n"] for r in rep["by_place"]) == rep["counts"]["analysed"]
+    assert rows["Jakarta"]["resistant"]["RIF"] >= 1  # R01, R12, R33 are Jakarta MDR/XDR
+    assert any("counts, not rates" in l for l in rep["limitations"])
+
+
+# ---------------------------------------------------------------- country / region catalogue
+def test_catalogue_has_the_who_lists_with_regions():
+    c = catalogue()
+    assert len(c["high_burden"]) == 30 and c["watchlist"] == ["Cambodia", "Russia", "Zimbabwe"]
+    for name in c["high_burden"] + c["watchlist"]:
+        assert name in INSDC_COUNTRIES, f"{name} must be the INSDC name ENA records use"
+        assert regions_for(name), f"{name} has no regions on file"
+    assert len(regions_for("Indonesia")) == 38 and len(regions_for("South Africa")) == 9
+
+
+@pytest.mark.parametrize("target,location,country,ok", [
+    ("West Java", "Indonesia: Jawa Barat", "Indonesia", True),  # ISO (local) name in the record
+    ("Jawa Barat", "Indonesia: Bandung, West Java", "Indonesia", True),  # English name in the record
+    ("Hà Nội", "Viet Nam: Hanoi", "Viet Nam", True),  # accents and spacing
+    ("Ho Chi Minh City", "Viet Nam: Ho Chi Minh", "Viet Nam", True),
+    ("Tigray", "Ethiopia: Tigrai", "Ethiopia", True),
+    ("West Java", "Indonesia: Central Java", "Indonesia", False),
+])
+def test_region_matching_uses_catalogue_aliases(target, location, country, ok):
+    assert region_matches(target, location, country) is ok
+
+
+def test_regions_are_canonicalised_and_found_in_questions():
+    assert canonical_region("Indonesia", "jawa barat") == "West Java"
+    assert resolve_target("Resistance in West Java", "Indonesia")["region"] == "West Java"  # no "province" needed
+    assert resolve_target("Resistance in Hanoi", "Viet Nam")["region"] == "Hà Nội"
+    assert resolve_target("Resistance in Zambia", "Zambia")["region"] == ""  # "Central"/"Northern" not guessed from prose
+
+
+def test_geo_endpoints(tmp_path):
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "g.db"))))
+    countries = c.get("/api/geo/countries").json()
+    assert "Indonesia" in countries["high_burden"] and "Cambodia" in countries["watchlist"] and "France" in countries["other"]
+    regions = [r["name"] for r in c.get("/api/geo/regions", params={"country": "Indonesia"}).json()["regions"]]
+    assert "West Java" in regions and len(regions) == 38
+    assert c.get("/api/geo/regions", params={"country": "France"}).json()["regions"] == []
+
+
+# ---------------------------------------------------------------- test isolation (issue #20)
+def test_resets_never_touch_databases_in_the_working_directory(tmp_path, monkeypatch):
+    """Resetting to live and back (what the Demo/Live picker does) must not open or create tbamr-*.db in the cwd,
+    where the developer's real pipeline databases live."""
+    monkeypatch.chdir(tmp_path)
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "start.db"))))
+    for mode in ("live", "demo"):
+        assert c.post("/api/reset", params={"data": mode}).status_code == 200
+    assert not list(tmp_path.glob("tbamr-*.db")), "a reset opened a database in the working directory"
+    assert os.environ["TBAMR_DB"].startswith(tempfile.gettempdir())
+
+
+def test_release_is_archived_after_it_is_recorded(orch, monkeypatch):
+    """Regression for #19: the Mongo archive must see the release decision already in the log."""
+    import tbamr.stores.results as results
+    seen = {}
+
+    def fake_save(state, report, gate):
+        seen["logged"] = any(d["outcome"] == "Approve" and "report v" in d["rationale"] for d in orch.log.all())
+        seen["gate"] = dict(state.gates.get("release", {}))
+
+    monkeypatch.setattr(results, "save_release", fake_save)
+    run_to_report(orch)
+    orch.raw_view("report", str(orch.state.report["version"]), "pi", "Ana")
+    orch.release("pi", "Ana", "draft")
+    assert seen == {"logged": True, "gate": {"by": "Ana", "role": "pi", "kind": "draft", "version": orch.state.report["version"]}}

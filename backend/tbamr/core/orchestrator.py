@@ -20,9 +20,10 @@ from ..agents.reporting import ReportingOrchestrator
 from ..agents.scope_guardian import ScopeGuardian
 from ..agents.verification import VerificationTasker
 from ..tools.demo import DST as DEMO_DST
-from ..tools.demo import demo_tbprofiler_json
+from ..tools.demo import demo_tbprofiler_failure, demo_tbprofiler_json
 from ..tools.tbprofiler import parse_result
 from .decisions import Decision, DecisionLog, Outcome
+from .geo import search_country
 from .models import GATES, ROLES, RULES, STAGES, THRESHOLDS, PipelineState, Sample
 
 
@@ -218,29 +219,37 @@ class Orchestrator:
     def _s1(self):
         st = self.state
         self.orch("—", Outcome.INFO, RULES["scope"], "Handing the research scope to the Scope Guardian.", 1)
-        st.scope = self.agents["scope_guardian"].review(st.question, st.country, st.target_drugs, st.cohort_target)
+        st.scope = self.agents["scope_guardian"].review(st.question, st.country, st.target_drugs, st.cohort_target, st.region)
+        target = st.scope.get("target") or {}
+        if target.get("country") and not target.get("problem"):
+            st.country = target["country"]  # canonical INSDC name or "Worldwide"; downstream agents read st.country
+            st.region = target.get("region") or ""
         self._set(1, "wait")
         return st.scope
 
     def _s2(self):
         st = self.state
-        self.orch("—", Outcome.INFO, RULES["elig"], "Asking the Discovery Assistant for candidate runs.", 2)
-        found = self.agents["discovery"].discover(st.country, st.question)
+        if not st.country:
+            raise StageError("No target population is set. Reopen the scope and set a country, or \"Worldwide\".")
+        where = search_country(st.country)
+        label = (f"{st.region}, {where}" if st.region else where) or "worldwide, as requested"
+        self.orch("—", Outcome.INFO, RULES["elig"], f"Asking the Discovery Assistant for candidate runs ({label}).", 2)
+        found = self.agents["discovery"].discover(where, st.question, region=st.region)
         self._add_rows(found["rows"])
         self.orch("—", Outcome.INFO, RULES["elig"], f"Handing {len(st.samples)} candidate(s) to the Verification Tasker.", 2)
-        self.agents["verification"].verify(st.samples, st.country)
+        self.agents["verification"].verify(st.samples, st.country, st.region)
         st.cohort_checks = self._cohort_checks(found.get("total_in_ena", 0))
         # re-plan: the cohort cannot answer a comparison across places → ask Discovery to widen the search once
         if any(c["kind"] == "single_location" and c["outcome"] == "Escalate" for c in st.cohort_checks) and st.replans < self.max_replans:
             st.replans += 1
             studies = sorted({s.study for s in st.samples if s.eligibility == "Verified"})
             self.orch("COHORT", Outcome.RETRY, RULES["cohort"], f"Re-planning: asking Discovery for studies other than {', '.join(studies)} to support the comparison.", 2)
-            more = self.agents["discovery"].discover(st.country, st.question, already_known=[s.run for s in st.samples],
+            more = self.agents["discovery"].discover(where, st.question, already_known=[s.run for s in st.samples],
                                                      focus=f"The verified cohort comes from one location. Find runs from other studies than {', '.join(studies)}.",
-                                                     exclude_studies=studies)
+                                                     exclude_studies=studies, region=st.region)
             new = self._add_rows(more["rows"])
             if new:
-                self.agents["verification"].verify(new, st.country)
+                self.agents["verification"].verify(new, st.country, st.region)
             st.cohort_checks = self._cohort_checks(max(found.get("total_in_ena", 0), more.get("total_in_ena", 0)))
             self.orch("COHORT", Outcome.INFO, RULES["cohort"], f"Re-plan added {len(new)} run(s).", 2)
         self._set(2, "wait")
@@ -275,11 +284,15 @@ class Orchestrator:
 
     def _s4(self):
         n = self.agents["profiling"].queue(self.state.samples)
-        if self.demo:  # simulate the analyst importing TB-Profiler files
+        if self.demo:  # simulate the analyst importing TB-Profiler files (some runs fail, some have no file yet)
+            prof = self.agents["profiling"]
             for s in self.state.samples:
-                j = demo_tbprofiler_json(s.run) if s.profiling == "Awaiting results" else None
-                if j:
-                    self.agents["profiling"].apply_result(s, parse_result(j, f"{s.run}.results.json"), "simulated demo result", j)
+                if s.profiling != "Awaiting results":
+                    continue
+                if err := demo_tbprofiler_failure(s.run):
+                    prof.fail(s, err)
+                elif j := demo_tbprofiler_json(s.run):
+                    prof.apply_result(s, parse_result(j, f"{s.run}.results.json"), "simulated demo result", j)
         self._set(4, "wait")
         return {"queued": n}
 
@@ -440,10 +453,26 @@ class Orchestrator:
 
         def work() -> None:
             from .executions import capture_execution
-            with capture_execution(self.log, f"TB-Profiler batch ({len(runs)} run(s))"):
+            with capture_execution(self.log, f"TB-Profiler batch ({len(runs)} run(s))") as ctx:
                 with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="tbp") as pool:
                     for _ in pool.map(profile_one, runs):
                         pass
+                # Record what the batch actually produced per sample, so the Logs tab can show the
+                # outcome of a historical TB-Profiler run alongside the captured log output.
+                outcomes = []
+                for r in runs:
+                    s = self.state.sample(r)
+                    if not s:
+                        outcomes.append({"run": r, "status": "unknown", "note": "sample not found in state"})
+                        continue
+                    m = s.profile_meta or {}
+                    outcomes.append({"run": r, "status": s.profiling or "", "note": s.profiling_note or "",
+                                     "tool": m.get("tool"), "db": m.get("db"),
+                                     "resistance_annotations": len(m.get("mutations", []) or []),
+                                     "median_depth": m.get("median_depth")})
+                ctx.record({"concurrency": concurrency, "threads_per_sample": self.agents["profiling"].runner.threads,
+                            "n_runs": len(runs), "outcomes": outcomes,
+                            "status_counts": dict(Counter(o["status"] for o in outcomes))})
             with self.lock:
                 self.busy = None
                 try:
@@ -490,11 +519,18 @@ class Orchestrator:
             if kind == "final" and (pending or rep.get("superseded")):
                 raise StageError("Final release is blocked while findings are pending or the report is superseded.")
             ev = self.note_raw(role, person, "report", str(rep["version"]), f"report v{rep['version']}")
-            self.state.gates["release"] = {"by": person, "role": role, "kind": kind, "version": rep["version"]}
+            gate = {"by": person, "role": role, "kind": kind, "version": rep["version"]}
+            self.state.gates["release"] = gate
             self.human(role, person, "—", Outcome.APPROVE, RULES["rpt"], f"{'Final release' if kind == 'final' else 'Exploratory draft shared'}: report v{rep['version']}.", 6, ev)
             if kind == "final":
                 self._set(6, "done")
             self.save()
+            # Archive to Mongo only after the release is recorded and saved, so the archived snapshot
+            # matches the decision log (best-effort; the SQLite log stays authoritative). Imported here
+            # to avoid pulling pymongo into the orchestrator's import graph when the stores package
+            # itself hasn't been touched.
+            from ..stores.results import save_release
+            save_release(self.state, rep, {**gate, "person": person, "role": role})
 
     def draft_summary(self) -> str:
         if not self.state.report:

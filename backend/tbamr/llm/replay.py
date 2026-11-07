@@ -118,18 +118,23 @@ def verification(messages):
     if step == 0:
         studies = sorted({a["study"] for a in amb if "country" in a["issue"]})
         calls = [use("find_publications", query=s, limit=3) for s in studies] + [use("ena_study", study_accession=s) for s in studies]
-        return [think(f"{len(amb)} ambiguous run(s). Checking studies and publications for those missing a country." if calls else f"{len(amb)} ambiguous run(s); the records themselves hold the evidence.")] + (calls or [use("submit", proposals=_proposals(amb, []))])
-    return [think("Proposing outcomes with the evidence found."), use("submit", proposals=_proposals(amb, _all_results(messages)))]
+        return [think(f"{len(amb)} ambiguous run(s). Checking studies and publications for those missing a country." if calls else f"{len(amb)} ambiguous run(s); the records themselves hold the evidence.")] + (calls or [use("submit", proposals=_proposals(amb, {}))])
+    # step 0 issued one find_publications call per study (sorted), so the first results line up with those studies
+    studies = sorted({a["study"] for a in amb if "country" in a["issue"]})
+    results = _all_results(messages)
+    pubs_by_study = {s: r for s, r in zip(studies, results) if isinstance(r, list)}
+    return [think("Proposing outcomes with the evidence found."), use("submit", proposals=_proposals(amb, pubs_by_study))]
 
 
-def _proposals(amb, results):
-    pubs = [p for r in results if isinstance(r, list) for p in r]
+def _proposals(amb, pubs_by_study):
     out = []
     for a in amb:
         if "BioSample" in a["issue"]:
             out.append({"run": a["run"], "outcome": "Exclude", "rationale": "Same isolate as an earlier run; keep the earlier run as the isolate's representative.", "evidence": f"BioSample {a['biosample']}"})
+        elif "region" in a["issue"]:
+            out.append({"run": a["run"], "outcome": "Hold", "rationale": "The location does not name the target region. Whether the recorded place lies inside it is a human decision.", "evidence": f"location {a.get('country') or 'missing'}"})
         elif "country" in a["issue"]:
-            pub = next((p for p in pubs if p and "Indonesia" in (p.get("title") or "")), None)
+            pub = next((p for p in pubs_by_study.get(a["study"], []) if p and "Indonesia" in (p.get("title") or "")), None)
             if pub:
                 out.append({"run": a["run"], "outcome": "Escalate", "rationale": "ENA country is missing, but a publication linked to the study describes Indonesian isolates. A human must confirm origin.", "evidence": pub.get("title", "")})
             else:

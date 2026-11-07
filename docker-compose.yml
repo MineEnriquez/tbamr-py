@@ -1,0 +1,43 @@
+# Optional: a local MongoDB for the pipeline-result archive and the upstream-data cache.
+#   docker compose up -d mongo        start Mongo in the background
+#   docker compose down               stop and remove
+#   docker compose logs -f mongo      tail the Mongo log
+#
+# The app degrades gracefully when Mongo is down — caches miss, result archive is skipped,
+# everything else keeps working. So this file is a convenience, not a requirement.
+services:
+  mongo:
+    image: mongo:7
+    container_name: tbamr-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Browser UI for Mongo. Visit http://localhost:8081 after `docker compose up -d mongo-express`.
+  # Default login (set below): admin / admin. Change these before exposing beyond localhost.
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: tbamr-mongo-express
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongo
+      ME_CONFIG_MONGODB_PORT: "27017"
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+      ME_CONFIG_SITE_BASEURL: /
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+
+volumes:
+  mongo-data:

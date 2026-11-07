@@ -1,10 +1,14 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api.js'
 import { fmtTime } from './common.jsx'
 
 /* Embedded log viewer: one entry per discrete action triggered by the user (stage run, gate
    approval, hold resolution, TB-Profiler batch, ...). Each entry stores the stdout/stderr/log
-   output captured while that action was running — scoped, not a continuous live tail. */
+   output captured while that action was running — scoped, not a continuous live tail.
+
+   Executions are grouped by "pipeline run" — a cycle from fresh state through to the next Reset.
+   The current run is live; previous runs are closed and remain selectable so you can look back
+   at logs from before the last reset. */
 
 const STATUS = { ok: 'OK', error: 'Error', running: 'Running…' }
 
@@ -14,6 +18,12 @@ function dur(a, b) {
   if (d < 60) return `${d.toFixed(1)}s`
   const m = Math.floor(d / 60), s = Math.round(d % 60)
   return `${m}m ${s}s`
+}
+
+function runLabel(r) {
+  if (!r) return ''
+  const base = r.label && r.label.trim() ? r.label : (r.started_at ? fmtTime(r.started_at) : `Run #${r.id}`)
+  return r.active ? `${base} · current` : base
 }
 
 function LogView({ text, errorsOnly }) {
@@ -32,40 +42,105 @@ function LogView({ text, errorsOnly }) {
   )
 }
 
+function resultHeadline(result) {
+  // Compact one-liner so the user doesn't have to open every result. Picks the keys that look
+  // informative without hard-coding every endpoint's shape.
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return ''
+  const parts = []
+  if (result.by) parts.push(`by ${result.by}`)
+  if (result.cohort_size != null) parts.push(`${result.cohort_size} in cohort`)
+  if (result.qc_pass != null) parts.push(`${result.qc_pass} pass · ${result.qc_escalated || 0} escalated · ${result.qc_excluded || 0} excluded`)
+  if (result.profiled != null) parts.push(`${result.profiled} profiled`)
+  if (result.n_runs != null) parts.push(`${result.n_runs} TB-Profiler run(s)`)
+  if (result.status_counts) parts.push(Object.entries(result.status_counts).map(([k, v]) => `${v} ${k || '?'}`).join(', '))
+  if (result.candidates != null) parts.push(`${result.candidates} candidate(s)`)
+  if (result.queued != null) parts.push(`${result.queued} queued`)
+  if (Array.isArray(result.imported)) parts.push(`${result.imported.length} imported` + (result.skipped?.length ? ` · ${result.skipped.length} skipped` : ''))
+  if (result.version != null) parts.push(`v${result.version}`)
+  if (result.kind) parts.push(result.kind)
+  if (result.decision) parts.push(result.decision)
+  if (result.fid) parts.push(result.fid)
+  if (result.run) parts.push(result.run)
+  return parts.join(' · ')
+}
+
+function ResultPanel({ result }) {
+  const [open, setOpen] = useState(false)
+  if (result == null) return null
+  const headline = resultHeadline(result)
+  const json = JSON.stringify(result, null, 2)
+  return (
+    <details open={open} onToggle={e => setOpen(e.currentTarget.open)} className="exec-result">
+      <summary>
+        <span className="eyebrow" style={{ marginRight: 8 }}>Result</span>
+        {headline && <span className="muted" style={{ fontSize: '.82rem' }}>{headline}</span>}
+      </summary>
+      <pre className="exec-result-json">{json}</pre>
+    </details>
+  )
+}
+
 export default function Logs({ version }) {
   const [items, setItems] = useState([])
+  const [runs, setRuns] = useState([])
+  const [runId, setRunId] = useState(null)  // null = active run
   const [sel, setSel] = useState(null)
   const [detail, setDetail] = useState(null)
   const [errorsOnly, setErrorsOnly] = useState(false)
   const [autoPick, setAutoPick] = useState(true)
-  const pull = useCallback(() => api.executions(200).then(d => {
+  const activeRunId = useMemo(() => (runs.find(r => r.active) || {}).id ?? null, [runs])
+  const effectiveRunId = runId ?? activeRunId
+  const selectedRun = useMemo(() => runs.find(r => r.id === effectiveRunId) || null, [runs, effectiveRunId])
+  const isActive = !selectedRun || selectedRun.active
+  const pullRuns = useCallback(() => api.runs().then(setRuns).catch(() => {}), [])
+  const pull = useCallback(() => api.executions(200, effectiveRunId == null ? undefined : effectiveRunId).then(d => {
     setItems(d)
-    if (autoPick && d.length && sel == null) setSel(d[0].id)
-  }).catch(() => {}), [autoPick, sel])
+    if (autoPick && d.length && (sel == null || !d.some(x => x.id === sel))) setSel(d[0].id)
+  }).catch(() => {}), [autoPick, sel, effectiveRunId])
+  useEffect(() => { pullRuns() }, [pullRuns, version])
   useEffect(() => { pull() }, [pull, version])
   useEffect(() => {
     if (sel == null) { setDetail(null); return }
     api.execution(sel).then(setDetail).catch(() => setDetail(null))
   }, [sel])
-  // Live refresh while an execution is still running
+  // Live refresh while an execution is still running (only meaningful on the active run)
   useEffect(() => {
+    if (!isActive) return
     const anyRunning = items.some(x => !x.end_ts)
     if (!anyRunning) return
-    const t = setInterval(pull, 1500)
+    const t = setInterval(() => { pull(); pullRuns() }, 1500)
     return () => clearInterval(t)
-  }, [items, pull])
+  }, [items, pull, pullRuns, isActive])
 
   return (
     <div className="logs">
       <aside className="logs-list">
         <div className="row between" style={{ padding: '4px 10px' }}>
           <h3 style={{ fontSize: '.95rem' }}>Executions</h3>
-          <button className="btn small ghost" onClick={pull}>Refresh</button>
+          <button className="btn small ghost" onClick={() => { pullRuns(); pull() }}>Refresh</button>
         </div>
+        {runs.length > 0 && (
+          <div className="row" style={{ padding: '0 10px 6px', fontSize: '.8rem', gap: 6 }}>
+            <label htmlFor="logs-run" className="muted">Pipeline run</label>
+            <select id="logs-run" value={runId == null ? '' : String(runId)}
+                    onChange={e => { setRunId(e.target.value ? Number(e.target.value) : null); setSel(null); setAutoPick(true) }}
+                    style={{ flex: 1, minWidth: 0 }}>
+              <option value="">Current run</option>
+              {runs.filter(r => !r.active).map(r => (
+                <option key={r.id} value={r.id}>{runLabel(r)}{r.n_executions ? ` · ${r.n_executions}` : ''}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {selectedRun && !selectedRun.active && (
+          <p className="muted" style={{ padding: '0 10px 6px', fontSize: '.75rem' }}>
+            Closed {selectedRun.ended_at ? fmtTime(selectedRun.ended_at) : ''} · read-only snapshot of a previous pipeline run.
+          </p>
+        )}
         <div className="row" style={{ padding: '0 10px 8px', fontSize: '.78rem' }}>
           <label><input type="checkbox" checked={autoPick} onChange={e => setAutoPick(e.target.checked)} /> auto-select newest</label>
         </div>
-        {!items.length && <p className="muted" style={{ padding: '0 10px' }}>Nothing recorded yet. Trigger a stage run or any other action to see captured logs.</p>}
+        {!items.length && <p className="muted" style={{ padding: '0 10px' }}>Nothing recorded in this run yet. Trigger a stage run or any other action to see captured logs.</p>}
         <ul className="logs-items">
           {items.map(x => {
             const status = x.end_ts ? x.status : 'running'
@@ -79,6 +154,7 @@ export default function Logs({ version }) {
                   <span>{x.start_ts ? fmtTime(x.start_ts) : '—'}</span>
                   <span>· {dur(x.start_ts, x.end_ts)}</span>
                   <span>· {x.log_bytes ? `${x.log_bytes.toLocaleString()} B` : '0 B'}</span>
+                  {x.has_result && <span className="logs-result-badge" title="This execution has a structured result">· result</span>}
                 </div>
                 {x.error && <div className="logs-err">{x.error}</div>}
               </li>
@@ -96,6 +172,7 @@ export default function Logs({ version }) {
             </div>
             <label style={{ fontSize: '.82rem' }}><input type="checkbox" checked={errorsOnly} onChange={e => setErrorsOnly(e.target.checked)} /> errors only</label>
           </div>
+          <ResultPanel result={detail.result} />
           <LogView text={detail.log_text} errorsOnly={errorsOnly} />
         </>}
       </section>
