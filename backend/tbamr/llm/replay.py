@@ -72,8 +72,16 @@ def scope_guardian(messages):
         warnings.append("The question compares places; that needs verified isolates from several locations, which will be checked after discovery.")
     # The definitions are fixed by the pipeline's rules; the scripted agent accepts them as given.
     gaps = [{"key": g["key"], "gap": g["gap"], "agrees": True} for g in c.get("required_policy_gaps", [])]
+    revised = ""
+    if re.search(r"associat|pattern|prevalence|how common", q, re.I):
+        t = c.get("target") or {}
+        where = (f"{t.get('region')}, {t.get('country')}" if t.get("region") else t.get("country")) or "the target population"
+        drugs = " and ".join(d.lower() for d in c.get("target_drugs", [])) or "the target drugs"
+        revised = (f"Among public Illumina WGS runs of M. tuberculosis from {where} that pass verification and QC, which "
+                   f"WHO-catalogued {drugs} resistance mutations are observed, how often, and, where phenotypic DST is "
+                   "available, how well do genotypic predictions agree with it?")
     return [think(f"Read the question ({len(q)} characters) and {len(c.get('target_drugs', []))} target drug(s). Accepting the four playbook definitions as the rules apply them; {len(warnings)} warning(s)."),
-            use("submit", blocking=[], gaps=gaps, warnings=warnings, asks_comparison_across_places=places)]
+            use("submit", blocking=[], gaps=gaps, warnings=warnings, asks_comparison_across_places=places, revised_question=revised)]
 
 
 def discovery(messages):

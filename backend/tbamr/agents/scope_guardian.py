@@ -53,6 +53,9 @@ class ScopeGuardian(LLMAgent):
         "restate a rule you agree with. Warnings: at most 4, specific to this question, these drugs and this target; do not "
         "repeat the four definitions or the standing caveats they already cover (no prevalence or clinical claims, missing "
         "DST, public genomes as a convenience sample). Return no warnings rather than generic ones. "
+        "If the question promises more than public genomes can answer (e.g. 'associated with', 'patterns', prevalence, "
+        "comparisons the target can't support), give `revised_question`: one sentence the data can answer, keeping the "
+        "researcher's intent, target and drugs. Leave it empty when the question is already answerable. "
         "You propose; the researcher approves."
     )
     max_steps = 3
@@ -66,6 +69,7 @@ class ScopeGuardian(LLMAgent):
                 "proposal": {"type": "string", "description": "only when agrees is false: the change you propose"}}, "required": ["key", "agrees"]}},
             "warnings": {"type": "array", "items": {"type": "string"}},
             "asks_comparison_across_places": {"type": "boolean"},
+            "revised_question": {"type": "string", "description": "optional: a wording of the question the data can answer"},
         },
         "required": ["blocking", "gaps", "warnings", "asks_comparison_across_places"],
     }
@@ -103,7 +107,10 @@ class ScopeGuardian(LLMAgent):
         for extra in (target.get("note"), target.get("notice")):  # rule notes lead the Guardian's own warnings
             if extra and extra not in warnings:
                 warnings.insert(0, extra)
-        return {"blocking": sorted(set(blocking)), "gaps": gaps, "warnings": warnings,
+        revised = " ".join(str(sub.get("revised_question") or "").split())
+        if revised and revised.lower() == " ".join(str(ctx.get("question", "")).split()).lower():
+            revised = ""  # identical to the researcher's own wording: nothing to propose
+        return {"blocking": sorted(set(blocking)), "gaps": gaps, "warnings": warnings, "revised_question": revised,
                 "asks_comparison_across_places": bool(sub.get("asks_comparison_across_places")), "target": target}
 
     @logged("tbamr.agents")

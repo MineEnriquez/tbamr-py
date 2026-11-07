@@ -62,6 +62,11 @@ class CacheToggle(BaseModel):
     enabled: bool
 
 
+class WarningResponse(Who):
+    decision: str  # "accept" | "disagree"
+    rationale: str = ""
+
+
 class Resolve(Who):
     run: str
     decision: str
@@ -175,6 +180,17 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
     def scope_target(question: str = "", country: str = "", region: str = ""):
         """Resolve the target population the same way Stage 1 will, so the form can show it before running."""
         return resolve_target(question, country, region)
+
+    @app.post("/api/scope/warnings/{idx}")
+    def respond_warning(idx: int, b: WarningResponse):
+        with capture_execution(O().log, f"Respond to scope warning {idx + 1}"):
+            guard(O().respond_warning, b.role, b.person, idx, b.decision, b.rationale)
+        return {"ok": True}
+
+    @app.post("/api/scope/revised-question")
+    def adopt_revised_question(b: Who):
+        with capture_execution(O().log, "Adopt revised question"):
+            return {"question": guard(O().adopt_revised_question, b.role, b.person)}
 
     @app.post("/api/scope/reopen")
     def reopen_scope():

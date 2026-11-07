@@ -360,3 +360,12 @@ details.defs[open] summary{margin-bottom:8px}
   color:var(--hold);background:var(--hold-bg);border:1px solid color-mix(in srgb,var(--hold) 40%,transparent);margin-bottom:-4px}
 .demo-mode.replay-mode :is(.panel, .flow, .drawer, .modal)::before{content:"DEMO · simulated data · scripted agents"}
 .cached-note{font-size:.88rem;border-left:3px solid var(--blue)}
+/* Scope warnings answered by the PI; Guardian's revised wording */
+.warn-list{padding-left:1.2em;list-style:decimal}
+.warn-item{margin-bottom:10px}
+.warn-item p{margin:0 0 4px}
+.warn-answer{font-size:.86rem;font-weight:600}
+.warn-answer.accept,.warn-accepted{color:var(--ok)}
+.warn-answer.disagree,.warn-disputed{color:var(--esc)}
+.revised-q{border-left:3px solid var(--blue)}
+.revised-text{font-size:1rem;font-style:italic;margin:6px 0 10px}

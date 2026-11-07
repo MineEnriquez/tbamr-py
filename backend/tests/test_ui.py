@@ -114,3 +114,28 @@ def test_country_and_region_dropdowns(page, live_server, reset_demo):
     country.select_option("Kenya")  # changing country clears the region
     page.wait_for_selector('#start-region option[value="Nairobi City"]', state="attached", timeout=3000)
     assert page.locator('#start-region').input_value() == ""
+
+
+def test_scope_warnings_must_be_answered_and_wording_can_be_adopted(page, live_server, reset_demo):
+    """Approve stays disabled until each Guardian warning is answered; the suggested wording reopens the scope."""
+    import json as _json
+    post = lambda path, body=None: urllib.request.urlopen(urllib.request.Request(
+        f"{live_server}{path}", data=_json.dumps(body or {}).encode(), headers={"Content-Type": "application/json"}, method="POST"), timeout=10).read()
+    post("/api/scope", {"question": "Which mutations are associated with rifampicin resistance across regions?", "country": "Indonesia"})
+    post("/api/stages/1/run")
+    page.on("dialog", lambda d: d.accept())
+    page.goto(f"{live_server}/", wait_until="networkidle")
+    page.get_by_role("button", name="Go to Stage 1 →").click()
+    approve = page.get_by_role("button", name="Approve scope", exact=True)
+    assert approve.is_disabled()
+    accept = page.locator(".warn-item").get_by_role("button", name="Accept", exact=True)
+    for _ in range(10):  # each answer re-renders the list, so always click the first remaining button
+        if accept.count() == 0:
+            break
+        n = accept.count()
+        accept.first.click()
+        page.wait_for_function(f"document.querySelectorAll('.warn-item .btn.primary').length < {n}", timeout=5000)
+    page.wait_for_function("!document.querySelector('.gate .btn.primary').disabled", timeout=5000)
+    assert page.locator(".warn-answer.accept").count() >= 1
+    page.get_by_role("button", name="Use this wording and review again").click()
+    page.wait_for_function("document.querySelector('textarea[aria-label=\"Research question\"]')?.value.includes('WHO-catalogued')", timeout=5000)

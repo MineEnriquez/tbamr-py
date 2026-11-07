@@ -27,8 +27,14 @@ def orch(tmp_path):
     return o
 
 
+def answer_warnings(o, decision="accept"):
+    """The PI answers every Scope Guardian warning (required before the scope can be approved)."""
+    for i in range(len(o.state.scope.get("warnings") or [])):
+        o.respond_warning("pi", "Ana", i, decision, "Accepted for this test.")
+
+
 def run_to_report(o):
-    o.run_stage(1); o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.run_stage(1); o.raw_view("scope", "guardian", "pi", "Ana"); answer_warnings(o); o.approve_scope("pi", "Ana")
     o.run_stage(2); o.raw_view("cohort", "all", "pi", "Ana"); o.approve_cohort("pi", "Ana")
     o.run_stage(3); o.raw_view("qc", "all", "analyst", "Budi"); o.confirm_qc("analyst", "Budi")
     o.run_stage(4); o.raw_view("profiling", "all", "analyst", "Budi"); o.close_profiling("analyst", "Budi")
@@ -158,7 +164,7 @@ def test_orchestrator_replans_when_cohort_cannot_answer(tmp_path):
     o.state.question = "Are there differences in resistance across regions of Indonesia?"
     o.run_stage(1)
     assert o.state.scope["asks_comparison_across_places"] is True
-    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.raw_view("scope", "guardian", "pi", "Ana"); answer_warnings(o); o.approve_scope("pi", "Ana")
     o.run_stage(2)
     outs = [d for d in o.log.all() if d["actor"] == "agent:orchestrator" and d["outcome"] == "Retry"]
     assert outs, "orchestrator should re-plan"
@@ -485,7 +491,7 @@ def test_question_country_becomes_the_search_scope(tmp_path):
     o.state.question, o.state.country = "Which mutations explain rifampicin resistance in Indonesia?", ""
     o.run_stage(1)
     assert o.state.country == "Indonesia" and o.state.scope["target"]["source"] == "question"
-    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.raw_view("scope", "guardian", "pi", "Ana"); answer_warnings(o); o.approve_scope("pi", "Ana")
     o.run_stage(2)
     assert o.state.sample("DEMO-R06").eligibility == "Excluded"  # Viet Nam is outside the resolved scope
 
@@ -495,7 +501,7 @@ def test_explicit_worldwide_searches_without_a_country_filter(tmp_path):
     o.state.question, o.state.country = "Global patterns of rifampicin resistance", ""
     o.run_stage(1)
     assert o.state.country == "Worldwide" and not o.state.scope["blocking"]
-    o.raw_view("scope", "guardian", "pi", "Ana"); o.approve_scope("pi", "Ana")
+    o.raw_view("scope", "guardian", "pi", "Ana"); answer_warnings(o); o.approve_scope("pi", "Ana")
     o.run_stage(2)
     calls = [t for t in o.log.traces("discovery") if t["kind"] == "tool_call"]
     assert all('country="Worldwide' not in json.dumps(t["payload"]) for t in calls)
@@ -707,13 +713,66 @@ def test_guardian_flags_a_cached_answer():
     assert _guardian_with(sub, cached=True).review("Rifampicin resistance in Indonesia", "Indonesia", ["Rifampicin"], 8)["from_cache"] is True
 
 
+# ---------------------------------------------------------------- scope warnings become decisions; revised question loop
+def _scoped(tmp_path, question, country="Indonesia"):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "s.db"))
+    o.state.question, o.state.country = question, country
+    o.run_stage(1)
+    o.raw_view("scope", "guardian", "pi", "Ana")
+    return o
 
-def test_tests_never_reach_the_real_claude_api(tmp_path):
-    """A reset rebuilds the app via make_client(); in tests it must stay on the scripted agents even if a key is set."""
-    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "b.db"))))
-    assert c.post("/api/reset", params={"data": "demo"}).status_code == 200
-    assert c.get("/api/state").json()["mode"]["brain"] == "replay"
 
+def test_scope_cannot_be_approved_until_every_warning_is_answered(tmp_path):
+    o = _scoped(tmp_path, "Compare rifampicin resistance across regions of Indonesia")
+    n = len(o.state.scope["warnings"])
+    assert n >= 1
+    with pytest.raises(StageError, match="Respond to every Scope Guardian warning"):
+        o.approve_scope("pi", "Ana")
+    with pytest.raises(StageError, match="Say why"):
+        o.respond_warning("pi", "Ana", 0, "disagree", "  ")
+    with pytest.raises(PermissionDenied):
+        o.respond_warning("analyst", "Budi", 0, "accept")
+    o.respond_warning("pi", "Ana", 0, "disagree", "Regions are compared descriptively only.")
+    for i in range(1, n):
+        o.respond_warning("pi", "Ana", i, "accept")
+    o.approve_scope("pi", "Ana")
+    logged = [d for d in o.log.all() if d["sample_id"].startswith("WARNING-")]
+    assert len(logged) == n and {d["outcome"] for d in logged} <= {"Approve", "Override"}
+    assert any("Regions are compared descriptively only." in d["rationale"] for d in logged)
+
+
+def test_report_lists_how_each_warning_was_handled(tmp_path):
+    o = _scoped(tmp_path, "Compare rifampicin resistance across regions of Indonesia")
+    answer_warnings(o)
+    o.approve_scope("pi", "Ana")
+    o.run_stage(2); o.raw_view("cohort", "all", "pi", "Ana"); o.approve_cohort("pi", "Ana")
+    o.run_stage(3); o.raw_view("qc", "all", "analyst", "Budi"); o.confirm_qc("analyst", "Budi")
+    o.run_stage(4); o.raw_view("profiling", "all", "analyst", "Budi"); o.close_profiling("analyst", "Budi")
+    o.run_stage(5); rep = o.run_stage(6)
+    assert rep["scope_warnings"] and all(w["decision"] == "accept" and w["person"] == "Ana" for w in rep["scope_warnings"])
+
+
+def test_revised_question_can_be_adopted_and_re_reviewed(tmp_path):
+    original = "Which mutations are associated with rifampicin resistance?"
+    o = _scoped(tmp_path, original)
+    revised = o.state.scope["revised_question"]
+    assert revised and "Indonesia" in revised and "associated" not in revised
+    o.adopt_revised_question("pi", "Ana")
+    assert o.state.question == revised and o.state.stage_status["1"] == "ready" and not o.state.scope
+    d = next(d for d in o.log.all() if "Research question revised" in d["rationale"])
+    assert original in d["rationale"] and revised in d["rationale"] and d["actor"] == "human:pi:Ana"
+    o.run_stage(1)  # round 2: the sharper wording needs no further revision
+    assert o.state.scope["revised_question"] == ""
+
+
+def test_scope_decision_endpoints(tmp_path):
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "a.db"))))
+    c.post("/api/scope", json={"question": "Which mutations are associated with rifampicin resistance across regions?", "country": "Indonesia"})
+    c.post("/api/stages/1/run")
+    assert c.post("/api/scope/warnings/0", json={"role": "pi", "person": "Ana", "decision": "maybe"}).status_code == 409
+    assert c.post("/api/scope/warnings/0", json={"role": "pi", "person": "Ana", "decision": "accept"}).status_code == 200
+    r = c.post("/api/scope/revised-question", json={"role": "pi", "person": "Ana"})
+    assert r.status_code == 200 and "WHO-catalogued" in r.json()["question"]
 
 
 def test_admin_cache_toggle_accepts_a_json_body(tmp_path):
@@ -722,3 +781,10 @@ def test_admin_cache_toggle_accepts_a_json_body(tmp_path):
     r = c.post("/api/admin/cache/claude/toggle", json={"enabled": False})
     assert r.status_code == 200 and r.json() == {"ok": True, "namespace": "claude", "enabled": False}
     assert c.post("/api/admin/cache/nope/toggle", json={"enabled": True}).status_code == 404
+
+
+def test_tests_never_reach_the_real_claude_api(tmp_path):
+    """A reset rebuilds the app via make_client(); in tests it must stay on the scripted agents even if a key is set."""
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "b.db"))))
+    assert c.post("/api/reset", params={"data": "demo"}).status_code == 200
+    assert c.get("/api/state").json()["mode"]["brain"] == "replay"

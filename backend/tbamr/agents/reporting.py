@@ -71,6 +71,8 @@ class ReportingOrchestrator(RuleAgent):
             "limitations": limitations,
             "provenance": {"tools": sorted({s.profile_meta.get("tool") for s in analysed if s.profile_meta.get("tool")}),
                            "databases": sorted({str(s.profile_meta.get("db")) for s in analysed if s.profile_meta.get("db")}), "rules": RULES},
+            "scope_warnings": [{"warning": w, **({k: v for k, v in (st.scope.get("responses") or {}).get(str(i), {}).items() if k != "ts"})}
+                               for i, w in enumerate(st.scope.get("warnings") or [])],
             "gates": st.gates, "summary_draft": None,
         }
         _LOG.info("report v%s counts: candidates=%d verified=%d qc_passed=%d analysed=%d", version, len(st.samples), len(cohort), len(qc), n)

@@ -336,12 +336,39 @@ function Definitions({ gaps }) {
   )
 }
 
+/* One Scope Guardian warning and the PI's answer: Accept (the study respects this limit) or Disagree
+ * (with the reason it doesn't apply). Answers are logged as decisions and listed in the report. */
+function WarningItem({ i, text, response, open, act, who }) {
+  const [why, setWhy] = useState('')
+  const [editing, setEditing] = useState(false)    // reopen the controls on an answered warning
+  const [disagree, setDisagree] = useState(false)  // showing the reason box
+  const send = (decision) => act(() => api.respondWarning(i, { ...who, decision, rationale: decision === 'disagree' ? why : '' }),
+    decision === 'accept' ? `Warning ${i + 1} accepted` : `Warning ${i + 1} disputed`).then(() => { setEditing(false); setDisagree(false) })
+  const showControls = open && (!response || editing)
+  return (
+    <li className="warn-item">
+      <p>{text}</p>
+      {response && !editing && <p className={'warn-answer ' + response.decision}>
+        {response.decision === 'accept' ? '✓ Accepted' : '✗ Disputed'} by {response.person || response.role}{response.rationale ? ` — ${response.rationale}` : ''}
+        {open && <button className="btn small ghost" style={{ marginLeft: 8 }} onClick={() => setEditing(true)}>Change</button>}</p>}
+      {showControls && <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+        {!disagree && <button className="btn small primary" onClick={() => send('accept')}>Accept</button>}
+        {!disagree && <button className="btn small" onClick={() => setDisagree(true)}>Disagree…</button>}
+        {disagree && <><input value={why} onChange={e => setWhy(e.target.value)} placeholder="Why doesn't this apply?" aria-label={`Reason for disputing warning ${i + 1}`} style={{ minWidth: 320 }} />
+          <button className="btn small primary" disabled={!why.trim()} onClick={() => send('disagree')}>Record</button></>}
+        {(disagree || editing) && <button className="btn small ghost" onClick={() => { setDisagree(false); setEditing(false) }}>Cancel</button>}
+      </div>}
+    </li>
+  )
+}
+
 function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
   const [q, setQ] = useState(st.question)
   const [country, setCountry] = useState(st.country || '')
   const [region, setRegion] = useState(st.region || '')
   const [target, setTarget] = useState(st.cohort_target ?? 8)
   const sc = st.scope || {}
+  const openWarnings = (sc.warnings || []).filter((_, i) => !(sc.responses || {})[String(i)]).length
   // Detect a question/country-field conflict: if the question clearly names a country different
   // from the Country field, the Guardian will silently use the field. Force the user to reconcile.
   const conflict = useMemo(() => {
@@ -392,12 +419,21 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
       </div>
       {sc.blocking?.length > 0 && <div className="box esc"><h3>Blocking gaps</h3><ul className="clean">{sc.blocking.map(b => <li key={b}>{b}</li>)}</ul></div>}
       {sc.from_cache && <div className="box note cached-note" role="note"><b>Cached answer.</b> This scope is identical to an earlier one, so the Scope Guardian's review below was reused from the cache: no new model call was made. Change the scope, or turn off the Claude cache in Admin, for a fresh review.</div>}
-      {sc.warnings?.length > 0 && <div className="box hold"><h3>Warnings from the Scope Guardian</h3><ul className="clean">{sc.warnings.map(w => <li key={w}>{w}</li>)}</ul></div>}
+      {status === 'wait' && sc.revised_question && <div className="box note revised-q">
+        <h3>The Scope Guardian suggests a sharper wording</h3>
+        <p className="revised-text">{sc.revised_question}</p>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn small primary" onClick={() => { if (confirm('Replace your question with this wording and run the Scope Guardian again? Your current answers to the warnings are cleared; both wordings stay in the decision log.')) act(() => api.adoptRevisedQuestion(who), 'Question revised — run Stage 1 again') }}>Use this wording and review again</button>
+          <span className="muted" style={{ fontSize: '.82rem' }}>Or keep your question and answer the warnings below.</span>
+        </div></div>}
+      {sc.warnings?.length > 0 && <div className="box hold"><h3>Warnings from the Scope Guardian <span className="muted" style={{ fontWeight: 400 }}>· answer each before approving</span></h3>
+        <ol className="clean warn-list">{sc.warnings.map((w, i) => <WarningItem key={i} i={i} text={w} response={(sc.responses || {})[String(i)]} open={status === 'wait'} act={act} who={who} />)}</ol></div>}
       <Definitions gaps={sc.gaps || []} />
       {status === 'wait' && <div className="box gate"><h3>Gate · Researcher approval</h3>
         <p className="role-reqd">Only <RoleBadge role="pi" /> can approve the scope.</p>
-        <p>Approving accepts the definitions this run will apply.</p>
-        <div className="row"><button className="btn primary" onClick={() => act(() => api.gate('scope', who), 'Scope approved')}>Approve scope</button>
+        <p>Approving accepts the definitions this run will apply{sc.warnings?.length ? ' and your answers to the warnings' : ''}.</p>
+        <div className="row"><button className="btn primary" disabled={openWarnings > 0} title={openWarnings ? `Answer the ${openWarnings} open warning(s) first` : undefined} onClick={() => act(() => api.gate('scope', who), 'Scope approved')}>Approve scope</button>
+          {openWarnings > 0 && <span className="muted" style={{ fontSize: '.84rem' }}>{openWarnings} warning{openWarnings > 1 ? 's' : ''} still to answer</span>}
           <RawLink kind="scope" k="guardian" /></div></div>}
       {status === 'done' && <p className="okmsg">Scope approved by {st.gates.scope?.person || ROLE_LABEL[st.gates.scope?.role] || 'researcher'}</p>}
     </>

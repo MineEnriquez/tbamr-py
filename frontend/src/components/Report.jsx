@@ -97,6 +97,8 @@ export default function Report({ st, act, brain }) {
         <div className="box"><h3>Lineages</h3>{r.lineages.length ? <ul className="clean">{r.lineages.map(([k, v]) => <li key={k}><span className="mono">{k}</span> — {v}</li>)}</ul> : <p className="muted">None yet.</p>}</div>
         <div className="box"><h3>Limitations</h3><ul className="clean">{r.limitations.map(l => <li key={l}>{l}</li>)}</ul></div>
       </div>
+      {r.scope_warnings?.length > 0 && <div><h3>Scope warnings and how they were handled</h3><ul className="clean">{r.scope_warnings.map((w, i) => <li key={i}>
+        {w.warning} <b className={w.decision === 'disagree' ? 'warn-disputed' : 'warn-accepted'}>{w.decision === 'accept' ? 'Accepted' : w.decision === 'disagree' ? 'Disputed' : 'Not answered'}</b>{w.person ? ` by ${w.person}` : ''}{w.rationale ? ` — ${w.rationale}` : ''}</li>)}</ul></div>}
       <div><h3>Unresolved findings</h3>{r.unresolved.length ? <ul className="clean">{r.unresolved.map(u => <li key={u.run + u.variant}><span className="mono">{u.run}</span> · {u.variant} ({u.drug}) — {u.reason}</li>)}</ul> : <p className="muted">None.</p>}</div>
       <div><h3>Exclusions and holds</h3><div className="tw"><table><thead><tr><th>Run</th><th>Status</th><th>Reason</th></tr></thead><tbody>
         {r.exclusions.map(x => <tr key={x.run}><td className="mono">{x.run}</td><td><Chip label={x.status || '—'} /></td><td style={{ fontSize: '.86rem' }}>{x.reason}</td></tr>)}
