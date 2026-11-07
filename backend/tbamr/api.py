@@ -21,6 +21,8 @@ from .core.decisions import DecisionLog, GuardrailViolation
 from .core.executions import capture_execution
 from .core.orchestrator import Orchestrator, PermissionDenied, StageError
 from .llm.client import make_client
+from .stores import cache as cache_module, mongo as mongo_module, results as results_module
+from .stores.cache import CACHE_NAMESPACES
 from .tools.demo import DemoDataTools
 from .tools.ena import DataTools
 
@@ -333,6 +335,52 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         if not row:
             raise HTTPException(404, f"No execution {execution_id}.")
         return row
+
+    # ---- Admin: Mongo + cache -------------------------------------------------
+    # Everything here is best-effort against Mongo; if Mongo is down the endpoints still return 200
+    # with `connected: false` so the admin UI can render a helpful "Mongo not reachable" state.
+    @app.get("/api/admin/mongo")
+    def mongo_status():
+        return mongo_module.status()
+
+    @app.post("/api/admin/mongo/reconnect")
+    def mongo_reconnect():
+        return mongo_module.reconnect()
+
+    @app.get("/api/admin/cache")
+    def cache_overview():
+        return {"mongo": mongo_module.status(), "caches": cache_module.cache.stats()}
+
+    class CacheToggle(BaseModel):
+        enabled: bool
+
+    @app.post("/api/admin/cache/{ns}/toggle")
+    def cache_toggle(ns: str, t: CacheToggle):
+        if ns not in CACHE_NAMESPACES:
+            raise HTTPException(404, f"Unknown cache namespace: {ns!r}")
+        cache_module.cache.set_enabled(ns, t.enabled)
+        return {"ok": True, "namespace": ns, "enabled": t.enabled}
+
+    @app.post("/api/admin/cache/{ns}/clear")
+    def cache_clear(ns: str):
+        if ns not in CACHE_NAMESPACES:
+            raise HTTPException(404, f"Unknown cache namespace: {ns!r}")
+        return {"ok": True, "namespace": ns, "deleted": cache_module.cache.clear(ns)}
+
+    @app.post("/api/admin/cache/clear-all")
+    def cache_clear_all():
+        return {"ok": True, "deleted": cache_module.cache.clear_all()}
+
+    @app.get("/api/admin/results")
+    def results_list(limit: int = 50):
+        return results_module.list_releases(limit=max(1, min(500, int(limit))))
+
+    @app.get("/api/admin/results/{release_id}")
+    def results_load(release_id: str):
+        doc = results_module.load_release(release_id)
+        if not doc:
+            raise HTTPException(404, f"No release {release_id!r} in Mongo (or Mongo is down).")
+        return doc
 
     # serve the built React app if present
     dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"

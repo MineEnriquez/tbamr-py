@@ -506,7 +506,13 @@ class Orchestrator:
             if kind == "final" and (pending or rep.get("superseded")):
                 raise StageError("Final release is blocked while findings are pending or the report is superseded.")
             ev = self.note_raw(role, person, "report", str(rep["version"]), f"report v{rep['version']}")
-            self.state.gates["release"] = {"by": person, "role": role, "kind": kind, "version": rep["version"]}
+            gate = {"by": person, "role": role, "kind": kind, "version": rep["version"]}
+            self.state.gates["release"] = gate
+            # Archive to Mongo (best-effort; the SQLite log stays authoritative). Imported here to
+            # avoid pulling pymongo into the orchestrator's import graph when the stores package
+            # itself hasn't been touched.
+            from ..stores.results import save_release
+            save_release(self.state, rep, {**gate, "person": person, "role": role})
             self.human(role, person, "—", Outcome.APPROVE, RULES["rpt"], f"{'Final release' if kind == 'final' else 'Exploratory draft shared'}: report v{rep['version']}.", 6, ev)
             if kind == "final":
                 self._set(6, "done")

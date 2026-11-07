@@ -18,6 +18,11 @@ from contextlib import closing
 
 import pytest
 
+# Keep tests independent of any local MongoDB: a running container would serve cached ENA/TB-Profiler/
+# Claude responses and the tests would no longer exercise the real request paths. Point the cache at an
+# unreachable server (the stores degrade gracefully). Set TBAMR_TEST_MONGO_URL to test against a real Mongo.
+os.environ["MONGO_URL"] = os.environ.get("TBAMR_TEST_MONGO_URL", "mongodb://127.0.0.1:1/tbamr-test")
+
 os.environ.setdefault("TBAMR_NO_APP", "1")
 
 

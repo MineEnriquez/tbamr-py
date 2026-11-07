@@ -12,6 +12,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from ..stores.cache import cache
+
 DRUG_ALIAS = {
     "rifampicin": "RIF", "rifampin": "RIF", "isoniazid": "INH", "ethambutol": "EMB", "pyrazinamide": "PZA",
     "levofloxacin": "FLQ", "moxifloxacin": "FLQ", "ofloxacin": "FLQ", "ciprofloxacin": "FLQ", "fluoroquinolones": "FLQ",
@@ -141,6 +143,18 @@ class TBProfilerRunner:
         }
 
     def run(self, run_accession: str, timeout: int = 7200) -> dict[str, Any]:
+        # NoSQL cache in front of the subprocess: if we've successfully profiled this run before
+        # (on any machine, from any workdir), reuse it. Only cache successes — never a failure dict.
+        hit = cache.get("tbprofiler", {"m": "run", "acc": run_accession})
+        if hit is not None and hit.get("ok"):
+            return {**hit, "cached": True}
+
+        result = self._run(run_accession, timeout)
+        if result.get("ok"):
+            cache.set("tbprofiler", {"m": "run", "acc": run_accession}, result)
+        return result
+
+    def _run(self, run_accession: str, timeout: int = 7200) -> dict[str, Any]:
         avail = self.available()
         if not avail["fasterq-dump"]:
             return {"ok": False, "error": "Not installed: fasterq-dump (brew install sratoolkit)."}

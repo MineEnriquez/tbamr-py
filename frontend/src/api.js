@@ -35,4 +35,13 @@ export const api = {
   importFiles: (who, files) => { const fd = new FormData(); [...files].forEach(f => fd.append('files', f)); return call('POST', '/profiling/import', fd, who) },
   runProfiler: (b) => call('POST', '/profiling/run', b),
   reset: (data) => call('POST', '/reset', undefined, { data }),
+  // Admin: Mongo health, cache per-namespace toggle/clear, pipeline-result archive.
+  adminMongo: () => call('GET', '/admin/mongo'),
+  adminMongoReconnect: () => call('POST', '/admin/mongo/reconnect'),
+  adminCache: () => call('GET', '/admin/cache'),
+  adminCacheToggle: (ns, enabled) => call('POST', `/admin/cache/${ns}/toggle`, { enabled }),
+  adminCacheClear: (ns) => call('POST', `/admin/cache/${ns}/clear`),
+  adminCacheClearAll: () => call('POST', '/admin/cache/clear-all'),
+  adminResults: (limit = 50) => call('GET', '/admin/results', undefined, { limit }),
+  adminResult: (id) => call('GET', '/admin/results/' + id),
 }
