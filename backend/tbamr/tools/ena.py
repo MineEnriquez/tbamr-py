@@ -43,26 +43,22 @@ class DataTools:
 
     def _ena_search_runs(self, country: str = "", extra_query: str = "", limit: int = 500, page_size: int = 200) -> dict[str, Any]:
         """Search M. tuberculosis read runs, optionally scoped by country. Empty, 'worldwide' or 'global'
-        (case-insensitive) all mean no country filter. Paging past the first batch."""
+        (case-insensitive) all mean no country filter.
+
+        One request with the full limit: the ENA Portal API search endpoint rejects `offset` ("Unsupported
+        param offset", HTTP 400), so paging with offsets made every search larger than one page fail outright.
+        `page_size` is kept for interface compatibility and ignored."""
         query = f'tax_tree({TB_TAXON})'
         if country and country.strip().lower() not in ("worldwide", "global", "any"):
             query += f' AND country="{country}*"'
         if extra_query:
             query += f" AND {extra_query}"
-        rows: list[dict[str, Any]] = []
-        offset = 0
-        while len(rows) < limit:
-            size = min(page_size, limit - len(rows))
-            r = self.http.get(
-                f"{ENA}/search",
-                params={"result": "read_run", "query": query, "fields": RUN_FIELDS, "format": "json", "limit": size, "offset": offset},
-            )
-            r.raise_for_status()
-            batch = r.json() if r.text.strip() else []
-            rows.extend(batch)
-            if len(batch) < size:
-                break
-            offset += size
+        r = self.http.get(
+            f"{ENA}/search",
+            params={"result": "read_run", "query": query, "fields": RUN_FIELDS, "format": "json", "limit": max(0, int(limit))},
+        )
+        r.raise_for_status()
+        rows: list[dict[str, Any]] = r.json() if r.text.strip() else []
         total = None
         try:
             total = self.ena_count(query)
