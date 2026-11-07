@@ -31,7 +31,7 @@ export default function App() {
   const [version, setVersion] = useState(0)
   const [receipts, setReceipts] = useState({})
   const [rawReq, setRawReq] = useState(null)
-  const [theme, setTheme] = useState(load('tbamr.theme') || 'auto')
+  const [theme, setTheme] = useState(load('tbamr.theme') || 'light')
   const [liveTraces, setLiveTraces] = useState([])
   const timer = useRef(null)
   const traceTimer = useRef(null)
