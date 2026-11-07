@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from tbamr.agents.discovery import DiscoveryAssistant
 from tbamr.agents.evidence import EvidenceAnalyst
-from tbamr.agents.scope_guardian import ScopeGuardian
+from tbamr.agents.scope_guardian import REQUIRED_GAPS, ScopeGuardian
 from tbamr.api import build_orchestrator, create_app
 from tbamr.core.decisions import Decision, DecisionLog, GuardrailViolation, Outcome
 from tbamr.core.models import Finding, Sample
@@ -596,3 +596,32 @@ def test_release_is_archived_after_it_is_recorded(orch, monkeypatch):
     orch.raw_view("report", str(orch.state.report["version"]), "pi", "Ana")
     orch.release("pi", "Ana", "draft")
     assert seen == {"logged": True, "gate": {"by": "Ana", "role": "pi", "kind": "draft", "version": orch.state.report["version"]}}
+
+
+# ---------------------------------------------------------------- Scope Guardian definitions match the rules
+def test_guardian_wording_never_replaces_the_applied_definitions():
+    """The model's proposed definitions are kept as suggestions; the applied text always comes from the rules."""
+    divergent = lambda m: [{"type": "tool_use", "name": "submit", "input": {"blocking": [], "warnings": [], "asks_comparison_across_places": False,
+        "gaps": [{"key": "missing_dst", "gap": "DST", "proposal": "Exclude samples without phenotypic DST."},
+                 {"key": "transmission", "gap": "Transmission", "proposal": "No transmission inference."}]}}]
+    g = ScopeGuardian(DecisionLog(), ReplayClient({"scope_guardian": divergent}))
+    res = g.review("Rifampicin resistance in Indonesia", "Indonesia", ["Rifampicin"], 8)
+    by = {x["key"]: x for x in res["gaps"]}
+    assert by["missing_dst"]["applied"] and "unavailable" in by["missing_dst"]["proposal"]
+    assert by["missing_dst"]["suggestion"] == "Exclude samples without phenotypic DST."
+    assert by["transmission"]["applied"] is False and by["transmission"]["proposal"] == ""
+    assert all(by[k]["applied"] for k in ("verified_origin", "duplicates", "out_of_bounds"))
+
+
+def test_definitions_describe_what_the_pipeline_does(orch):
+    """Pin the applied wording to the behaviour it describes, so the two cannot drift apart again."""
+    rules = {k: p for k, _, p in REQUIRED_GAPS}
+    run_to_report(orch)
+    st = orch.state
+    # verified origin: other country Excluded, missing country Hold (even with a supporting publication, R15)
+    assert "Excluded" in rules["verified_origin"] and st.sample("DEMO-R06").eligibility == "Excluded"
+    assert "Hold" in rules["verified_origin"] and st.sample("DEMO-R15").eligibility == "Hold"
+    # missing DST: kept, never excluded for lacking DST (R02 has no DST and is analysed)
+    assert "Kept in the cohort" in rules["missing_dst"] and not st.sample("DEMO-R02").dst and st.sample("DEMO-R02").profiling == "Done"
+    # duplicates: the first run is kept, the later one excluded when the agent confirms (R01 kept, R07 excluded)
+    assert "first run seen" in rules["duplicates"] and st.sample("DEMO-R01").eligibility == "Verified" and st.sample("DEMO-R07").eligibility == "Excluded"
