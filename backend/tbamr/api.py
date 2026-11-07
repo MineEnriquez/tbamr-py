@@ -137,6 +137,10 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
     def raw_receipts(role: str = "pi", person: str = ""):
         return O().log.receipts(O().ident(role, person))
 
+    @app.get("/api/reports")
+    def reports():
+        return O().log.report_history()
+
     @app.get("/api/raw/{kind}/{key}")
     def raw_view(kind: str, key: str, role: str = "pi", person: str = ""):
         try:
