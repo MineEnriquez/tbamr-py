@@ -163,8 +163,36 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       {busy && <div className="working" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span>Working on <b>{busy}</b>… agents are reasoning and calling tools; watch the Agent team tab for live traces.</span></div>}
       {status === 'locked' && <div className="box note"><p className="muted">This stage unlocks when the previous stage's human gate is passed.</p></div>}
       {n === 1 && <S1 st={st} status={status} act={act} who={who} onDirtyChange={setScopeDirty} onBlockedChange={setScopeBlocked} />}
+      {n === 2 && status === 'ready' && (
+        <div className="box note">
+          <p><b>Run agents</b> will hand the pipeline to <b>two</b> Claude-powered agents in sequence:</p>
+          <ul className="clean" style={{ fontSize: '.9rem' }}>
+            <li><b>Discovery Assistant</b> — queries the <span className="mono">ENA Portal API</span> for <i>M. tuberculosis</i> read runs matching your scope (country + any extra constraints), paging through results up to the cohort target. For each candidate it may also call <span className="mono">ena_study</span> and <span className="mono">find_publications</span> (Europe PMC) to attach provenance.</li>
+            <li><b>Verification Tasker</b> — rule checks + Claude agent — treats a run as <b>Verified</b> only when the ENA/BioSample country field confirms the scope. Missing or conflicting origin → <b>Hold</b> for your review; the Guardian's policy on inferred origin is enforced here. If too few runs clear verification, the Orchestrator can re-plan once and ask Discovery to broaden the search.</li>
+          </ul>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see candidate counts (Verified / On hold / Excluded), per-run archive records, and any cohort-level checks before the <RoleBadge role="pi" /> gate opens.</p>
+        </div>
+      )}
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
+      {n === 3 && status === 'ready' && (
+        <div className="box note">
+          <p><b>Run agents</b> will hand this stage to <b>one</b> rules-only agent (no Claude):</p>
+          <ul className="clean" style={{ fontSize: '.9rem' }}>
+            <li><b>QC Analyst</b> — for every verified run it estimates coverage from <span className="mono">base_count ÷ genome_size</span> and checks that an <span className="mono">MD5</span> is listed in the archive record. Runs below the coverage threshold or missing a checksum are <b>Escalated</b>; the rest pass.</li>
+          </ul>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see a per-run table (coverage, MD5, QC chip). Resolve each escalation with a short rationale, then <RoleBadge role="analyst" /> confirms the batch.</p>
+        </div>
+      )}
       {n === 3 && ['wait', 'done'].includes(status) && <S3 st={st} status={status} act={act} who={who} openSample={openSample} />}
+      {n === 4 && status === 'ready' && (
+        <div className="box note">
+          <p><b>Run agents</b> will hand this stage to <b>one</b> tool-runner agent (no Claude):</p>
+          <ul className="clean" style={{ fontSize: '.9rem' }}>
+            <li><b>Profiling Tasker</b> — runs <b>TB-Profiler</b> on every QC-passed run, either as a subprocess (Docker image <span className="mono">staphb/tbprofiler</span>, or a local <span className="mono">tb-profiler</span> binary) or by parsing JSON results you drop into the import area. It only produces results; it never interprets resistance — that is the Evidence Analyst's job in Stage 5.</li>
+          </ul>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see per-run status (Awaiting / Done / Failed) and the import drop zone. <RoleBadge role="analyst" /> closes the batch when every run has a result or is explicitly skipped.</p>
+        </div>
+      )}
       {n === 4 && ['wait', 'done'].includes(status) && <S4 snap={snap} status={status} act={act} who={who} openSample={openSample} />}
       {n === 5 && status === 'done' && <S5 st={st} act={act} />}
       {n === 6 && status === 'ready' && (
