@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from .article import render_article_html
 from .core.decisions import DecisionLog, GuardrailViolation
 from .core.executions import capture_execution
-from .core.geo import resolve_target
+from .core.geo import country_catalogue, regions_for, resolve_target
 from .core.orchestrator import Orchestrator, PermissionDenied, StageError
 from .llm.client import make_client
 from .stores import cache as cache_module, mongo as mongo_module, results as results_module
@@ -152,6 +152,16 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         st.question, st.country, st.region, st.target_drugs, st.cohort_target = s.question, s.country, s.region, s.target_drugs, s.cohort_target
         O().save()
         return {"ok": True}
+
+    @app.get("/api/geo/countries")
+    def geo_countries():
+        """Country options: WHO high-burden TB countries, the WHO watchlist, then all other countries."""
+        return country_catalogue()
+
+    @app.get("/api/geo/regions")
+    def geo_regions(country: str = ""):
+        """First-level regions (provinces, states, ...) for a catalogued country; [] when none are on file."""
+        return {"country": country, "regions": [{"name": r["name"], "type": r.get("type")} for r in regions_for(country)]}
 
     @app.get("/api/scope/target")
     def scope_target(question: str = "", country: str = "", region: str = ""):

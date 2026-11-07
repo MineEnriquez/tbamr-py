@@ -10,7 +10,7 @@ from collections import Counter
 from typing import Any
 
 from ..core.decisions import Outcome
-from ..core.geo import WORLDWIDE, country_of, region_of
+from ..core.geo import WORLDWIDE, country_of, place_label
 from ..core.models import RULES, PipelineState
 from ..tools.tbprofiler import DRUG_NAMES
 from .base import RuleAgent
@@ -73,13 +73,14 @@ class ReportingOrchestrator(RuleAgent):
 
     @staticmethod
     def _by_place(st: PipelineState, analysed: list, fx: list, drugs: list[str]) -> tuple[list[dict[str, Any]], str, int]:
-        """Counts per place: per country for worldwide scope, per region (ENA text after the colon) otherwise."""
+        """Counts per place: per country for worldwide scope, otherwise per region (the catalogued region the ENA
+        location names, e.g. "Bandung, West Java" -> "West Java"; uncatalogued text is shown as recorded)."""
         worldwide = st.country == WORLDWIDE
         kind = "country" if worldwide else "region"
         pred = {(f.sample_id, f.drug) for f in fx if f.cls == "tech" and f.review != "Not supported"}
         groups: dict[str, list] = {}
         for s in analysed:
-            key = (country_of(s.country) if worldwide else region_of(s.country)) or "not recorded"
+            key = (country_of(s.country) if worldwide else place_label(s.country, st.country)) or "not recorded"
             groups.setdefault(key, []).append(s)
         rows = [{"place": k, "n": len(v), "resistant": {d: sum((s.run, d) in pred for s in v) for d in drugs}}
                 for k, v in groups.items()]

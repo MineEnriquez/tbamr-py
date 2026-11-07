@@ -78,7 +78,7 @@ class VerificationTasker(LLMAgent):
                 ambiguous.append((s, "country field missing in ENA"))
             elif scoped and region and not region_of(c):
                 ambiguous.append((s, f"region missing from the ENA location (target region: {region})"))
-            elif scoped and region and not region_matches(region, c):
+            elif scoped and region and not region_matches(region, c, country):
                 ambiguous.append((s, f'region recorded as "{region_of(c)}", which does not name the target region {region}'))
             elif s.biosample and s.biosample in seen:
                 ambiguous.append((s, f"BioSample {s.biosample} already used by {seen[s.biosample]} (possible repeated isolate)"))
