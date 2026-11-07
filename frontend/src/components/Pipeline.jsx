@@ -83,6 +83,70 @@ function ScopeTarget({ st }) {
   return <span className="target-missing">target population not set</span>
 }
 
+/* Country + region pickers for the scope form. Countries are grouped: WHO high TB burden list,
+ * WHO watchlist, every other country, and an explicit Worldwide. Regions (provinces, states...) load
+ * for the chosen country from the catalogue; "Other" allows a place that is not on file. */
+let geoCountriesPromise = null
+function useGeoCountries() {
+  const [c, setC] = useState(null)
+  useEffect(() => {
+    geoCountriesPromise = geoCountriesPromise || api.geoCountries().catch(e => { geoCountriesPromise = null; throw e })
+    let live = true
+    geoCountriesPromise.then(r => live && setC(r)).catch(() => {})
+    return () => { live = false }
+  }, [])
+  return c
+}
+
+function useGeoRegions(country) {
+  const [r, setR] = useState({ country: null, regions: [] })
+  useEffect(() => {
+    if (!country || country === 'Worldwide') { setR({ country, regions: [] }); return }
+    let live = true
+    api.geoRegions(country).then(x => live && setR({ country, regions: x.regions || [] })).catch(() => live && setR({ country, regions: [] }))
+    return () => { live = false }
+  }, [country])
+  return r.country === country ? r.regions : null  // null while loading
+}
+
+const OTHER = '__other__'
+function ScopePlace({ prefix, country, setCountry, region, setRegion }) {
+  const cat = useGeoCountries()
+  const regions = useGeoRegions(country)
+  const names = useMemo(() => (regions || []).map(r => r.name), [regions])
+  const listed = cat ? [...cat.high_burden, ...cat.watchlist, ...cat.other, 'Worldwide'] : []
+  const typedCountry = country && cat && !listed.includes(country)
+  const [other, setOther] = useState(false)
+  useEffect(() => { if (regions && region && !names.includes(region)) setOther(true) }, [regions, region, names])
+  const noRegion = !country || country === 'Worldwide'
+  const pickCountry = v => { setCountry(v); setRegion(''); setOther(false) }
+  const pickRegion = v => { if (v === OTHER) { setOther(true); setRegion('') } else { setOther(false); setRegion(v) } }
+  return <>
+    <div className="ctl"><label htmlFor={`${prefix}-country`}>Target country <span className="muted" style={{ fontWeight: 400 }}>(or name it in the question)</span></label>
+      <select id={`${prefix}-country`} value={country} onChange={e => pickCountry(e.target.value)} style={{ minWidth: 260 }}>
+        <option value="">Choose a country…</option>
+        <option value="Worldwide">Worldwide (all countries)</option>
+        {cat && <optgroup label="High TB burden countries (WHO, 2021–2025)">{cat.high_burden.map(n => <option key={n} value={n}>{n}</option>)}</optgroup>}
+        {cat && <optgroup label="WHO TB watchlist">{cat.watchlist.map(n => <option key={n} value={n}>{n}</option>)}</optgroup>}
+        {cat && <optgroup label="All other countries">{cat.other.map(n => <option key={n} value={n}>{n}</option>)}</optgroup>}
+        {typedCountry && <option value={country}>{country} (as entered)</option>}
+      </select></div>
+    <div className="ctl"><label htmlFor={`${prefix}-region`}>Region <span className="muted" style={{ fontWeight: 400 }}>(optional: province, state…)</span></label>
+      {noRegion ? <select id={`${prefix}-region`} disabled style={{ minWidth: 220 }}><option>{country === 'Worldwide' ? 'Not available for worldwide' : 'Choose a country first'}</option></select>
+        : regions === null ? <select id={`${prefix}-region`} disabled style={{ minWidth: 220 }}><option>Loading regions…</option></select>
+        : regions.length === 0 ? <input id={`${prefix}-region`} value={region} onChange={e => setRegion(e.target.value)} placeholder="No list on file: type a region, or leave empty" style={{ minWidth: 260 }} />
+        : <div className="row" style={{ gap: 6 }}>
+            <select id={`${prefix}-region`} value={other ? OTHER : region} onChange={e => pickRegion(e.target.value)} style={{ minWidth: 220 }}>
+              <option value="">Whole country</option>
+              {regions.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
+              <option value={OTHER}>Other (type a name)…</option>
+            </select>
+            {other && <input aria-label="Region name" value={region} onChange={e => setRegion(e.target.value)} placeholder="Region as written in records" style={{ minWidth: 200 }} autoFocus />}
+          </div>}
+    </div>
+  </>
+}
+
 /* Strip the specific alias we matched out of the question text (word-boundary), leaving the rest
  * of the sentence intact so the user can keep editing. */
 function stripCountryFromQuestion(question, alias) {
@@ -145,10 +209,7 @@ function StartHero({ snap, act, who, busy, setView }) {
       <textarea value={q} onChange={e => setQ(e.target.value)} aria-label="Research question" className="start-ta"
         placeholder="e.g. What patterns of drug resistance can we identify in Mycobacterium tuberculosis genomic samples from Indonesia, and which mutations are associated with resistance to rifampicin and isoniazid?" />
       <div className="row" style={{ gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <div className="ctl"><label htmlFor="start-country">Target country <span className="muted" style={{ fontWeight: 400 }}>(or name it in the question)</span></label>
-          <input id="start-country" value={country} onChange={e => setCountry(e.target.value)} placeholder='e.g. Indonesia, or "Worldwide" for all countries' style={{ minWidth: 320 }} /></div>
-        <div className="ctl"><label htmlFor="start-region">Region <span className="muted" style={{ fontWeight: 400 }}>(optional: province, state…)</span></label>
-          <input id="start-region" value={region} onChange={e => setRegion(e.target.value)} placeholder="e.g. West Java" style={{ minWidth: 200 }} /></div>
+        <ScopePlace prefix="start" country={country} setCountry={setCountry} region={region} setRegion={setRegion} />
         <div className="ctl"><label htmlFor="start-target">Cohort target</label>
           <input id="start-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
       </div>
@@ -278,10 +339,7 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
     <div className="box"><span className="eyebrow">Research question</span>
       <textarea value={q} onChange={e => setQ(e.target.value)} aria-label="Research question" />
       <div className="row" style={{ gap: 14, alignItems: 'flex-end' }}>
-        <div className="ctl"><label htmlFor="scope-country">Target country <span className="muted" style={{ fontWeight: 400 }}>(or name it in the question)</span></label>
-          <input id="scope-country" value={country} onChange={e => setCountry(e.target.value)} placeholder='e.g. Indonesia, or "Worldwide" for all countries' style={{ minWidth: 320 }} /></div>
-        <div className="ctl"><label htmlFor="scope-region">Region <span className="muted" style={{ fontWeight: 400 }}>(optional: province, state…)</span></label>
-          <input id="scope-region" value={region} onChange={e => setRegion(e.target.value)} placeholder="e.g. West Java" style={{ minWidth: 200 }} /></div>
+        <ScopePlace prefix="scope" country={country} setCountry={setCountry} region={region} setRegion={setRegion} />
         <div className="ctl"><label htmlFor="scope-target">Cohort target</label>
           <input id="scope-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
       </div>
