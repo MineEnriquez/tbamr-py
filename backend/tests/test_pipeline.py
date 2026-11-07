@@ -12,7 +12,7 @@ from tbamr.core.decisions import Decision, DecisionLog, GuardrailViolation, Outc
 from tbamr.core.models import Finding, Sample
 from tbamr.core.orchestrator import PermissionDenied, StageError
 from tbamr.llm.client import ReplayClient
-from tbamr.core.geo import resolve_target
+from tbamr.core.geo import INSDC_COUNTRIES, canonical_region, catalogue, region_matches, regions_for, resolve_target
 from tbamr.tools.demo import SCENARIOS, DemoDataTools
 from tbamr.tools.ena import DataTools
 from tbamr.tools.tbprofiler import parse_result
@@ -51,7 +51,7 @@ def test_full_demo_flow(orch):
     assert {s.run for s in st.samples if s.eligibility == "Excluded"} == {"DEMO-R06", "DEMO-R07", "DEMO-R08", "DEMO-R18", "DEMO-R19", "DEMO-R23", "DEMO-R24"}
     assert {s.run for s in st.samples if s.eligibility == "Hold"} == {"DEMO-R15", "DEMO-R16", "DEMO-R20", "DEMO-R21", "DEMO-R22"}
     assert st.sample("DEMO-R04").qc == "Escalated"  # 27x borderline
-    assert rep["counts"] == {"candidates": 42, "verified": 30, "qc_passed": 26, "analysed": 24}
+    assert rep["counts"] == {"candidates": 43, "verified": 31, "qc_passed": 27, "analysed": 25}
     assert [d["drug"] for d in rep["drugs"]][:2] == ["RIF", "INH"]
     pending = {(f["run"], f["variant"]) for f in rep["unresolved"]}
     assert ("DEMO-R14", "rpoB p.Ser450Leu") in pending  # low depth
@@ -482,3 +482,87 @@ def test_explicit_worldwide_searches_without_a_country_filter(tmp_path):
     calls = [t for t in o.log.traces("discovery") if t["kind"] == "tool_call"]
     assert all('country="Worldwide' not in json.dumps(t["payload"]) for t in calls)
     assert o.state.sample("DEMO-R06").eligibility == "Verified"  # origin is informational for worldwide
+
+
+# ---------------------------------------------------------------- subnational target
+@pytest.mark.parametrize("question,field,region,want,blocked", [
+    ("Resistance patterns", "Indonesia", "West Java", ("Indonesia", "West Java"), False),
+    ("Resistance patterns", "Indonesia: West Java", "", ("Indonesia", "West Java"), False),  # ENA format in the Country field
+    ("Resistance in West Java province, Indonesia", "", "", ("Indonesia", "West Java"), False),  # named in the question
+    ("Which MDR-TB mutations occur in Western Cape province?", "South Africa", "", ("South Africa", "Western Cape"), False),
+    ("Compare West Java province and Bali province", "Indonesia", "", ("Indonesia", ""), False),  # comparison: whole country
+    ("Resistance patterns", "Worldwide", "West Java", ("", ""), True),  # a region needs one country
+    ("Resistance in West Java province", "", "", ("", ""), True),  # region without a country
+    ("Resistance in Bali province", "Indonesia", "West Java", ("", ""), True),  # field and question disagree
+])
+def test_subnational_target_resolution(question, field, region, want, blocked):
+    t = resolve_target(question, field, region)
+    assert bool(t["problem"]) is blocked and (t["country"], t["region"]) == want
+
+
+def test_region_matching_is_a_whole_phrase():
+    assert region_matches("West Java", "Indonesia: West Java")
+    assert region_matches("west java province", "Indonesia:West Java")
+    assert region_matches("West Java", "Indonesia: Bandung, West Java")
+    assert not region_matches("West Java", "Indonesia: Central Java")
+    assert not region_matches("West Java", "Indonesia")
+
+
+def test_region_scope_verifies_matching_runs_and_holds_the_rest(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "r.db"))
+    o.state.question, o.state.country, o.state.region = "Which rifampicin mutations are present?", "Indonesia", "West Java"
+    rep = run_to_report(o)
+    st = o.state
+    assert st.region == "West Java" and st.scope["target"]["region"] == "West Java"
+    verified = {s.run for s in st.samples if s.eligibility == "Verified"}
+    assert verified == {"DEMO-R02", "DEMO-R13", "DEMO-R43"}  # "West Java" and "Bandung, West Java"
+    assert st.sample("DEMO-R04").eligibility == "Hold"  # Central Java: a person decides, never excluded by guesswork
+    assert "does not name the target region" in st.sample("DEMO-R04").eligibility_note
+    assert st.sample("DEMO-R06").eligibility == "Excluded"  # other country still excluded by rule
+    assert [(r["place"], r["n"]) for r in rep["by_place"]] == [("West Java", 3)] and rep["place_kind"] == "region"  # "Bandung, West Java" counted under West Java
+
+
+def test_report_breaks_country_scope_down_by_region(orch):
+    rep = run_to_report(orch)
+    rows = {r["place"]: r for r in rep["by_place"]}
+    assert rep["place_kind"] == "region" and sum(r["n"] for r in rep["by_place"]) == rep["counts"]["analysed"]
+    assert rows["Jakarta"]["resistant"]["RIF"] >= 1  # R01, R12, R33 are Jakarta MDR/XDR
+    assert any("counts, not rates" in l for l in rep["limitations"])
+
+
+# ---------------------------------------------------------------- country / region catalogue
+def test_catalogue_has_the_who_lists_with_regions():
+    c = catalogue()
+    assert len(c["high_burden"]) == 30 and c["watchlist"] == ["Cambodia", "Russia", "Zimbabwe"]
+    for name in c["high_burden"] + c["watchlist"]:
+        assert name in INSDC_COUNTRIES, f"{name} must be the INSDC name ENA records use"
+        assert regions_for(name), f"{name} has no regions on file"
+    assert len(regions_for("Indonesia")) == 38 and len(regions_for("South Africa")) == 9
+
+
+@pytest.mark.parametrize("target,location,country,ok", [
+    ("West Java", "Indonesia: Jawa Barat", "Indonesia", True),  # ISO (local) name in the record
+    ("Jawa Barat", "Indonesia: Bandung, West Java", "Indonesia", True),  # English name in the record
+    ("Hà Nội", "Viet Nam: Hanoi", "Viet Nam", True),  # accents and spacing
+    ("Ho Chi Minh City", "Viet Nam: Ho Chi Minh", "Viet Nam", True),
+    ("Tigray", "Ethiopia: Tigrai", "Ethiopia", True),
+    ("West Java", "Indonesia: Central Java", "Indonesia", False),
+])
+def test_region_matching_uses_catalogue_aliases(target, location, country, ok):
+    assert region_matches(target, location, country) is ok
+
+
+def test_regions_are_canonicalised_and_found_in_questions():
+    assert canonical_region("Indonesia", "jawa barat") == "West Java"
+    assert resolve_target("Resistance in West Java", "Indonesia")["region"] == "West Java"  # no "province" needed
+    assert resolve_target("Resistance in Hanoi", "Viet Nam")["region"] == "Hà Nội"
+    assert resolve_target("Resistance in Zambia", "Zambia")["region"] == ""  # "Central"/"Northern" not guessed from prose
+
+
+def test_geo_endpoints(tmp_path):
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "g.db"))))
+    countries = c.get("/api/geo/countries").json()
+    assert "Indonesia" in countries["high_burden"] and "Cambodia" in countries["watchlist"] and "France" in countries["other"]
+    regions = [r["name"] for r in c.get("/api/geo/regions", params={"country": "Indonesia"}).json()["regions"]]
+    assert "West Java" in regions and len(regions) == 38
+    assert c.get("/api/geo/regions", params={"country": "France"}).json()["regions"] == []
