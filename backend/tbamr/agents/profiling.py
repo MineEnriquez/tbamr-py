@@ -44,11 +44,14 @@ class ProfilingTasker(RuleAgent):
         self.decide(s.run, Outcome.PROCEED, RULES["prof"], "TB-Profiler result recorded: " + s.profiling_note,
                     f"file {s.profile_meta.get('file', '')}; median depth {s.profile_meta.get('median_depth')}", stage=4)
 
+    def fail(self, s: Sample, error: str) -> None:
+        s.profiling, s.profiling_note = "Failed", error
+        self.decide(s.run, Outcome.ESCALATE, RULES["prof"], "TB-Profiler did not complete: " + s.profiling_note, stage=4)
+
     def run_one(self, s: Sample) -> dict[str, Any]:
         res = self.runner.run(s.run)
         if res.get("ok"):
             self.apply_result(s, res["result"], "run locally", res.get("raw"))
         else:
-            s.profiling, s.profiling_note = "Failed", res.get("error", "")
-            self.decide(s.run, Outcome.ESCALATE, RULES["prof"], "TB-Profiler did not complete: " + s.profiling_note, stage=4)
+            self.fail(s, res.get("error", ""))
         return res

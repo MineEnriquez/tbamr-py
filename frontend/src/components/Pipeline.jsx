@@ -50,6 +50,103 @@ function detectCountryInQuestion(question) {
   return null
 }
 
+/* Live target-population check: asks the backend (same rule Stage 1 applies) which country the
+ * study is about. Worldwide only counts when stated explicitly; anything unclear blocks the start. */
+function useTarget(question, country, region) {
+  const [t, setT] = useState(null)
+  useEffect(() => {
+    let live = true
+    const id = setTimeout(() => api.scopeTarget(question || '', country || '', region || '').then(r => live && setT(r)).catch(() => live && setT(null)), 250)
+    return () => { live = false; clearTimeout(id) }
+  }, [question, country, region])
+  return t
+}
+
+function TargetNote({ t }) {
+  if (!t) return null
+  if (t.problem) return <div className="box esc target-note" role="status"><b>Target population unclear.</b> {t.problem}</div>
+  const where = t.country === 'Worldwide' ? <b>worldwide</b> : <><b>{t.country}</b>{t.region && <> · region <b>{t.region}</b></>}</>
+  const src = s => s === 'field' ? 'form' : 'question'
+  return <>
+    <p className="target-note ok" role="status">Target population: {where} <span className="muted">· from the {src(t.source)}{t.region && t.region_source !== t.source ? ` (region from the ${src(t.region_source)})` : ''}</span></p>
+    {t.region && <p className="target-note muted region-note">Runs from {t.country} whose ENA location does not name {t.region} go on hold for a person to confirm.</p>}
+    {t.note && <p className="target-note muted region-note">{t.note}</p>}
+    {t.notice && <div className="box note target-notice"><b>Expected run time</b><p>{t.notice}</p></div>}
+  </>
+}
+
+/* Scope summary line once the scope has been handed to the Guardian. */
+function ScopeTarget({ st }) {
+  const t = st.scope?.target
+  if (st.country === 'Worldwide') return <>target <b>worldwide</b> (requested explicitly)</>
+  if (st.country) return <>target <b>{st.country}</b>{st.region && <> · <b>{st.region}</b></>}{t?.source === 'question' ? ' (from the question)' : ''}</>
+  return <span className="target-missing">target population not set</span>
+}
+
+/* Country + region pickers for the scope form. Countries are grouped: WHO high TB burden list,
+ * WHO watchlist, every other country, and an explicit Worldwide. Regions (provinces, states...) load
+ * for the chosen country from the catalogue; "Other" allows a place that is not on file. */
+let geoCountriesPromise = null
+function useGeoCountries() {
+  const [c, setC] = useState(null)
+  useEffect(() => {
+    geoCountriesPromise = geoCountriesPromise || api.geoCountries().catch(e => { geoCountriesPromise = null; throw e })
+    let live = true
+    geoCountriesPromise.then(r => live && setC(r)).catch(() => {})
+    return () => { live = false }
+  }, [])
+  return c
+}
+
+function useGeoRegions(country) {
+  const [r, setR] = useState({ country: null, regions: [] })
+  useEffect(() => {
+    if (!country || country === 'Worldwide') { setR({ country, regions: [] }); return }
+    let live = true
+    api.geoRegions(country).then(x => live && setR({ country, regions: x.regions || [] })).catch(() => live && setR({ country, regions: [] }))
+    return () => { live = false }
+  }, [country])
+  return r.country === country ? r.regions : null  // null while loading
+}
+
+const OTHER = '__other__'
+function ScopePlace({ prefix, country, setCountry, region, setRegion }) {
+  const cat = useGeoCountries()
+  const regions = useGeoRegions(country)
+  const names = useMemo(() => (regions || []).map(r => r.name), [regions])
+  const listed = cat ? [...cat.high_burden, ...cat.watchlist, ...cat.other, 'Worldwide'] : []
+  const typedCountry = country && cat && !listed.includes(country)
+  const [other, setOther] = useState(false)
+  useEffect(() => { if (regions && region && !names.includes(region)) setOther(true) }, [regions, region, names])
+  const noRegion = !country || country === 'Worldwide'
+  const pickCountry = v => { setCountry(v); setRegion(''); setOther(false) }
+  const pickRegion = v => { if (v === OTHER) { setOther(true); setRegion('') } else { setOther(false); setRegion(v) } }
+  return <>
+    <div className="ctl"><label htmlFor={`${prefix}-country`}>Target country <span className="muted" style={{ fontWeight: 400 }}>(or name it in the question)</span></label>
+      <select id={`${prefix}-country`} value={country} onChange={e => pickCountry(e.target.value)} style={{ minWidth: 260 }}>
+        <option value="">Choose a country…</option>
+        <option value="Worldwide">Worldwide (all countries)</option>
+        {cat && <optgroup label="High TB burden countries (WHO, 2021–2025)">{cat.high_burden.map(n => <option key={n} value={n}>{n}</option>)}</optgroup>}
+        {cat && <optgroup label="WHO TB watchlist">{cat.watchlist.map(n => <option key={n} value={n}>{n}</option>)}</optgroup>}
+        {cat && <optgroup label="All other countries">{cat.other.map(n => <option key={n} value={n}>{n}</option>)}</optgroup>}
+        {typedCountry && <option value={country}>{country} (as entered)</option>}
+      </select></div>
+    <div className="ctl"><label htmlFor={`${prefix}-region`}>Region <span className="muted" style={{ fontWeight: 400 }}>(optional: province, state…)</span></label>
+      {noRegion ? <select id={`${prefix}-region`} disabled style={{ minWidth: 220 }}><option>{country === 'Worldwide' ? 'Not available for worldwide' : 'Choose a country first'}</option></select>
+        : regions === null ? <select id={`${prefix}-region`} disabled style={{ minWidth: 220 }}><option>Loading regions…</option></select>
+        : regions.length === 0 ? <input id={`${prefix}-region`} value={region} onChange={e => setRegion(e.target.value)} placeholder="No list on file: type a region, or leave empty" style={{ minWidth: 260 }} />
+        : <div className="row" style={{ gap: 6 }}>
+            <select id={`${prefix}-region`} value={other ? OTHER : region} onChange={e => pickRegion(e.target.value)} style={{ minWidth: 220 }}>
+              <option value="">Whole country</option>
+              {regions.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
+              <option value={OTHER}>Other (type a name)…</option>
+            </select>
+            {other && <input aria-label="Region name" value={region} onChange={e => setRegion(e.target.value)} placeholder="Region as written in records" style={{ minWidth: 200 }} autoFocus />}
+          </div>}
+    </div>
+  </>
+}
+
 /* Strip the specific alias we matched out of the question text (word-boundary), leaving the rest
  * of the sentence intact so the user can keep editing. */
 function stripCountryFromQuestion(question, alias) {
@@ -78,23 +175,26 @@ function StartHero({ snap, act, who, busy, setView }) {
   const st = snap.state, status = st.stage_status['1']
   const [q, setQ] = useState(st.question)
   const [country, setCountry] = useState(st.country || '')
+  const [region, setRegion] = useState(st.region || '')
   const [target, setTarget] = useState(st.cohort_target ?? 8)
   const conflict = useMemo(() => {
     const inQ = detectCountryInQuestion(q)
-    const field = country.trim()
+    const field = country.split(':')[0].trim()
     if (!inQ || !field) return null
     if (inQ.canonical.toLowerCase() === field.toLowerCase()) return null
     return { canonical: inQ.canonical, matched: inQ.matched, field }
   }, [q, country])
-  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || target !== (st.cohort_target ?? 8))
-  const save = () => act(() => api.setScope({ question: q, country, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')
+  const tgt = useTarget(q, country, region)
+  const unclear = !!tgt?.problem
+  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || region !== (st.region || '') || target !== (st.cohort_target ?? 8))
+  const save = () => act(() => api.setScope({ question: q, country, region, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')
   const start = () => act(() => api.run(1), 'Stage 1 finished')
-  const canRun = status === 'ready' && !busy && !dirty && !conflict
+  const canRun = status === 'ready' && !busy && !dirty && !conflict && !unclear
   if (status !== 'ready') return (
     <section className="panel start-hero">
       <span className="eyebrow">Start · Research question</span>
       <h1 className="start-q">{st.question || <span className="muted">No research question yet.</span>}</h1>
-      <p className="start-sub">Scope: {st.country ? <>country <b>{st.country}</b></> : <>worldwide</>} · cohort target <b>{st.cohort_target}</b> · drugs <b>{st.target_drugs.join(', ')}</b></p>
+      <p className="start-sub">Scope: <ScopeTarget st={st} /> · cohort target <b>{st.cohort_target}</b> · drugs <b>{st.target_drugs.join(', ')}</b></p>
       <div className="row" style={{ gap: 10, marginTop: 12 }}>
         <button className="btn primary" onClick={() => setView(1)}>Go to Stage 1 →</button>
         <button className="btn ghost" title="Reopen the scope form; clears downstream work (samples/report) but preserves decision history." onClick={() => { if (confirm('Reopen scope? This clears discovered samples and any report, but keeps the decision history.')) act(() => api.reopenScope(), 'Scope reopened') }}>✎ Edit scope</button>
@@ -109,8 +209,7 @@ function StartHero({ snap, act, who, busy, setView }) {
       <textarea value={q} onChange={e => setQ(e.target.value)} aria-label="Research question" className="start-ta"
         placeholder="e.g. What patterns of drug resistance can we identify in Mycobacterium tuberculosis genomic samples from Indonesia, and which mutations are associated with resistance to rifampicin and isoniazid?" />
       <div className="row" style={{ gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <div className="ctl"><label htmlFor="start-country">Country <span className="muted" style={{ fontWeight: 400 }}>(or state it in the question)</span></label>
-          <input id="start-country" value={country} onChange={e => setCountry(e.target.value)} placeholder='e.g. Indonesia · "Worldwide" for no filter · or leave blank if the question says so' style={{ minWidth: 320 }} /></div>
+        <ScopePlace prefix="start" country={country} setCountry={setCountry} region={region} setRegion={setRegion} />
         <div className="ctl"><label htmlFor="start-target">Cohort target</label>
           <input id="start-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
       </div>
@@ -122,10 +221,11 @@ function StartHero({ snap, act, who, busy, setView }) {
           <button className="btn small" onClick={() => setQ(stripCountryFromQuestion(q, conflict.matched))}>Use <b>{conflict.field}</b> (remove "{conflict.matched}" from the question)</button>
         </div>
       </div>}
+      {!conflict && <TargetNote t={tgt} />}
       <div className="row" style={{ gap: 8, marginTop: 14 }}>
         <button className="btn primary" disabled={!dirty || !!conflict} onClick={save}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
-        <button className="btn primary" disabled={!canRun} title={!canRun ? (conflict ? 'Resolve the conflict first' : dirty ? 'Save the scope first' : busy ? 'A stage is running' : '') : 'Hand the scope to the Scope Guardian'} onClick={start}>Start the pipeline →</button>
-        <span className="muted" style={{ fontSize: '.82rem' }}>{conflict ? 'Fix the conflict above.' : dirty ? 'Save, then Start.' : canRun ? 'Ready to start.' : ''}</span>
+        <button className="btn primary" disabled={!canRun} title={!canRun ? (conflict ? 'Resolve the conflict first' : unclear ? 'Set a clear target population first' : dirty ? 'Save the scope first' : busy ? 'A stage is running' : '') : 'Hand the scope to the Scope Guardian'} onClick={start}>Start the pipeline →</button>
+        <span className="muted" style={{ fontSize: '.82rem' }}>{conflict ? 'Fix the conflict above.' : unclear ? 'Set the target population above.' : dirty ? 'Save, then Start.' : canRun ? 'Ready to start.' : ''}</span>
       </div>
     </section>
   )
@@ -152,7 +252,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
   const [scopeBlocked, setScopeBlocked] = useState(false)
   const disabled = n === 1 && status === 'ready' && (scopeDirty || scopeBlocked)
   const disabledReason = (n === 1 && status === 'ready')
-    ? (scopeBlocked ? 'Resolve the country/question conflict first' : (scopeDirty ? 'Save the scope first' : ''))
+    ? (scopeBlocked ? 'Set a clear target population (and resolve any country/question conflict) first' : (scopeDirty ? 'Save the scope first' : ''))
     : (busy ? 'A stage is running' : '')
   const runBtn = <button className="btn primary" disabled={status !== 'ready' || !!busy || disabled} title={disabledReason || undefined}
                    onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'ready' ? 'Run agents' : 'Ran'}</button>
@@ -163,8 +263,36 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       {busy && <div className="working" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span>Working on <b>{busy}</b>… agents are reasoning and calling tools; watch the Agent team tab for live traces.</span></div>}
       {status === 'locked' && <div className="box note"><p className="muted">This stage unlocks when the previous stage's human gate is passed.</p></div>}
       {n === 1 && <S1 st={st} status={status} act={act} who={who} onDirtyChange={setScopeDirty} onBlockedChange={setScopeBlocked} />}
+      {n === 2 && status === 'ready' && (
+        <div className="box note">
+          <p><b>Run agents</b> will hand the pipeline to <b>two</b> Claude-powered agents in sequence:</p>
+          <ul className="clean" style={{ fontSize: '.9rem' }}>
+            <li><b>Discovery Assistant</b> — queries the <span className="mono">ENA Portal API</span> for <i>M. tuberculosis</i> read runs matching your scope (country + any extra constraints), paging through results up to the cohort target. For each candidate it may also call <span className="mono">ena_study</span> and <span className="mono">find_publications</span> (Europe PMC) to attach provenance.</li>
+            <li><b>Verification Tasker</b> — rule checks + Claude agent — treats a run as <b>Verified</b> only when the ENA/BioSample country field confirms the scope. Missing or conflicting origin → <b>Hold</b> for your review; the Guardian's policy on inferred origin is enforced here. If too few runs clear verification, the Orchestrator can re-plan once and ask Discovery to broaden the search.</li>
+          </ul>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see candidate counts (Verified / On hold / Excluded), per-run archive records, and any cohort-level checks before the <RoleBadge role="pi" /> gate opens.</p>
+        </div>
+      )}
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
+      {n === 3 && status === 'ready' && (
+        <div className="box note">
+          <p><b>Run agents</b> will hand this stage to <b>one</b> rules-only agent (no Claude):</p>
+          <ul className="clean" style={{ fontSize: '.9rem' }}>
+            <li><b>QC Analyst</b> — for every verified run it estimates coverage from <span className="mono">base_count ÷ genome_size</span> and checks that an <span className="mono">MD5</span> is listed in the archive record. Runs below the coverage threshold or missing a checksum are <b>Escalated</b>; the rest pass.</li>
+          </ul>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see a per-run table (coverage, MD5, QC chip). Resolve each escalation with a short rationale, then <RoleBadge role="analyst" /> confirms the batch.</p>
+        </div>
+      )}
       {n === 3 && ['wait', 'done'].includes(status) && <S3 st={st} status={status} act={act} who={who} openSample={openSample} />}
+      {n === 4 && status === 'ready' && (
+        <div className="box note">
+          <p><b>Run agents</b> will hand this stage to <b>one</b> tool-runner agent (no Claude):</p>
+          <ul className="clean" style={{ fontSize: '.9rem' }}>
+            <li><b>Profiling Tasker</b> — runs <b>TB-Profiler</b> on every QC-passed run, either as a subprocess (Docker image <span className="mono">staphb/tbprofiler</span>, or a local <span className="mono">tb-profiler</span> binary) or by parsing JSON results you drop into the import area. It only produces results; it never interprets resistance — that is the Evidence Analyst's job in Stage 5.</li>
+          </ul>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see per-run status (Awaiting / Done / Failed) and the import drop zone. <RoleBadge role="analyst" /> closes the batch when every run has a result or is explicitly skipped.</p>
+        </div>
+      )}
       {n === 4 && ['wait', 'done'].includes(status) && <S4 snap={snap} status={status} act={act} who={who} openSample={openSample} />}
       {n === 5 && status === 'done' && <S5 st={st} act={act} />}
       {n === 6 && status === 'ready' && (
@@ -188,28 +316,30 @@ function Stage({ n, snap, act, who, busy, openSample }) {
 function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
   const [q, setQ] = useState(st.question)
   const [country, setCountry] = useState(st.country || '')
+  const [region, setRegion] = useState(st.region || '')
   const [target, setTarget] = useState(st.cohort_target ?? 8)
   const sc = st.scope || {}
   // Detect a question/country-field conflict: if the question clearly names a country different
   // from the Country field, the Guardian will silently use the field. Force the user to reconcile.
   const conflict = useMemo(() => {
     const inQ = detectCountryInQuestion(q)
-    const fieldTrim = country.trim()
+    const fieldTrim = country.split(':')[0].trim()
     if (!inQ) return null
     if (!fieldTrim) return null  // only the question specifies a country — fine, let the Guardian use it
     if (inQ.canonical.toLowerCase() === fieldTrim.toLowerCase()) return null  // they agree
     return { canonical: inQ.canonical, matched: inQ.matched, field: fieldTrim }
   }, [q, country])
   // When the form drifts from what's in the backend, mark the whole stage dirty so the Run button disables.
-  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || target !== (st.cohort_target ?? 8))
+  const tgt = useTarget(status === 'ready' ? q : st.question, status === 'ready' ? country : st.country, status === 'ready' ? region : st.region)
+  const unclear = status === 'ready' && !!tgt?.problem
+  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || region !== (st.region || '') || target !== (st.cohort_target ?? 8))
   useEffect(() => { onDirtyChange && onDirtyChange(dirty) }, [dirty, onDirtyChange])
-  useEffect(() => { onBlockedChange && onBlockedChange(!!conflict) }, [conflict, onBlockedChange])
+  useEffect(() => { onBlockedChange && onBlockedChange(!!conflict || unclear) }, [conflict, unclear, onBlockedChange])
   if (status === 'ready') return (
     <div className="box"><span className="eyebrow">Research question</span>
       <textarea value={q} onChange={e => setQ(e.target.value)} aria-label="Research question" />
       <div className="row" style={{ gap: 14, alignItems: 'flex-end' }}>
-        <div className="ctl"><label htmlFor="scope-country">Country <span className="muted" style={{ fontWeight: 400 }}>(or state it in the question)</span></label>
-          <input id="scope-country" value={country} onChange={e => setCountry(e.target.value)} placeholder='e.g. Indonesia · "Worldwide" for no filter · or leave blank if the question says so' style={{ minWidth: 320 }} /></div>
+        <ScopePlace prefix="scope" country={country} setCountry={setCountry} region={region} setRegion={setRegion} />
         <div className="ctl"><label htmlFor="scope-target">Cohort target</label>
           <input id="scope-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
       </div>
@@ -221,9 +351,10 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
           <button className="btn small" onClick={() => setQ(stripCountryFromQuestion(q, conflict.matched))}>Use <b>{conflict.field}</b> (remove "{conflict.matched}" from the question)</button>
         </div>
       </div>}
-      <div className="row"><button className="btn small primary" disabled={!dirty || !!conflict} onClick={() => act(() => api.setScope({ question: q, country, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
+      {!conflict && <TargetNote t={tgt} />}
+      <div className="row"><button className="btn small primary" disabled={!dirty || !!conflict} onClick={() => act(() => api.setScope({ question: q, country, region, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
         <span className="muted" style={{ fontSize: '.82rem' }}>
-          {conflict ? 'Resolve the conflict above before saving.' : (dirty ? 'Unsaved changes — Save scope before Run agents.' : 'Scope saved. Click Run agents to kick off the Scope Guardian.')}
+          {conflict ? 'Resolve the conflict above before saving.' : unclear ? 'Set a clear target population before running.' : (dirty ? 'Unsaved changes — Save scope before Run agents.' : 'Scope saved. Click Run agents to kick off the Scope Guardian.')}
         </span></div></div>)
   return (
     <>
@@ -231,7 +362,7 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
         <div className="row between" style={{ alignItems: 'flex-start' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <span className="eyebrow">Research question</span><p>{st.question}</p>
-            <p className="muted" style={{ fontSize: '.82rem' }}>Scope: {st.country ? <>country <b>{st.country}</b></> : <>worldwide (not set explicitly)</>} · cohort target {st.cohort_target} · drugs {st.target_drugs.join(', ')}</p>
+            <p className="muted" style={{ fontSize: '.82rem' }}>Scope: <ScopeTarget st={st} /> · cohort target {st.cohort_target} · drugs {st.target_drugs.join(', ')}</p>
           </div>
           <button className="btn small ghost" title="Reopen the scope form; clears downstream work (samples/report) but preserves decision history." onClick={() => { if (confirm('Reopen scope? This clears discovered samples and any report, but keeps the decision history.')) act(() => api.reopenScope(), 'Scope reopened') }}>✎ Edit scope</button>
         </div>

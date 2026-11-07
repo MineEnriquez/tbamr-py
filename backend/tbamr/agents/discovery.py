@@ -68,11 +68,14 @@ class DiscoveryAssistant(LLMAgent):
                 "search_notes": sub.get("search_notes", ""), "concerns": concerns, "total_in_ena": max([t for t in totals if t] or [0])}
 
     def discover(self, country: str, question: str, already_known: list[str] | None = None, focus: str = "",
-                 exclude_studies: list[str] | None = None) -> dict[str, Any]:
-        scope = f"from {country}" if country else "worldwide"
+                 exclude_studies: list[str] | None = None, region: str = "") -> dict[str, Any]:
+        scope = (f"from {region}, {country}" if region else f"from {country}") if country else "worldwide"
         task = (f"Find candidate M. tuberculosis WGS runs ({scope}) for this question: {question}"
                 + (f"\nFollow-up from the Orchestrator: {focus}" if focus else ""))
-        res = self.run(task, {"country": country, "already_known": already_known or [], "focus": focus,
+        if region:
+            task += (f"\nThe target is the region {region}. ENA can only be searched by country, so search {country} and return all "
+                     "candidates; the Verification Tasker checks the region in each run's location field.")
+        res = self.run(task, {"country": country, "region": region, "already_known": already_known or [], "focus": focus,
                              "exclude_studies": exclude_studies or []})
         if not res.get("ok"):
             self.decide("—", Outcome.ESCALATE, RULES["elig"], f"Discovery did not complete: {res.get('error')}", stage=2)
