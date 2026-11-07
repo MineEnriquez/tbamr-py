@@ -88,8 +88,15 @@ class ReportingOrchestrator(RuleAgent):
             "provenance": {"tools": sorted({s.profile_meta.get("tool") for s in analysed if s.profile_meta.get("tool")}),
                            "databases": sorted({str(s.profile_meta.get("db")) for s in analysed if s.profile_meta.get("db")}), "rules": RULES},
             "resistance_definition": RESISTANCE_DEFINITION,
+            "catalogue_consistent": True,
             "gates": st.gates, "summary_draft": None,
         }
+        dbs = report["provenance"]["databases"]
+        if n and (len(dbs) > 1 or "not in file" in dbs):
+            report["catalogue_consistent"] = False
+            report["limitations"].insert(0, f"Mixed or unrecorded mutation-catalogue versions in this report ({', '.join(dbs)}): calls are not "
+                                            "comparable across runs. Re-profile all runs with one catalogue version before release.")
+            _LOG.warning("report v%s mixes catalogue versions: %s", version, dbs)
         _LOG.info("report v%s counts: candidates=%d verified=%d qc_passed=%d analysed=%d", version, len(st.samples), len(cohort), len(qc), n)
         for r in rows:
             _LOG.info("report v%s %s: predicted resistant %d/%d, uncertain/pending %d, reviewed %d, DST %d (concordant %s)",

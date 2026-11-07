@@ -724,3 +724,7 @@ def test_no_mdr_labels_reach_the_agents_or_the_summary(orch):
     assert "never label isolates MDR" in captured["system"] and "'associated with'" in captured["system"]
     assert "catalogue" in captured["prompt"]
 
+
+def test_report_flags_mixed_catalogue_versions(orch):
+    rep = run_to_report(orch)  # the demo deliberately mixes a 4.x file without a database, demo-db and tbdb
+    assert rep["catalogue_consistent"] is False and rep["limitations"][0].startswith("Mixed or unrecorded mutation-catalogue versions")

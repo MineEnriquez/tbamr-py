@@ -86,6 +86,7 @@ export default function Report({ st, act, brain }) {
       <div className="box note"><p>Computational predictions from public genomes: not laboratory-confirmed susceptibility, not a national prevalence estimate.</p></div>
       {r.resistance_definition && <div className="box defs-report"><p><b>How resistance is called.</b> {r.resistance_definition}</p>
         <p className="muted" style={{ margin: 0 }}>Catalogue: <span className="mono">{r.provenance.databases.join(', ') || 'not recorded'}</span> · {r.provenance.tools.join(', ') || 'tool not recorded'}</p></div>}
+      {r.catalogue_consistent === false && <div className="box esc" role="alert"><p><b>Mixed catalogue versions.</b> Runs in this report were called with different or unrecorded mutation-catalogue versions, so their calls are not comparable. Re-profile all runs with one version before release.</p></div>}
       <Summary r={r} act={act} />
       <History currentVersion={r.version} />
       <div><h3>Sample counts</h3>{bar('Total candidates', c.candidates)}{bar('Verified eligible', c.verified)}{bar('Quality Control-passed', c.qc_passed)}{bar('Profiled & evaluated', c.analysed, true)}</div>
