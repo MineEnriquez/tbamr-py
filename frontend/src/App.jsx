@@ -5,6 +5,7 @@ import Team from './components/Team.jsx'
 import Pipeline from './components/Pipeline.jsx'
 import Samples, { Drawer } from './components/Samples.jsx'
 import Review from './components/Review.jsx'
+import Admin from './components/Admin.jsx'
 import Report from './components/Report.jsx'
 import Insights from './components/Insights.jsx'
 import Logs from './components/Logs.jsx'
@@ -94,7 +95,7 @@ export default function App() {
   if (!snap) return <div className="wrap"><p className="muted">Loading…</p></div>
   const st = snap.state
   const pending = st.samples.flatMap(s => s.findings).filter(f => f.review === 'Pending').length
-  const tabs = [['pipeline', 'Pipeline'], ['review', 'Review queue'], ['samples', 'Samples'], ['report', 'Report'], ['team', 'Agent team'], ['insights', 'Decisions & metrics'], ['logs', 'Logs'], ['about', 'About']]
+  const tabs = [['pipeline', 'Pipeline'], ['review', 'Review queue'], ['samples', 'Samples'], ['report', 'Report'], ['team', 'Agent team'], ['insights', 'Decisions & metrics'], ['logs', 'Logs'], ['admin', 'Admin'], ['about', 'About']]
 
   return (
     <RawCtx.Provider value={raw}>
@@ -132,6 +133,7 @@ export default function App() {
         {tab === 'report' && <Report st={st} act={act} brain={snap.mode.brain} />}
         {tab === 'insights' && <Insights m={metrics} decisions={decisions} />}
         {tab === 'logs' && <Logs version={version} />}
+        {tab === 'admin' && <Admin />}
         {tab === 'about' && <About />}
       </main>
       {sel && <Drawer run={sel} st={st} pending={snap.pending_overrides} act={act} who={who} close={() => setSel(null)} version={version} />}

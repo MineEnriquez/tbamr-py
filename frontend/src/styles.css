@@ -69,6 +69,13 @@ textarea{width:100%;min-height:56px;resize:vertical}
 .role-badge.r-analyst{color:var(--blue)}
 .role-badge.r-tbexpert{color:var(--ok)}
 .role-reqd{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:.9rem;color:var(--ink)}
+/* Admin: compact inline on/off switch for the cache toggles. */
+.switch-small{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.switch-small input{appearance:none;width:28px;height:16px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;transition:background .12s}
+.switch-small input:checked{background:color-mix(in srgb,var(--ok) 70%,transparent)}
+.switch-small input::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:transform .12s}
+.switch-small input:checked::after{transform:translateX(12px)}
+.switch-small input:disabled{opacity:.5;cursor:not-allowed}
 /* Data-mode switch: flips demo ↔ live and resets the pipeline. Styled like a toggle so the state is unambiguous. */
 .mode-switch{display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;cursor:pointer;padding:0;font:inherit;color:inherit}
 .mode-switch:disabled{opacity:.55;cursor:not-allowed}

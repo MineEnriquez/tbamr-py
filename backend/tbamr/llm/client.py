@@ -13,6 +13,8 @@ from __future__ import annotations
 import os
 from typing import Any, Callable, Protocol
 
+from ..stores.cache import cache
+
 DEFAULT_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5-5")
 
 
@@ -34,6 +36,12 @@ class ClaudeClient:
         self.client = anthropic.Anthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
 
     def complete(self, agent, system, messages, tools):
+        # Cache keyed by the whole request shape. Enabled by default; the admin page lets a user
+        # turn Claude caching off when they want fresh reasoning for every call.
+        key = {"m": "complete", "model": self.model, "agent": agent, "system": system, "messages": messages, "tools": tools}
+        return cache.wrap("claude", key, lambda: self._complete_live(system, messages, tools))
+
+    def _complete_live(self, system, messages, tools):
         resp = self.client.messages.create(
             model=self.model, max_tokens=self.max_tokens, system=system, messages=messages, tools=tools
         )
@@ -46,6 +54,10 @@ class ClaudeClient:
         return out
 
     def text(self, system: str, prompt: str) -> str:
+        key = {"m": "text", "model": self.model, "system": system, "prompt": prompt}
+        return cache.wrap("claude", key, lambda: self._text_live(system, prompt))
+
+    def _text_live(self, system: str, prompt: str) -> str:
         resp = self.client.messages.create(model=self.model, max_tokens=800, system=system, messages=[{"role": "user", "content": prompt}])
         return "".join(b.text for b in resp.content if b.type == "text")
 
