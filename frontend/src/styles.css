@@ -369,3 +369,4 @@ details.defs[open] summary{margin-bottom:8px}
 .warn-answer.disagree,.warn-disputed{color:var(--esc)}
 .revised-q{border-left:3px solid var(--blue)}
 .revised-text{font-size:1rem;font-style:italic;margin:6px 0 10px}
+.below-min{color:var(--hold);font-weight:600}

@@ -38,7 +38,7 @@ SCOPE = {
     "question": "What is the lineage composition and resistance profile of recent MTB sequencing in Indonesia?",
     "country": "Indonesia",
     "target_drugs": ["Rifampicin", "Isoniazid"],
-    "cohort_target": 8,
+    "cohort_target": 100,
 }
 
 PI = {"role": "pi", "person": "Ana"}

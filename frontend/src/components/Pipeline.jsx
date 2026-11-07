@@ -179,7 +179,7 @@ function StartHero({ snap, act, who, busy, setView }) {
   const [q, setQ] = useState(st.question)
   const [country, setCountry] = useState(st.country || '')
   const [region, setRegion] = useState(st.region || '')
-  const [target, setTarget] = useState(st.cohort_target ?? 8)
+  const [target, setTarget] = useState(st.cohort_target ?? 100)
   const conflict = useMemo(() => {
     const inQ = detectCountryInQuestion(q)
     const field = country.split(':')[0].trim()
@@ -189,7 +189,7 @@ function StartHero({ snap, act, who, busy, setView }) {
   }, [q, country])
   const tgt = useTarget(q, country, region)
   const unclear = !!tgt?.problem
-  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || region !== (st.region || '') || target !== (st.cohort_target ?? 8))
+  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || region !== (st.region || '') || target !== (st.cohort_target ?? 100))
   const save = () => act(() => api.setScope({ question: q, country, region, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')
   const start = () => act(() => api.run(1), 'Stage 1 finished')
   const canRun = status === 'ready' && !busy && !dirty && !conflict && !unclear
@@ -197,7 +197,7 @@ function StartHero({ snap, act, who, busy, setView }) {
     <section className="panel start-hero">
       <span className="eyebrow">Start · Research question</span>
       <h1 className="start-q">{st.question || <span className="muted">No research question yet.</span>}</h1>
-      <p className="start-sub">Scope: <ScopeTarget st={st} /> · cohort target <b>{st.cohort_target}</b> · drugs <b>{st.target_drugs.join(', ')}</b></p>
+      <p className="start-sub">Scope: <ScopeTarget st={st} /> · minimum cohort <b>{st.cohort_target}</b> · drugs <b>{st.target_drugs.join(', ')}</b></p>
       <div className="row" style={{ gap: 10, marginTop: 12 }}>
         <button className="btn primary" onClick={() => setView(1)}>Go to Stage 1 →</button>
         <button className="btn ghost" title="Reopen the scope form; clears downstream work (samples/report) but preserves decision history." onClick={() => { if (confirm('Reopen scope? This clears discovered samples and any report, but keeps the decision history.')) act(() => api.reopenScope(), 'Scope reopened') }}>✎ Edit scope</button>
@@ -213,7 +213,7 @@ function StartHero({ snap, act, who, busy, setView }) {
         placeholder="e.g. What patterns of drug resistance can we identify in Mycobacterium tuberculosis genomic samples from Indonesia, and which mutations are associated with resistance to rifampicin and isoniazid?" />
       <div className="row" style={{ gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <ScopePlace prefix="start" country={country} setCountry={setCountry} region={region} setRegion={setRegion} />
-        <div className="ctl"><label htmlFor="start-target">Cohort target</label>
+        <div className="ctl"><label htmlFor="start-target" title="The smallest cohort (unique isolates) you consider adequate. Discovery searches further to reach it and the gates warn if the cohort falls short; eligible isolates are never dropped to fit a number. 100 keeps a 95% confidence interval for a proportion within about ±10 percentage points.">Minimum cohort <span className="muted" style={{ fontWeight: 400 }}>(isolates)</span></label>
           <input id="start-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
       </div>
       {conflict && <div className="box esc" style={{ marginTop: 10 }}>
@@ -270,7 +270,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
         <div className="box note">
           <p><b>Run agents</b> will hand the pipeline to <b>two</b> Claude-powered agents in sequence:</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
-            <li><b>Discovery Assistant</b> — queries the <span className="mono">ENA Portal API</span> for <i>M. tuberculosis</i> read runs matching your scope (country + any extra constraints), paging through results up to the cohort target. For each candidate it may also call <span className="mono">ena_study</span> and <span className="mono">find_publications</span> (Europe PMC) to attach provenance.</li>
+            <li><b>Discovery Assistant</b> — queries the <span className="mono">ENA Portal API</span> for <i>M. tuberculosis</i> read runs matching your scope (country + any extra constraints), aiming for at least the minimum cohort and searching further studies when it falls short (it never drops eligible runs to fit the number). For each candidate it may also call <span className="mono">ena_study</span> and <span className="mono">find_publications</span> (Europe PMC) to attach provenance.</li>
             <li><b>Verification Tasker</b> — rule checks + Claude agent — treats a run as <b>Verified</b> only when the ENA/BioSample country field confirms the scope. Missing or conflicting origin → <b>Hold</b> for your review; the Guardian's policy on inferred origin is enforced here. If too few runs clear verification, the Orchestrator can re-plan once and ask Discovery to broaden the search.</li>
           </ul>
           <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see candidate counts (Verified / On hold / Excluded), per-run archive records, and any cohort-level checks before the <RoleBadge role="pi" /> gate opens.</p>
@@ -366,7 +366,7 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
   const [q, setQ] = useState(st.question)
   const [country, setCountry] = useState(st.country || '')
   const [region, setRegion] = useState(st.region || '')
-  const [target, setTarget] = useState(st.cohort_target ?? 8)
+  const [target, setTarget] = useState(st.cohort_target ?? 100)
   const sc = st.scope || {}
   const openWarnings = (sc.warnings || []).filter((_, i) => !(sc.responses || {})[String(i)]).length
   // Detect a question/country-field conflict: if the question clearly names a country different
@@ -382,7 +382,7 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
   // When the form drifts from what's in the backend, mark the whole stage dirty so the Run button disables.
   const tgt = useTarget(status === 'ready' ? q : st.question, status === 'ready' ? country : st.country, status === 'ready' ? region : st.region)
   const unclear = status === 'ready' && !!tgt?.problem
-  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || region !== (st.region || '') || target !== (st.cohort_target ?? 8))
+  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || region !== (st.region || '') || target !== (st.cohort_target ?? 100))
   useEffect(() => { onDirtyChange && onDirtyChange(dirty) }, [dirty, onDirtyChange])
   useEffect(() => { onBlockedChange && onBlockedChange(!!conflict || unclear) }, [conflict, unclear, onBlockedChange])
   if (status === 'ready') return (
@@ -390,7 +390,7 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
       <textarea value={q} onChange={e => setQ(e.target.value)} aria-label="Research question" />
       <div className="row" style={{ gap: 14, alignItems: 'flex-end' }}>
         <ScopePlace prefix="scope" country={country} setCountry={setCountry} region={region} setRegion={setRegion} />
-        <div className="ctl"><label htmlFor="scope-target">Cohort target</label>
+        <div className="ctl"><label htmlFor="scope-target" title="The smallest cohort (unique isolates) you consider adequate. Discovery searches further to reach it and the gates warn if the cohort falls short; eligible isolates are never dropped to fit a number. 100 keeps a 95% confidence interval for a proportion within about ±10 percentage points.">Minimum cohort <span className="muted" style={{ fontWeight: 400 }}>(isolates)</span></label>
           <input id="scope-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
       </div>
       {conflict && <div className="box esc" style={{ marginTop: 10 }}>
@@ -412,7 +412,7 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
         <div className="row between" style={{ alignItems: 'flex-start' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <span className="eyebrow">Research question</span><p>{st.question}</p>
-            <p className="muted" style={{ fontSize: '.82rem' }}>Scope: <ScopeTarget st={st} /> · cohort target {st.cohort_target} · drugs {st.target_drugs.join(', ')}</p>
+            <p className="muted" style={{ fontSize: '.82rem' }}>Scope: <ScopeTarget st={st} /> · minimum cohort {st.cohort_target} · drugs {st.target_drugs.join(', ')}</p>
           </div>
           <button className="btn small ghost" title="Reopen the scope form; clears downstream work (samples/report) but preserves decision history." onClick={() => { if (confirm('Reopen scope? This clears discovered samples and any report, but keeps the decision history.')) act(() => api.reopenScope(), 'Scope reopened') }}>✎ Edit scope</button>
         </div>
@@ -458,7 +458,7 @@ function S2({ st, status, act, who, openSample }) {
     <>
       <div className="metrics">
         <div className="metric"><span className="v">{st.samples.length}</span><span className="l">Candidates found</span></div>
-        <div className="metric"><span className="v" style={{ color: 'var(--ok)' }}>{v.length}</span><span className="l">Verified (target ≥{st.cohort_target})</span></div>
+        <div className="metric"><span className="v" style={{ color: 'var(--ok)' }}>{v.length}</span><span className="l">Verified (minimum {st.cohort_target})</span></div>
         <div className="metric"><span className="v" style={{ color: 'var(--hold)' }}>{h.length}</span><span className="l">On hold</span></div>
         <div className="metric"><span className="v" style={{ color: 'var(--ex)' }}>{x.length}</span><span className="l">Excluded</span></div>
       </div>

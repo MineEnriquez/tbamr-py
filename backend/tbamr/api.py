@@ -20,6 +20,7 @@ from .article import render_article_html
 from .core.decisions import DecisionLog, GuardrailViolation
 from .core.executions import capture_execution
 from .core.geo import country_catalogue, regions_for, resolve_target
+from .core.models import DEFAULT_COHORT_TARGET
 from .core.orchestrator import Orchestrator, PermissionDenied, StageError
 from .llm.client import make_client
 from .stores import cache as cache_module, mongo as mongo_module, results as results_module
@@ -99,7 +100,7 @@ class Scope(BaseModel):
     country: str = ""  # INSDC country name or "Worldwide"; empty → must be named in the question, else Stage 1 blocks
     region: str = ""  # optional subnational target inside the country (free text, e.g. "West Java")
     target_drugs: list[str] = ["Rifampicin", "Isoniazid"]
-    cohort_target: int = 8
+    cohort_target: int = DEFAULT_COHORT_TARGET
 
 
 class RunProfiler(Who):

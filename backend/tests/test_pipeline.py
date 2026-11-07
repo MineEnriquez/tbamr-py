@@ -59,7 +59,7 @@ def test_full_demo_flow(orch):
     assert {s.run for s in st.samples if s.eligibility == "Excluded"} == {"DEMO-R06", "DEMO-R07", "DEMO-R08", "DEMO-R18", "DEMO-R19", "DEMO-R23", "DEMO-R24"}
     assert {s.run for s in st.samples if s.eligibility == "Hold"} == {"DEMO-R15", "DEMO-R16", "DEMO-R20", "DEMO-R21", "DEMO-R22"}
     assert st.sample("DEMO-R04").qc == "Escalated"  # 27x borderline
-    assert rep["counts"] == {"candidates": 43, "verified": 31, "qc_passed": 27, "analysed": 25}
+    assert rep["counts"] == {"candidates": 43, "verified": 31, "qc_passed": 27, "analysed": 25, "planned_minimum": 100}
     assert [d["drug"] for d in rep["drugs"]][:2] == ["RIF", "INH"]
     pending = {(f["run"], f["variant"]) for f in rep["unresolved"]}
     assert ("DEMO-R14", "rpoB p.Ser450Leu") in pending  # low depth
@@ -865,3 +865,37 @@ def test_no_mdr_labels_reach_the_agents_or_the_summary(orch):
 def test_report_flags_mixed_catalogue_versions(orch):
     rep = run_to_report(orch)  # the demo deliberately mixes a 4.x file without a database, demo-db and tbdb
     assert rep["catalogue_consistent"] is False and rep["limitations"][0].startswith("Mixed or unrecorded mutation-catalogue versions")
+
+
+def test_default_cohort_target_is_realistic():
+    """A new scope aims for 100 isolates (95% CI within about +/-10 points), not 8."""
+    from tbamr.api import Scope
+    from tbamr.core.models import DEFAULT_COHORT_TARGET, PipelineState
+    assert DEFAULT_COHORT_TARGET == 100 and PipelineState().cohort_target == 100 and Scope(question="q").cohort_target == 100
+
+
+# ---------------------------------------------------------------- minimum cohort: search effort and adequacy, never selection
+def test_short_cohort_is_flagged_and_searched_but_nothing_is_dropped(orch):
+    orch.state.cohort_target = 100  # the demo has 31 verified isolates
+    rep = run_to_report(orch)
+    kinds = {c["kind"] for c in orch.state.cohort_checks}
+    assert {"below_minimum", "below_minimum_qc"} <= kinds
+    assert orch.state.replans == 1 and any("planned minimum of 100" in d["rationale"] and d["outcome"] == "Retry" for d in orch.log.all())
+    assert rep["counts"]["verified"] == 31 and rep["counts"]["planned_minimum"] == 100  # every eligible isolate kept
+    assert any("analysed against a planned minimum of 100" in l for l in rep["limitations"])
+
+
+def test_cohort_at_or_above_the_minimum_is_not_flagged(orch):
+    orch.state.cohort_target = 20
+    run_to_report(orch)
+    assert not {"below_minimum", "below_minimum_qc"} & {c["kind"] for c in orch.state.cohort_checks}
+    assert orch.state.replans == 0
+
+
+def test_discovery_is_told_the_minimum_and_never_to_drop_candidates():
+    seen = []
+    def policy(messages):
+        seen.append(messages[0]["content"])
+        return [{"type": "tool_use", "name": "submit", "input": {"candidate_runs": [], "studies": [], "search_notes": "", "concerns": []}}]
+    DiscoveryAssistant(DecisionLog(), ReplayClient({"discovery": policy}), DemoDataTools()).discover("Indonesia", "q?", minimum=100)
+    assert "at least 100 isolates" in seen[0] and "Never drop candidates" in seen[0]

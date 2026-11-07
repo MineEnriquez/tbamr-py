@@ -135,9 +135,13 @@ class VerificationTasker(LLMAgent):
 
     # 4. cohort checks (rules) -----------------------------------------------------
     @logged("tbamr.agents")
-    def cohort_checks(self, samples: list[Sample], asks_places: bool, total_in_ena: int) -> list[dict[str, Any]]:
+    def cohort_checks(self, samples: list[Sample], asks_places: bool, total_in_ena: int, minimum: int = 0) -> list[dict[str, Any]]:
         v = [s for s in samples if s.eligibility == "Verified"]
         checks: list[dict[str, Any]] = []
+        if minimum and len(v) < minimum:  # the planned minimum is an adequacy check, never a reason to relax criteria
+            checks.append({"outcome": "Escalate", "kind": "below_minimum",
+                           "text": f"{len(v)} verified isolate(s), below the planned minimum of {minimum}: estimates will be less precise than "
+                                   "planned. Criteria were not relaxed; widen the search or accept the smaller cohort knowingly."})
         locs, studies = Counter(s.location for s in v), Counter(s.study for s in v)
         if v and len(locs) == 1:
             loc = next(iter(locs))
