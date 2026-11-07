@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 
 import httpx
 import pytest
@@ -566,3 +568,15 @@ def test_geo_endpoints(tmp_path):
     regions = [r["name"] for r in c.get("/api/geo/regions", params={"country": "Indonesia"}).json()["regions"]]
     assert "West Java" in regions and len(regions) == 38
     assert c.get("/api/geo/regions", params={"country": "France"}).json()["regions"] == []
+
+
+# ---------------------------------------------------------------- test isolation (issue #20)
+def test_resets_never_touch_databases_in_the_working_directory(tmp_path, monkeypatch):
+    """Resetting to live and back (what the Demo/Live picker does) must not open or create tbamr-*.db in the cwd,
+    where the developer's real pipeline databases live."""
+    monkeypatch.chdir(tmp_path)
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "start.db"))))
+    for mode in ("live", "demo"):
+        assert c.post("/api/reset", params={"data": mode}).status_code == 200
+    assert not list(tmp_path.glob("tbamr-*.db")), "a reset opened a database in the working directory"
+    assert os.environ["TBAMR_DB"].startswith(tempfile.gettempdir())

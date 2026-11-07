@@ -8,7 +8,9 @@ Two kinds of tests live in this suite:
   port in a background thread per test session, pointing it at an isolated temp SQLite file
   (demo + replay mode so no network, no API key, no cross-test leakage).
 """
+import atexit
 import os
+import shutil
 import socket
 import tempfile
 import threading
@@ -24,6 +26,14 @@ import pytest
 os.environ["MONGO_URL"] = os.environ.get("TBAMR_TEST_MONGO_URL", "mongodb://127.0.0.1:1/tbamr-test")
 
 os.environ.setdefault("TBAMR_NO_APP", "1")
+
+# Never let a test open the developer's real pipeline databases (tbamr-demo.db / tbamr-live.db in the working
+# directory). POST /api/reset reopens `TBAMR_DB` or, if unset, `tbamr-<mode>.db` relative to the cwd, so any test
+# that resets (or switches Demo/Live) would otherwise clear the real pipeline. Always overridden, even if the
+# developer has TBAMR_DB set for their own server. See issue #20.
+_TEST_DB_DIR = tempfile.mkdtemp(prefix="tbamr-test-db-")
+os.environ["TBAMR_DB"] = os.path.join(_TEST_DB_DIR, "tbamr-test.db")
+atexit.register(shutil.rmtree, _TEST_DB_DIR, True)
 
 
 def _free_port() -> int:
