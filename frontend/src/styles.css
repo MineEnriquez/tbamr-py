@@ -94,7 +94,7 @@ textarea{width:100%;min-height:56px;resize:vertical}
 .tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--blue)}
 .count{display:inline-block;margin-left:6px;background:var(--pend-bg);color:var(--pend);border-radius:9px;padding:0 7px;font-size:.75rem}
 .stepper{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
-.step{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;text-align:left;display:flex;flex-direction:column;gap:2px;cursor:pointer;min-width:0;box-shadow:var(--shadow-sm);transition:border-color .15s, box-shadow .15s}
+.step{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 12px;text-align:left;display:flex;flex-direction:column;gap:2px;cursor:pointer;min-width:0;box-shadow:var(--shadow-sm);transition:border-color .15s, box-shadow .15s, opacity .15s, transform .15s}
 .step:hover{border-color:color-mix(in srgb,var(--muted) 35%,var(--line));box-shadow:var(--shadow-md)}
 .step .n{font-family:var(--f-mono);font-size:.72rem;color:var(--muted)} .step .nm{font-family:var(--f-display);font-weight:600;font-size:.86rem}
 .step .st{font-size:.74rem;font-weight:600}
@@ -249,9 +249,10 @@ footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);paddi
 
 /* workflow canvas - mermaid-style flowchart: thin outlines, light type, airy spacing. Container auto-sizes to fit the floating chip above every card and the tooltip that drops below it on hover. */
 .flow{background:transparent;border:none;padding:4px 0;display:flex;flex-direction:column;gap:16px;box-shadow:none;overflow:visible}
-.fchart{display:flex;align-items:center;justify-content:flex-start;gap:14px;overflow-x:auto;overflow-y:visible;padding:30px 4px 40px;flex-wrap:nowrap;min-height:0}
-.fnode{flex:0 0 auto;position:relative;width:150px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:30px 14px 22px;margin-top:14px;text-align:center;cursor:pointer;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:10px;justify-content:center;transition:border-color .15s, box-shadow .15s}
-.fnode:hover{border-color:var(--blue);box-shadow:0 2px 10px color-mix(in srgb,var(--blue) 10%,transparent)}
+/* No scrolling: cards flex to share the width, and the hover tooltip overflows freely over the content below. */
+.fchart{display:flex;align-items:stretch;justify-content:space-between;gap:8px;overflow:visible;padding:18px 0 6px;flex-wrap:nowrap;min-height:0;min-width:0}
+.fnode{flex:1 1 0;min-width:96px;max-width:180px;position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px 10px 18px;margin-top:0;text-align:center;cursor:pointer;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:10px;justify-content:center;transition:border-color .15s, box-shadow .15s}
+.fnode:hover,.fnode:focus-visible{border-color:var(--blue);box-shadow:var(--shadow-md);transform:translateY(-2px);z-index:6}
 .fnode.stage{min-height:170px}
 /* floating pill chip that sits above the card, outside the rectangle */
 .fnode .fcap{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font:500 .66rem/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:inline-flex;gap:7px;align-items:center;white-space:nowrap;z-index:2}
@@ -268,6 +269,7 @@ footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);paddi
 .fnode.s-wait{border-color:var(--esc)}
 .fnode.s-wait .fcap{color:var(--esc);font-weight:600;border-color:var(--esc)}
 .fnode.s-locked{opacity:.55;border-style:dashed}
+.fnode.s-locked:hover,.fnode.s-locked:focus-visible{opacity:1}
 .fnode.s-locked .fcap{border-style:dashed}
 .fnode.cur{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .fnode.cur .fcap{border-color:var(--accent)}
@@ -275,7 +277,7 @@ footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);paddi
 @keyframes nodebreath{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--blue) 40%,transparent)}50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--blue) 0%,transparent)}}
 @media (prefers-reduced-motion:reduce){.fnode.busy{animation:none}}
 
-.fnode.cap{min-width:120px;background:transparent;border-style:dashed;border-color:var(--line);cursor:default}
+.fnode.cap{align-self:center;min-width:96px;max-width:140px;background:transparent;border-style:dashed;border-color:var(--line);cursor:default}
 .fnode.cap:hover{border-color:var(--line);box-shadow:none}
 .fnode.cap.done{border-color:color-mix(in srgb,var(--ok) 55%,var(--line))}
 .fnode.cap.done .fcap{color:var(--ok)}
@@ -292,17 +294,18 @@ footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);paddi
 .start-hero .start-sub{margin:0 0 6px}
 .start-hero .start-ta{min-height:120px;font:300 1.05rem/1.5 var(--f-body);padding:14px 16px;resize:vertical}
 
-.farrow{flex:0 0 auto;display:inline-flex;align-items:center;color:var(--muted);opacity:.65;gap:0}
-.farrow i{display:block;width:28px;height:1px;background:currentColor}
+.farrow{align-self:center;flex:0 1 38px;min-width:14px;display:inline-flex;align-items:center;color:var(--muted);opacity:.65;gap:0}
+.farrow i{display:block;flex:1 1 auto;min-width:4px;height:1px;background:currentColor}
 .farrow svg{display:block;flex:none;transform:translateX(-1px)}
 
-.fbtip{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%) translateY(4px);background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-md);padding:10px 12px;min-width:200px;max-width:260px;display:flex;flex-direction:column;gap:6px;z-index:5;opacity:0;pointer-events:none;transition:opacity .15s, transform .15s;text-align:left}
+.fbtip{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%) translateY(4px);background:var(--surface);border:1px solid color-mix(in srgb,var(--blue) 35%,var(--line));border-top:3px solid var(--blue);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:12px 14px;min-width:220px;max-width:280px;display:flex;flex-direction:column;gap:8px;z-index:10;opacity:0;pointer-events:none;transition:opacity .15s, transform .15s;text-align:left}
 .fnode:hover .fbtip,.fnode:focus-within .fbtip{opacity:1;transform:translateX(-50%) translateY(0)}
-.fbtip-title{font:600 .72rem/1 var(--f-body);color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
-.fbtip-agents{display:flex;flex-wrap:wrap;gap:4px}
-.fbtip-ag{font-size:.7rem;padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted);font-weight:400}
-.fbtip-ag.llm{background:var(--pend-bg);color:var(--pend)}
+.fbtip-title{font:600 .74rem/1 var(--f-body);color:var(--ink);letter-spacing:.04em;text-transform:uppercase}
+.fbtip-agents{display:flex;flex-wrap:wrap;gap:6px}
+.fbtip-ag{font-size:.8rem;padding:3px 10px;border-radius:999px;background:var(--surface-2);color:var(--ink);font-weight:500;border:1px solid var(--line)}
+.fbtip-ag.llm{background:var(--pend-bg);color:var(--pend);border-color:color-mix(in srgb,var(--pend) 30%,transparent)}
 
+@media (max-width:980px){.fchart{flex-wrap:wrap;justify-content:center;row-gap:30px}.farrow{display:none}.fnode{flex:1 1 140px}}
 .flegend{display:flex;flex-wrap:wrap;gap:6px 18px;font:400 .82rem/1.4 var(--f-body);color:var(--muted);padding:0 4px;align-items:center;letter-spacing:.04em}
 .flegend .sw{display:inline-flex;align-items:center;gap:5px}
 .flegend .sw i{display:inline-block;width:8px;height:8px;border-radius:50%}
