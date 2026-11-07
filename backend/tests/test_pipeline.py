@@ -239,6 +239,20 @@ def test_ena_search_is_one_request_without_offset():
     assert len(searches) == 1 and searches[0]["limit"] == "500" and "offset" not in searches[0]
 
 
+def test_discovery_keeps_search_results_when_the_agent_never_submits():
+    """An agent that searches but runs out of steps without submitting must not turn into zero candidates."""
+    def policy(messages):
+        if sum(m["role"] == "assistant" for m in messages) == 0:
+            return [{"type": "tool_use", "name": "ena_search_runs", "input": {"country": "Indonesia"}}]
+        return [{"type": "text", "text": "Still thinking about more studies..."}]  # never calls submit
+
+    log = DecisionLog()
+    res = DiscoveryAssistant(log, ReplayClient({"discovery": policy}), DemoDataTools()).discover("Indonesia", "q?")
+    assert res["candidate_runs"] and all(r.startswith("DEMO-") for r in res["candidate_runs"])
+    assert any("stopped without submitting" in c for c in res["concerns"])
+    assert any(t["kind"] == "fallback" for t in log.traces("discovery"))
+
+
 # ---------------------------------------------------------------- API
 def test_api_flow(tmp_path):
     app = create_app(build_orchestrator("demo", "replay", str(tmp_path / "a.db")))
