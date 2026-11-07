@@ -335,7 +335,7 @@ class Orchestrator:
                 raise StageError("Fix the blocking gaps first.")
             ev = self.note_raw(role, person, "scope", "guardian", "the Scope Guardian's result")
             self.state.gates["scope"] = {"by": person, "role": role}
-            self.human(role, person, "—", Outcome.APPROVE, RULES["scope"], "Scope approved; proposed definitions accepted.", 1, ev)
+            self.human(role, person, "—", Outcome.APPROVE, RULES["scope"], "Scope approved; the definitions applied by rule are accepted.", 1, ev)
             self._complete(1)
             self.save()
 

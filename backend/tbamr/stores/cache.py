@@ -144,6 +144,8 @@ class _Cache:
                 elif ns in ("ena", "pmc", "tbprofiler"):
                     log.info("cache hit namespace=%s method=%s", ns, payload.get("m"))
             return hit
+        if isinstance(payload, dict) and self.is_enabled(ns):
+            log.info("cache miss namespace=%s method=%s agent=%s → fetching live", ns, payload.get("m"), payload.get("agent", "-"))
         value = fn()
         if value is not None:
             self.set(ns, payload, value)

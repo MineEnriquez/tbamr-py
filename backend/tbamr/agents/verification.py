@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import logging
 from collections import Counter
 from typing import Any
 
@@ -96,6 +97,9 @@ class VerificationTasker(LLMAgent):
     # 2-3. agent investigation + guardrails ---------------------------------------
     def validate(self, sub: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
         allowed = set(ctx.get("runs", []))
+        dropped = [p.get("run") for p in sub.get("proposals", []) if p.get("run") not in allowed]
+        if dropped:
+            logging.getLogger("tbamr.agents.verification").warning("guardrail dropped %d proposal(s) for runs not under review: %s", len(dropped), dropped[:10])
         props = []
         for p in sub.get("proposals", []):
             if p.get("run") not in allowed:
