@@ -12,7 +12,7 @@ from tbamr.core.decisions import Decision, DecisionLog, GuardrailViolation, Outc
 from tbamr.core.models import Finding, Sample
 from tbamr.core.orchestrator import PermissionDenied, StageError
 from tbamr.llm.client import ReplayClient
-from tbamr.core.geo import resolve_target
+from tbamr.core.geo import region_matches, resolve_target
 from tbamr.tools.demo import SCENARIOS, DemoDataTools
 from tbamr.tools.ena import DataTools
 from tbamr.tools.tbprofiler import parse_result
@@ -482,3 +482,41 @@ def test_explicit_worldwide_searches_without_a_country_filter(tmp_path):
     calls = [t for t in o.log.traces("discovery") if t["kind"] == "tool_call"]
     assert all('country="Worldwide' not in json.dumps(t["payload"]) for t in calls)
     assert o.state.sample("DEMO-R06").eligibility == "Verified"  # origin is informational for worldwide
+
+
+# ---------------------------------------------------------------- subnational target
+@pytest.mark.parametrize("question,field,region,want,blocked", [
+    ("Resistance patterns", "Indonesia", "West Java", ("Indonesia", "West Java"), False),
+    ("Resistance patterns", "Indonesia: West Java", "", ("Indonesia", "West Java"), False),  # ENA format in the Country field
+    ("Resistance in West Java province, Indonesia", "", "", ("Indonesia", "West Java"), False),  # named in the question
+    ("Which MDR-TB mutations occur in Western Cape province?", "South Africa", "", ("South Africa", "Western Cape"), False),
+    ("Compare West Java province and Bali province", "Indonesia", "", ("Indonesia", ""), False),  # comparison: whole country
+    ("Resistance patterns", "Worldwide", "West Java", ("", ""), True),  # a region needs one country
+    ("Resistance in West Java province", "", "", ("", ""), True),  # region without a country
+    ("Resistance in Bali province", "Indonesia", "West Java", ("", ""), True),  # field and question disagree
+])
+def test_subnational_target_resolution(question, field, region, want, blocked):
+    t = resolve_target(question, field, region)
+    assert bool(t["problem"]) is blocked and (t["country"], t["region"]) == want
+
+
+def test_region_matching_is_a_whole_phrase():
+    assert region_matches("West Java", "Indonesia: West Java")
+    assert region_matches("west java province", "Indonesia:West Java")
+    assert region_matches("West Java", "Indonesia: Bandung, West Java")
+    assert not region_matches("West Java", "Indonesia: Central Java")
+    assert not region_matches("West Java", "Indonesia")
+
+
+def test_region_scope_verifies_matching_runs_and_holds_the_rest(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "r.db"))
+    o.state.question, o.state.country, o.state.region = "Which rifampicin mutations are present?", "Indonesia", "West Java"
+    run_to_report(o)
+    st = o.state
+    assert st.region == "West Java" and st.scope["target"]["region"] == "West Java"
+    verified = {s.run for s in st.samples if s.eligibility == "Verified"}
+    assert verified == {"DEMO-R02", "DEMO-R13", "DEMO-R43"}  # "West Java" and "Bandung, West Java"
+    assert st.sample("DEMO-R04").eligibility == "Hold"  # Central Java: a person decides, never excluded by guesswork
+    assert "does not name the target region" in st.sample("DEMO-R04").eligibility_note
+    assert st.sample("DEMO-R06").eligibility == "Excluded"  # other country still excluded by rule
+

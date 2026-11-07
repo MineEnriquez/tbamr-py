@@ -131,6 +131,8 @@ def _proposals(amb, pubs_by_study):
     for a in amb:
         if "BioSample" in a["issue"]:
             out.append({"run": a["run"], "outcome": "Exclude", "rationale": "Same isolate as an earlier run; keep the earlier run as the isolate's representative.", "evidence": f"BioSample {a['biosample']}"})
+        elif "region" in a["issue"]:
+            out.append({"run": a["run"], "outcome": "Hold", "rationale": "The location does not name the target region. Whether the recorded place lies inside it is a human decision.", "evidence": f"location {a.get('country') or 'missing'}"})
         elif "country" in a["issue"]:
             pub = next((p for p in pubs_by_study.get(a["study"], []) if p and "Indonesia" in (p.get("title") or "")), None)
             if pub:

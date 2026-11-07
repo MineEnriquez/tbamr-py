@@ -16,6 +16,7 @@ from collections import Counter
 from typing import Any
 
 from ..core.decisions import Outcome
+from ..core.geo import region_matches, region_of
 from ..core.models import RULES, Sample
 from .base import LLMAgent, Tool
 
@@ -28,7 +29,8 @@ class VerificationTasker(LLMAgent):
         "Some runs could not be decided by the eligibility rules. For each one, gather evidence with your tools and propose "
         "Hold, Exclude or Escalate with a short rationale and the evidence you found. When the researcher scoped by country, "
         "Verified origin requires the ENA country field; a publication alone can support a human decision but cannot verify a "
-        "run. For worldwide searches, origin is informational and does not block verification."
+        "run. When a subnational region is targeted, a run whose location does not name that region stays on Hold: say what "
+        "place it records, and never assert that a city lies inside the region; a person confirms that. For worldwide searches, origin is informational and does not block verification."
     )
     max_steps = 8
     submit_schema = {
@@ -55,7 +57,7 @@ class VerificationTasker(LLMAgent):
         ]
 
     # 1. rule pre-checks -----------------------------------------------------------
-    def precheck(self, samples: list[Sample], country: str) -> list[tuple[Sample, str]]:
+    def precheck(self, samples: list[Sample], country: str, region: str = "") -> list[tuple[Sample, str]]:
         """Classify each run. If `country` is a real country, the research is scoped to that country and
         runs whose ENA country field names a different place are excluded; missing-country goes to
         the agent. If `country` is empty or a worldwide sentinel ('worldwide'/'global'/'any'),
@@ -74,12 +76,16 @@ class VerificationTasker(LLMAgent):
                 self.decide(s.run, Outcome.EXCLUDE, RULES["elig"], s.eligibility_note, f"ENA run {s.run}", stage=2)
             elif scoped and not c:
                 ambiguous.append((s, "country field missing in ENA"))
+            elif scoped and region and not region_of(c):
+                ambiguous.append((s, f"region missing from the ENA location (target region: {region})"))
+            elif scoped and region and not region_matches(region, c):
+                ambiguous.append((s, f'region recorded as "{region_of(c)}", which does not name the target region {region}'))
             elif s.biosample and s.biosample in seen:
                 ambiguous.append((s, f"BioSample {s.biosample} already used by {seen[s.biosample]} (possible repeated isolate)"))
             elif s.platform.upper() != "ILLUMINA":
                 ambiguous.append((s, f"platform {s.platform or 'missing'} is not the approved ILLUMINA"))
             else:
-                s.eligibility, s.eligibility_note = "Verified", f"{country_note} WGS; Illumina; BioSample not shared."
+                s.eligibility, s.eligibility_note = "Verified", f"{country_note}{f' Matches target region {region}.' if scoped and region else ''} WGS; Illumina; BioSample not shared."
                 self.decide(s.run, Outcome.PROCEED, RULES["elig"], s.eligibility_note, f"ENA run {s.run}, BioSample {s.biosample}", stage=2)
             if s.biosample and s.biosample not in seen:
                 seen[s.biosample] = s.run
@@ -96,8 +102,8 @@ class VerificationTasker(LLMAgent):
             props.append({"run": p["run"], "outcome": outcome, "rationale": p.get("rationale", ""), "evidence": p.get("evidence", "")})
         return {"proposals": props}
 
-    def verify(self, samples: list[Sample], country: str) -> dict[str, Any]:
-        ambiguous = self.precheck(samples, country)
+    def verify(self, samples: list[Sample], country: str, region: str = "") -> dict[str, Any]:
+        ambiguous = self.precheck(samples, country, region)
         proposals: dict[str, dict[str, Any]] = {}
         if ambiguous:
             ctx = {"runs": [s.run for s, _ in ambiguous],

@@ -121,12 +121,8 @@ def _regions_in(text: str) -> list[str]:
     return [r for r in hits if not any(r != o and r in o for o in hits)]  # "africa" is part of "sub-saharan africa"
 
 
-def resolve_target(question: str | None, country_field: str | None) -> dict[str, Any]:
-    """Decide the study's target population.
-
-    Returns {"country": INSDC name | "Worldwide" | "", "source": "field" | "question" | "",
-    "problem": None or a message telling the researcher exactly what to fix}.
-    """
+def _resolve_country(question: str | None, country_field: str | None) -> dict[str, Any]:
+    """Country part of the target: INSDC name, "Worldwide", or a problem."""
     q, field = question or "", (country_field or "").strip()
     named = countries_in(q)
     if field:
@@ -151,5 +147,95 @@ def resolve_target(question: str | None, country_field: str | None) -> dict[str,
         return {"country": WORLDWIDE, "source": "question", "problem": None, "notice": WORLDWIDE_NOTICE}
     regions = _regions_in(q)
     if regions:
-        return {"country": "", "source": "", "problem": f'The question names a region ({", ".join(regions)}) but archive records can only be filtered by country. Set the Country field to one country, or to "Worldwide".'}
+        return {"country": "", "source": "", "problem": f'The question names a multi-country region ({", ".join(regions)}). Set the Country field to one country (optionally with a Region inside it), or to "Worldwide".'}
     return {"country": "", "source": "", "problem": 'No target population: the question does not name a country and the Country field is empty. Enter a target country, or "Worldwide" to include all countries.'}
+
+
+# ---------------------------------------------------------------------------------------------
+# Subnational regions. ENA stores location as "Country: free text" (e.g. "Indonesia: West Java",
+# "Indonesia: Bandung, West Java"). There is no controlled vocabulary below country level, so a
+# region is matched as a normalised phrase inside the free text, never by guessing geography.
+_REGION_NOISE = {"province", "provinsi", "prov", "state", "region", "district", "regency", "kabupaten", "city", "kota",
+                 "county", "prefecture", "oblast", "governorate", "department", "municipality"}
+_REGION_IN_Q = re.compile(r"(?:\b(?:province|state|region|district|governorate|oblast|prefecture) of\s+([A-Z][\w'.-]*(?:\s+[A-Z][\w'.-]*){0,3}))"
+                          r"|(?:\b([A-Z][\w'.-]*(?:\s+[A-Z][\w'.-]*){0,3})\s+(?:[Pp]rovince|[Ss]tate|[Rr]egion|[Dd]istrict|[Gg]overnorate|[Oo]blast|[Pp]refecture)\b)")
+
+
+_LEAD_WORDS = {"the", "in", "of", "from", "and", "or", "compare", "comparing", "resistance", "patterns", "what", "which", "how",
+               "are", "is", "do", "does", "among", "across", "between", "within", "for", "to", "tb", "mdr", "mdr-tb", "drug"}
+
+
+def norm_region(text: str | None) -> str:
+    words = re.sub(r"[^\w\s]", " ", (text or "").lower()).split()
+    return " ".join(w for w in words if w not in _REGION_NOISE)
+
+
+def region_of(location: str | None) -> str:
+    """The subnational part of an ENA location ("Indonesia: West Java" -> "West Java"), or ''."""
+    loc = location or ""
+    return loc.split(":", 1)[1].strip() if ":" in loc else ""
+
+
+def country_of(location: str | None) -> str:
+    return (location or "").split(":", 1)[0].strip()
+
+
+def region_matches(target_region: str | None, location: str | None) -> bool:
+    """True when the location's subnational text names the target region (case/punctuation-insensitive, whole words)."""
+    t, r = norm_region(target_region), norm_region(region_of(location))
+    return bool(t and r) and f" {t} " in f" {r} "
+
+
+def regions_in_question(question: str | None, country: str = "") -> list[str]:
+    """Subnational regions named with an explicit administrative word ("West Java province", "the state of Lagos")."""
+    out: list[str] = []
+    for m in _REGION_IN_Q.finditer(question or ""):
+        name = (m.group(1) or m.group(2) or "").strip()
+        words = name.split()
+        while words and words[0].lower() in _LEAD_WORDS:  # sentence words captured by the capitalised-phrase pattern
+            words.pop(0)
+        name = " ".join(words)
+        if name and canonical_country(name) is None and name.lower() != (country or "").lower() and name not in out:
+            out.append(name)
+    return out
+
+
+def resolve_target(question: str | None, country_field: str | None, region_field: str | None = None) -> dict[str, Any]:
+    """Decide the study's target population: a country, optionally a region inside it, or worldwide.
+
+    Returns {"country": INSDC name | "Worldwide" | "", "region": free text | "", "source": "field" | "question" | "",
+    "region_source": "field" | "question" | "", "problem": None or a message saying exactly what to fix,
+    "notice": optional run-time notice}.
+    """
+    field, region = (country_field or "").strip(), (region_field or "").strip()
+    if ":" in field:  # ENA's own format typed into the Country field: "Indonesia: West Java"
+        field, inline = field.split(":", 1)
+        field, inline = field.strip(), inline.strip()
+        if region and inline and norm_region(region) != norm_region(inline):
+            return {"country": "", "region": "", "source": "", "region_source": "", "problem": f'The Country field names region "{inline}" but the Region field says "{region}". Keep one.'}
+        region = region or inline
+    t = _resolve_country(question, field)
+    t.setdefault("notice", None)
+    t["region"], t["region_source"] = "", ""
+    asked = regions_in_question(question, t["country"])
+    if t["problem"]:
+        if not field and (region or asked) and t["problem"].startswith("No target population"):
+            where = region or ", ".join(asked)
+            t["problem"] = f'The scope names {where} but no country. Set the Country field to the country it belongs to.'
+        return t
+    if region:
+        if t["country"] == WORLDWIDE:
+            return {**t, "country": "", "source": "", "notice": None, "problem": f'Region "{region}" needs a single country. Set the Country field to the country it belongs to.'}
+        others = [a for a in asked if norm_region(a) != norm_region(region)]
+        if others:
+            return {**t, "country": "", "source": "", "problem": f'The Region field says "{region}" but the question names {", ".join(others)}. Make them agree.'}
+        return {**t, "region": region, "region_source": "field"}
+    if asked:
+        if t["country"] == WORLDWIDE:
+            return {**t, "country": "", "source": "", "notice": None, "problem": f'The question names {", ".join(asked)} but the scope is worldwide. Set the Country field to the country it belongs to.'}
+        if len(asked) > 1:  # a within-country comparison: target the whole country, the report breaks down by region
+            return {**t, "regions_named": asked,
+                    "note": f'Targeting all of {t["country"]}. The question names several regions ({", ".join(asked)}); the report breaks results down by region so they can be compared.'}
+        return {**t, "region": asked[0], "region_source": "question"}
+    return t
+

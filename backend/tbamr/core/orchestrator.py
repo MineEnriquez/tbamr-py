@@ -219,10 +219,11 @@ class Orchestrator:
     def _s1(self):
         st = self.state
         self.orch("—", Outcome.INFO, RULES["scope"], "Handing the research scope to the Scope Guardian.", 1)
-        st.scope = self.agents["scope_guardian"].review(st.question, st.country, st.target_drugs, st.cohort_target)
+        st.scope = self.agents["scope_guardian"].review(st.question, st.country, st.target_drugs, st.cohort_target, st.region)
         target = st.scope.get("target") or {}
         if target.get("country") and not target.get("problem"):
             st.country = target["country"]  # canonical INSDC name or "Worldwide"; downstream agents read st.country
+            st.region = target.get("region") or ""
         self._set(1, "wait")
         return st.scope
 
@@ -231,11 +232,12 @@ class Orchestrator:
         if not st.country:
             raise StageError("No target population is set. Reopen the scope and set a country, or \"Worldwide\".")
         where = search_country(st.country)
-        self.orch("—", Outcome.INFO, RULES["elig"], f"Asking the Discovery Assistant for candidate runs ({where or 'worldwide, as requested'}).", 2)
-        found = self.agents["discovery"].discover(where, st.question)
+        label = (f"{st.region}, {where}" if st.region else where) or "worldwide, as requested"
+        self.orch("—", Outcome.INFO, RULES["elig"], f"Asking the Discovery Assistant for candidate runs ({label}).", 2)
+        found = self.agents["discovery"].discover(where, st.question, region=st.region)
         self._add_rows(found["rows"])
         self.orch("—", Outcome.INFO, RULES["elig"], f"Handing {len(st.samples)} candidate(s) to the Verification Tasker.", 2)
-        self.agents["verification"].verify(st.samples, st.country)
+        self.agents["verification"].verify(st.samples, st.country, st.region)
         st.cohort_checks = self._cohort_checks(found.get("total_in_ena", 0))
         # re-plan: the cohort cannot answer a comparison across places → ask Discovery to widen the search once
         if any(c["kind"] == "single_location" and c["outcome"] == "Escalate" for c in st.cohort_checks) and st.replans < self.max_replans:
@@ -244,10 +246,10 @@ class Orchestrator:
             self.orch("COHORT", Outcome.RETRY, RULES["cohort"], f"Re-planning: asking Discovery for studies other than {', '.join(studies)} to support the comparison.", 2)
             more = self.agents["discovery"].discover(where, st.question, already_known=[s.run for s in st.samples],
                                                      focus=f"The verified cohort comes from one location. Find runs from other studies than {', '.join(studies)}.",
-                                                     exclude_studies=studies)
+                                                     exclude_studies=studies, region=st.region)
             new = self._add_rows(more["rows"])
             if new:
-                self.agents["verification"].verify(new, st.country)
+                self.agents["verification"].verify(new, st.country, st.region)
             st.cohort_checks = self._cohort_checks(max(found.get("total_in_ena", 0), more.get("total_in_ena", 0)))
             self.orch("COHORT", Outcome.INFO, RULES["cohort"], f"Re-plan added {len(new)} run(s).", 2)
         self._set(2, "wait")
