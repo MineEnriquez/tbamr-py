@@ -32,7 +32,8 @@ class ScopeGuardian(LLMAgent):
     system_prompt = (
         "Review the researcher's scope. Identify blocking gaps (missing question, drugs or numbers). "
         "The target population has already been resolved by rule and is given as `target` in the context: either one "
-        "country, or worldwide because the researcher asked for it explicitly. Never widen or change it. If the target "
+        "country (optionally one subnational region inside it), or worldwide because the researcher asked for it explicitly. "
+        "Never widen or change it. If the target "
         "has a `problem`, it is already blocking. Propose concrete definitions for the playbook's policy gaps, and warn about parts "
         "of the question that public genomes may not support (prevalence, clinical use, comparisons across places). "
         "You propose; the researcher approves."
@@ -61,18 +62,19 @@ class ScopeGuardian(LLMAgent):
         if not ctx.get("target_drugs"):
             blocking.append("No target drugs selected.")
         # Target population (rule, not model): one country, or worldwide only when explicitly asked for.
-        target = ctx.get("target") or resolve_target(ctx.get("question"), ctx.get("country"))
+        target = ctx.get("target") or resolve_target(ctx.get("question"), ctx.get("country"), ctx.get("region"))
         if target["problem"]:
             blocking.append(target["problem"])
         warnings = list(sub.get("warnings") or [])
-        if target.get("notice") and target["notice"] not in warnings:
-            warnings.insert(0, target["notice"])
+        for extra in (target.get("note"), target.get("notice")):  # rule notes lead the Guardian's own warnings
+            if extra and extra not in warnings:
+                warnings.insert(0, extra)
         return {"blocking": sorted(set(blocking)), "gaps": gaps, "warnings": warnings,
                 "asks_comparison_across_places": bool(sub.get("asks_comparison_across_places")), "target": target}
 
-    def review(self, question: str, country: str, target_drugs: list[str], cohort_target: int) -> dict[str, Any]:
-        target = resolve_target(question, country)
-        ctx = {"question": question, "country": country, "target": target, "target_drugs": target_drugs, "cohort_target": cohort_target,
+    def review(self, question: str, country: str, target_drugs: list[str], cohort_target: int, region: str = "") -> dict[str, Any]:
+        target = resolve_target(question, country, region)
+        ctx = {"question": question, "country": country, "region": region, "target": target, "target_drugs": target_drugs, "cohort_target": cohort_target,
                "required_policy_gaps": [{"key": k, "gap": g} for k, g, _ in REQUIRED_GAPS]}
         res = self.run("Review this research scope and submit your assessment.", ctx)
         if not res.get("ok"):
@@ -81,7 +83,8 @@ class ScopeGuardian(LLMAgent):
                    "target": target}
         self.log.put_raw("scope", "guardian", {"input": ctx, "result": res, "brain": self.client.mode})
         outcome = Outcome.HOLD if res["blocking"] else Outcome.ESCALATE
-        where = (f"Target population: {target['country']} (from the {target['source']})." if not target["problem"]
+        place = target["country"] + (f" · {target['region']}" if target.get("region") else "")
+        where = (f"Target population: {place} (from the {target['source']})." if not target["problem"]
                  else f"Target population unclear: {target['problem']}")
         self.decide("SCOPE", outcome, RULES["scope"],
                     f"{where} {len(res['blocking'])} blocking gap(s); {len(res['gaps'])} definitions proposed; {len(res['warnings'])} warning(s). Researcher approval needed.",

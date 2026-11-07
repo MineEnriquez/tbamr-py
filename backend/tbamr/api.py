@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from .article import render_article_html
 from .core.decisions import DecisionLog, GuardrailViolation
 from .core.executions import capture_execution
-from .core.geo import resolve_target
+from .core.geo import country_catalogue, regions_for, resolve_target
 from .core.orchestrator import Orchestrator, PermissionDenied, StageError
 from .llm.client import make_client
 from .stores import cache as cache_module, mongo as mongo_module, results as results_module
@@ -44,7 +44,7 @@ def _run_label_from_state(orch: Orchestrator) -> str:
     if rep and rep.get("version"):
         return f"Report v{rep['version']}" + (" · final" if st.gates.get("release", {}).get("kind") == "final" else "")
     if st.scope and st.gates.get("scope"):
-        loc = st.country or "target not set"
+        loc = (f"{st.region}, {st.country}" if st.region else st.country) or "target not set"
         drugs = ", ".join(st.target_drugs or [])
         return f"Scope: {loc}" + (f" · {drugs}" if drugs else "")
     if (st.question or "").strip():
@@ -88,6 +88,7 @@ class Release(Who):
 class Scope(BaseModel):
     question: str
     country: str = ""  # INSDC country name or "Worldwide"; empty → must be named in the question, else Stage 1 blocks
+    region: str = ""  # optional subnational target inside the country (free text, e.g. "West Java")
     target_drugs: list[str] = ["Rifampicin", "Isoniazid"]
     cohort_target: int = 8
 
@@ -148,14 +149,24 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         st = O().state
         if st.stage_status["1"] != "ready":
             raise HTTPException(409, "The scope can only be edited before the Guardian runs. Use /api/scope/reopen to go back.")
-        st.question, st.country, st.target_drugs, st.cohort_target = s.question, s.country, s.target_drugs, s.cohort_target
+        st.question, st.country, st.region, st.target_drugs, st.cohort_target = s.question, s.country, s.region, s.target_drugs, s.cohort_target
         O().save()
         return {"ok": True}
 
+    @app.get("/api/geo/countries")
+    def geo_countries():
+        """Country options: WHO high-burden TB countries, the WHO watchlist, then all other countries."""
+        return country_catalogue()
+
+    @app.get("/api/geo/regions")
+    def geo_regions(country: str = ""):
+        """First-level regions (provinces, states, ...) for a catalogued country; [] when none are on file."""
+        return {"country": country, "regions": [{"name": r["name"], "type": r.get("type")} for r in regions_for(country)]}
+
     @app.get("/api/scope/target")
-    def scope_target(question: str = "", country: str = ""):
+    def scope_target(question: str = "", country: str = "", region: str = ""):
         """Resolve the target population the same way Stage 1 will, so the form can show it before running."""
-        return resolve_target(question, country)
+        return resolve_target(question, country, region)
 
     @app.post("/api/scope/reopen")
     def reopen_scope():

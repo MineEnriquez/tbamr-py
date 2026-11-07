@@ -63,6 +63,8 @@ _RUNS = [
     ("DEMO-R40", "SAMDEMO0040", "PRJDEMO-C", "Indonesia: Ambon", "WGS", "ILLUMINA", "PAIRED", 91, True),
     ("DEMO-R41", "SAMDEMO0041", "PRJDEMO-F", "Indonesia: Mataram", "WGS", "ILLUMINA", "PAIRED", 76, True),
     ("DEMO-R42", "SAMDEMO0042", "PRJDEMO-E", "Indonesia: Tangerang", "WGS", "ILLUMINA", "PAIRED", 68, True),
+    # --- subnational: location recorded as "city, province" ----------------------------------
+    ("DEMO-R43", "SAMDEMO0043", "PRJDEMO-A", "Indonesia: Bandung, West Java", "WGS", "ILLUMINA", "PAIRED", 73, True),
 ]
 # Runs a loosely-scoped archive search can return although their country is outside the scope.
 _DECOYS = {"DEMO-R06", "DEMO-R24"}
@@ -111,6 +113,7 @@ _PROFILES = {
                                              ("pncA", "p.Gln10Pro", "pyrazinamide", "Assoc w R", 83, 1.0), ("embB", "p.Gly406Ala", "ethambutol", "Assoc w R", 80, 1.0),
                                              ("rpsL", "p.Lys43Arg", "streptomycin", "Assoc w R", 85, 1.0), ("rrs", "n.1401A>G", "amikacin", "Assoc w R", 79, 1.0)]),
     "DEMO-R41": ("La1.8.BCG", "Other", [("pncA", "p.His57Asp", "pyrazinamide", "Assoc w R", 74, 1.0)]),
+    "DEMO-R43": ("lineage2.2.1", "HR-TB", [("katG", "p.Ser315Thr", "isoniazid", "Assoc w R", 70, 1.0)]),
     "DEMO-R42": ("lineage1.1.1", "Sensitive", [("gyrA", "p.Glu21Gln", "moxifloxacin", "Not assoc w R", 66, 1.0),
                                                 ("rpoB", "p.Ala1075Ala", "rifampicin", "Not assoc w R", 70, 1.0)]),
 }
@@ -182,6 +185,7 @@ SCENARIOS: dict[str, dict[str, Any]] = {
     "DEMO-R39": {"what": "One variant annotated for two drugs (INH + ethionamide)", "expect": {"elig": "Verified", "qc": "Pass", "prof": "Done"}},
     "DEMO-R40": {"what": "MDR-TB plus pyrazinamide, ethambutol, streptomycin, amikacin", "expect": {"elig": "Verified", "qc": "Pass", "prof": "Done"}},
     "DEMO-R41": {"what": "M. bovis BCG lineage (likely contamination); intrinsic pncA", "expect": {"elig": "Verified", "qc": "Pass", "prof": "Done"}},
+    "DEMO-R43": {"what": "Location 'Bandung, West Java' (city + province) still matches a West Java region target", "expect": {"elig": "Verified", "qc": "Pass", "prof": "Done"}},
     "DEMO-R42": {"what": "Only lineage markers ('not associated') → nothing counted", "expect": {"elig": "Verified", "qc": "Pass", "prof": "Done", "review": {"gyrA p.Glu21Gln": "Not required"}}},
 }
 

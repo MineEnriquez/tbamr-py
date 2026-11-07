@@ -33,7 +33,7 @@ def test_landing_defaults_to_the_start_hero(page, live_server, reset_demo):
     """On a fresh load the user lands on the Start hero (view=0), which shows a prominent
     research-question textarea and the toggle-able 'start' chip in the Flow diagram."""
     page.goto(f"{live_server}/", wait_until="networkidle")
-    # The Start hero exposes a large textarea labelled "Research question" and a #start-country input.
+    # The Start hero exposes a large textarea labelled "Research question" and a #start-country dropdown.
     assert page.locator('textarea[aria-label="Research question"]').is_visible()
     assert page.locator('#start-country').is_visible()
     # The Flow's 'start' chip is now a real button and marked current (cur) when view=0.
@@ -69,7 +69,7 @@ def test_scope_conflict_blocks_save_and_run(page, live_server, reset_demo):
     page.locator('textarea[aria-label="Research question"]').fill(
         "Resistance patterns in Mycobacterium tuberculosis genomes from Indonesia."
     )
-    page.locator('#start-country').fill("Kenya")
+    page.locator('#start-country').select_option("Kenya")
     # Wait for the memoised conflict to materialise.
     page.wait_for_selector('text="Country/question conflict — pick one"', timeout=3000)
     save_btn = page.get_by_role("button", name="Save scope")
@@ -98,3 +98,19 @@ def test_flow_start_chip_navigates_back_to_the_start_view(page, live_server, res
     page.locator('button.fnode.cap.clickable').first.click()
     page.wait_for_selector('#start-country', timeout=3000)
     assert page.locator('textarea[aria-label="Research question"]').is_visible()
+
+
+def test_country_and_region_dropdowns(page, live_server, reset_demo):
+    """Countries are grouped with the WHO high-burden list first; choosing one loads its regions, and the
+    chosen region shows up in the resolved target population."""
+    page.goto(f"{live_server}/", wait_until="networkidle")
+    country = page.locator('#start-country')
+    assert country.locator('optgroup[label^="High TB burden"] option[value="Indonesia"]').count() == 1
+    assert page.locator('#start-region').is_disabled()  # no country yet
+    country.select_option("Indonesia")
+    page.wait_for_selector('#start-region option[value="West Java"]', state="attached", timeout=3000)
+    page.locator('#start-region').select_option("West Java")
+    page.wait_for_selector('text=Target population: Indonesia · region West Java', timeout=3000)
+    country.select_option("Kenya")  # changing country clears the region
+    page.wait_for_selector('#start-region option[value="Nairobi City"]', state="attached", timeout=3000)
+    assert page.locator('#start-region').input_value() == ""

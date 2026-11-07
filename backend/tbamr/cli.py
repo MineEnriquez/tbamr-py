@@ -20,18 +20,19 @@ def main() -> None:
     ap.add_argument("--brain", choices=["replay", "claude"], default=None)
     ap.add_argument("--question", default=None)
     ap.add_argument("--country", default="Indonesia", help='target country (INSDC name), or "Worldwide" for all countries')
+    ap.add_argument("--region", default="", help='optional subnational region inside the country, e.g. "West Java"')
     a = ap.parse_args()
     db = os.path.join(tempfile.mkdtemp(), "walkthrough.db")
     o = build_orchestrator("live" if a.live else "demo", a.brain, db)
     if a.question:
         o.state.question = a.question
-    o.state.country = a.country
+    o.state.country, o.state.region = a.country, a.region
     p = lambda *x: print(*x, flush=True)
     p(f"Mode: data={'live' if a.live else 'demo'} brain={o.client.mode}\n")
     p("Stage 1 · Scope Guardian"); s = o.run_stage(1); p(f"  {len(s['gaps'])} definitions proposed, warnings: {s['warnings']}")
     if s["blocking"]:
         p("  Blocked:", *s["blocking"]); return
-    p(f"  target population: {o.state.country}")
+    p(f"  target population: {o.state.country}" + (f" · {o.state.region}" if o.state.region else ""))
     o.approve_scope("pi", "Researcher"); p("  ✓ scope approved by PI")
     p("Stage 2 · Discovery + Verification"); r = o.run_stage(2)
     st = o.state
