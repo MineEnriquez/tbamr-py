@@ -70,14 +70,17 @@ class DiscoveryAssistant(LLMAgent):
 
     @logged("tbamr.agents")
     def discover(self, country: str, question: str, already_known: list[str] | None = None, focus: str = "",
-                 exclude_studies: list[str] | None = None, region: str = "") -> dict[str, Any]:
+                 exclude_studies: list[str] | None = None, region: str = "", minimum: int = 0) -> dict[str, Any]:
         scope = (f"from {region}, {country}" if region else f"from {country}") if country else "worldwide"
         task = (f"Find candidate M. tuberculosis WGS runs ({scope}) for this question: {question}"
                 + (f"\nFollow-up from the Orchestrator: {focus}" if focus else ""))
         if region:
             task += (f"\nThe target is the region {region}. ENA can only be searched by country, so search {country} and return all "
                      "candidates; the Verification Tasker checks the region in each run's location field.")
-        res = self.run(task, {"country": country, "region": region, "already_known": already_known or [], "focus": focus,
+        if minimum:
+            task += (f"\nThe researcher plans a cohort of at least {minimum} isolates. Return every eligible candidate you find; if your "
+                     "searches return fewer, look for additional studies before submitting. Never drop candidates to hit a number.")
+        res = self.run(task, {"country": country, "region": region, "minimum": minimum, "already_known": already_known or [], "focus": focus,
                              "exclude_studies": exclude_studies or []})
         if not res.get("ok"):
             # The agent stopped without submitting (e.g. it used its step budget). Don't throw away what its searches

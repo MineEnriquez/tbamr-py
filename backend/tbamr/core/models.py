@@ -38,6 +38,10 @@ RULES = {
     "rpt": "RPT-v1.2",
 }
 
+# Default cohort size (unique isolates): with 100 isolates a 95% confidence interval for a proportion is at most
+# about +/-10 percentage points (worst case at 50%); with 8 it is +/-30 or more.
+DEFAULT_COHORT_TARGET = 100
+
 THRESHOLDS = {"min_cov": 30.0, "border_cov": 25.0, "min_depth": 10, "min_freq": 0.9, "genome_bp": 4_411_532}
 
 
@@ -112,7 +116,7 @@ class PipelineState:
     country: str = ""  # target population: INSDC country or "Worldwide" (explicit only); resolved at Stage 1
     region: str = ""  # optional subnational target inside `country` (free text, matched against ENA "Country: Region")
     target_drugs: list[str] = field(default_factory=lambda: ["Rifampicin", "Isoniazid"])
-    cohort_target: int = 8
+    cohort_target: int = DEFAULT_COHORT_TARGET
     stage_status: dict[str, str] = field(
         default_factory=lambda: {"1": "ready", "2": "locked", "3": "locked", "4": "locked", "5": "locked", "6": "locked"}
     )

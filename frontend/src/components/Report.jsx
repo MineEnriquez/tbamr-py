@@ -86,7 +86,7 @@ export default function Report({ st, act, brain }) {
       <div className="box note"><p>Computational predictions from public genomes: not laboratory-confirmed susceptibility, not a national prevalence estimate.</p></div>
       <Summary r={r} act={act} />
       <History currentVersion={r.version} />
-      <div><h3>Sample counts</h3>{bar('Total candidates', c.candidates)}{bar('Verified eligible', c.verified)}{bar('Quality Control-passed', c.qc_passed)}{bar('Profiled & evaluated', c.analysed, true)}</div>
+      <div><h3>Sample counts</h3>{bar('Total candidates', c.candidates)}{bar('Verified eligible', c.verified)}{bar('Quality Control-passed', c.qc_passed)}{bar('Profiled & evaluated', c.analysed, true)}{c.planned_minimum ? <p className={c.analysed < c.planned_minimum ? 'below-min' : 'muted'} style={{ fontSize: '.84rem', margin: '4px 0 0' }}>Planned minimum cohort: {c.planned_minimum}{c.analysed < c.planned_minimum ? ` · ${c.analysed} analysed, below the minimum` : ' · reached'}</p> : null}</div>
       <div><h3>Resistance evidence by drug <span className="muted" style={{ fontWeight: 400 }}>(n = {c.analysed})</span></h3>
         <div className="tw"><table><thead><tr><th>Drug</th><th className="num">Predicted resistant</th><th className="num">Uncertain / pending</th><th className="num">Reviewed</th><th className="num">Matched DST</th><th className="num">Concordance</th></tr></thead><tbody>
           {r.drugs.map(d => <tr key={d.drug}><td>{d.name}</td><td className="num">{d.predicted_resistant} / {d.n}</td><td className="num">{d.uncertain_or_pending}</td><td className="num">{d.reviewed}</td><td className="num">{d.dst_n} / {d.n}</td><td className="num">{d.dst_n ? `${d.concordant} / ${d.dst_n}` : 'n/a'}</td></tr>)}

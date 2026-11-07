@@ -244,19 +244,25 @@ class Orchestrator:
         where = search_country(st.country)
         label = (f"{st.region}, {where}" if st.region else where) or "worldwide, as requested"
         self.orch("—", Outcome.INFO, RULES["elig"], f"Asking the Discovery Assistant for candidate runs ({label}).", 2)
-        found = self.agents["discovery"].discover(where, st.question, region=st.region)
+        found = self.agents["discovery"].discover(where, st.question, region=st.region, minimum=st.cohort_target)
         self._add_rows(found["rows"])
         self.orch("—", Outcome.INFO, RULES["elig"], f"Handing {len(st.samples)} candidate(s) to the Verification Tasker.", 2)
         self.agents["verification"].verify(st.samples, st.country, st.region)
         st.cohort_checks = self._cohort_checks(found.get("total_in_ena", 0))
-        # re-plan: the cohort cannot answer a comparison across places → ask Discovery to widen the search once
-        if any(c["kind"] == "single_location" and c["outcome"] == "Escalate" for c in st.cohort_checks) and st.replans < self.max_replans:
+        # re-plan once when the cohort can't answer the question: one location for a comparison across places, or fewer
+        # verified isolates than the planned minimum. It widens the search (other studies); it never relaxes criteria.
+        one_place = any(c["kind"] == "single_location" and c["outcome"] == "Escalate" for c in st.cohort_checks)
+        short = any(c["kind"] == "below_minimum" for c in st.cohort_checks)
+        if (one_place or short) and st.replans < self.max_replans:
             st.replans += 1
             studies = sorted({s.study for s in st.samples if s.eligibility == "Verified"})
-            self.orch("COHORT", Outcome.RETRY, RULES["cohort"], f"Re-planning: asking Discovery for studies other than {', '.join(studies)} to support the comparison.", 2)
-            more = self.agents["discovery"].discover(where, st.question, already_known=[s.run for s in st.samples],
-                                                     focus=f"The verified cohort comes from one location. Find runs from other studies than {', '.join(studies)}.",
-                                                     exclude_studies=studies, region=st.region)
+            n_ok = sum(s.eligibility == "Verified" for s in st.samples)
+            why = (f"The verified cohort comes from one location. Find runs from other studies than {', '.join(studies)}." if one_place else
+                   f"Only {n_ok} verified isolate(s) against a planned minimum of {st.cohort_target}. Find additional eligible runs from other studies.")
+            self.orch("COHORT", Outcome.RETRY, RULES["cohort"], f"Re-planning: asking Discovery for studies other than {', '.join(studies) or 'those found'} "
+                      + ("to support the comparison." if one_place else f"to reach the planned minimum of {st.cohort_target}."), 2)
+            more = self.agents["discovery"].discover(where, st.question, already_known=[s.run for s in st.samples], focus=why,
+                                                     exclude_studies=studies, region=st.region, minimum=st.cohort_target)
             new = self._add_rows(more["rows"])
             if new:
                 self.agents["verification"].verify(new, st.country, st.region)
@@ -287,11 +293,19 @@ class Orchestrator:
     @logged("tbamr.orchestrator")
     def _cohort_checks(self, total: int) -> list[dict[str, Any]]:
         asks = bool(self.state.scope.get("asks_comparison_across_places"))
-        return self.agents["verification"].cohort_checks(self.state.samples, asks, total)
+        return self.agents["verification"].cohort_checks(self.state.samples, asks, total, minimum=self.state.cohort_target)
 
     @logged("tbamr.orchestrator")
     def _s3(self):
         res = self.agents["qc"].assess(self.state.samples)
+        st = self.state
+        passed = sum(s.qc == "Pass" for s in st.samples if s.in_cohort)
+        st.cohort_checks = [c for c in st.cohort_checks if c.get("kind") != "below_minimum_qc"]
+        if st.cohort_target and passed < st.cohort_target:
+            text = (f"{passed} isolate(s) passed QC, below the planned minimum of {st.cohort_target}: estimates will be less precise "
+                    "than planned. QC thresholds were not relaxed.")
+            st.cohort_checks.append({"outcome": "Escalate", "kind": "below_minimum_qc", "text": text})
+            self.orch("COHORT", Outcome.ESCALATE, RULES["cohort"], text, 3)
         self._set(3, "wait")
         return res
 

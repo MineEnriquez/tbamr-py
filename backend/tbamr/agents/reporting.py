@@ -52,6 +52,8 @@ class ReportingOrchestrator(RuleAgent):
         pending = [f for f in fx if f.review in ("Pending", "Needs more data")]
         by_place, place_kind, no_region = self._by_place(st, analysed, fx, drugs)
         limitations = [c["text"] for c in st.cohort_checks]
+        if st.cohort_target and n < st.cohort_target:
+            limitations.append(f"{n} isolate(s) analysed against a planned minimum of {st.cohort_target}: estimates are less precise than planned.")
         if no_region:
             limitations.append(f"{no_region} of {n} analysed run(s) have no region recorded in ENA; they are listed as \"not recorded\" in the regional breakdown.")
         if len(by_place) > 1:
@@ -62,7 +64,8 @@ class ReportingOrchestrator(RuleAgent):
                         "Public genomes are a convenience sample: no national prevalence estimate and no clinical use."]
         report = {
             "version": version, "generated_at": time.time(), "rule_version": RULES["rpt"], "superseded": False,
-            "counts": {"candidates": len(st.samples), "verified": len(cohort), "qc_passed": len(qc), "analysed": n},
+            "counts": {"candidates": len(st.samples), "verified": len(cohort), "qc_passed": len(qc), "analysed": n,
+                       "planned_minimum": st.cohort_target},
             "drugs": rows, "top_mutations": muts, "lineages": lineages,
             "target": {"country": st.country, "region": getattr(st, "region", "")}, "by_place": by_place, "place_kind": place_kind,
             "exclusions": [{"run": s.run, "status": s.eligibility if s.eligibility != "Verified" else s.qc, "reason": s.eligibility_note if s.eligibility != "Verified" else s.qc_note}
