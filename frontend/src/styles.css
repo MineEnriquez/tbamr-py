@@ -331,3 +331,4 @@ p.target-note.ok b{color:var(--ink)}
 .target-missing{color:var(--esc);font-weight:600}
 .target-notice{margin-top:8px;font-size:.88rem;border-left:3px solid var(--hold)}
 .target-notice p{margin-top:4px}
+.region-note{font-size:.84rem;margin-top:2px}

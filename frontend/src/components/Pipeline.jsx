@@ -52,22 +52,25 @@ function detectCountryInQuestion(question) {
 
 /* Live target-population check: asks the backend (same rule Stage 1 applies) which country the
  * study is about. Worldwide only counts when stated explicitly; anything unclear blocks the start. */
-function useTarget(question, country) {
+function useTarget(question, country, region) {
   const [t, setT] = useState(null)
   useEffect(() => {
     let live = true
-    const id = setTimeout(() => api.scopeTarget(question || '', country || '').then(r => live && setT(r)).catch(() => live && setT(null)), 250)
+    const id = setTimeout(() => api.scopeTarget(question || '', country || '', region || '').then(r => live && setT(r)).catch(() => live && setT(null)), 250)
     return () => { live = false; clearTimeout(id) }
-  }, [question, country])
+  }, [question, country, region])
   return t
 }
 
 function TargetNote({ t }) {
   if (!t) return null
   if (t.problem) return <div className="box esc target-note" role="status"><b>Target population unclear.</b> {t.problem}</div>
-  const where = t.country === 'Worldwide' ? <b>worldwide</b> : <b>{t.country}</b>
+  const where = t.country === 'Worldwide' ? <b>worldwide</b> : <><b>{t.country}</b>{t.region && <> · region <b>{t.region}</b></>}</>
+  const src = s => s === 'field' ? 'form' : 'question'
   return <>
-    <p className="target-note ok" role="status">Target population: {where} <span className="muted">· from the {t.source === 'field' ? 'Country field' : 'question'}</span></p>
+    <p className="target-note ok" role="status">Target population: {where} <span className="muted">· from the {src(t.source)}{t.region && t.region_source !== t.source ? ` (region from the ${src(t.region_source)})` : ''}</span></p>
+    {t.region && <p className="target-note muted region-note">Runs from {t.country} whose ENA location does not name {t.region} go on hold for a person to confirm.</p>}
+    {t.note && <p className="target-note muted region-note">{t.note}</p>}
     {t.notice && <div className="box note target-notice"><b>Expected run time</b><p>{t.notice}</p></div>}
   </>
 }
@@ -76,7 +79,7 @@ function TargetNote({ t }) {
 function ScopeTarget({ st }) {
   const t = st.scope?.target
   if (st.country === 'Worldwide') return <>target <b>worldwide</b> (requested explicitly)</>
-  if (st.country) return <>target <b>{st.country}</b>{t?.source === 'question' ? ' (from the question)' : ''}</>
+  if (st.country) return <>target <b>{st.country}</b>{st.region && <> · <b>{st.region}</b></>}{t?.source === 'question' ? ' (from the question)' : ''}</>
   return <span className="target-missing">target population not set</span>
 }
 
@@ -108,18 +111,19 @@ function StartHero({ snap, act, who, busy, setView }) {
   const st = snap.state, status = st.stage_status['1']
   const [q, setQ] = useState(st.question)
   const [country, setCountry] = useState(st.country || '')
+  const [region, setRegion] = useState(st.region || '')
   const [target, setTarget] = useState(st.cohort_target ?? 8)
   const conflict = useMemo(() => {
     const inQ = detectCountryInQuestion(q)
-    const field = country.trim()
+    const field = country.split(':')[0].trim()
     if (!inQ || !field) return null
     if (inQ.canonical.toLowerCase() === field.toLowerCase()) return null
     return { canonical: inQ.canonical, matched: inQ.matched, field }
   }, [q, country])
-  const tgt = useTarget(q, country)
+  const tgt = useTarget(q, country, region)
   const unclear = !!tgt?.problem
-  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || target !== (st.cohort_target ?? 8))
-  const save = () => act(() => api.setScope({ question: q, country, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')
+  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || region !== (st.region || '') || target !== (st.cohort_target ?? 8))
+  const save = () => act(() => api.setScope({ question: q, country, region, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')
   const start = () => act(() => api.run(1), 'Stage 1 finished')
   const canRun = status === 'ready' && !busy && !dirty && !conflict && !unclear
   if (status !== 'ready') return (
@@ -143,6 +147,8 @@ function StartHero({ snap, act, who, busy, setView }) {
       <div className="row" style={{ gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div className="ctl"><label htmlFor="start-country">Target country <span className="muted" style={{ fontWeight: 400 }}>(or name it in the question)</span></label>
           <input id="start-country" value={country} onChange={e => setCountry(e.target.value)} placeholder='e.g. Indonesia, or "Worldwide" for all countries' style={{ minWidth: 320 }} /></div>
+        <div className="ctl"><label htmlFor="start-region">Region <span className="muted" style={{ fontWeight: 400 }}>(optional: province, state…)</span></label>
+          <input id="start-region" value={region} onChange={e => setRegion(e.target.value)} placeholder="e.g. West Java" style={{ minWidth: 200 }} /></div>
         <div className="ctl"><label htmlFor="start-target">Cohort target</label>
           <input id="start-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
       </div>
@@ -249,22 +255,23 @@ function Stage({ n, snap, act, who, busy, openSample }) {
 function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
   const [q, setQ] = useState(st.question)
   const [country, setCountry] = useState(st.country || '')
+  const [region, setRegion] = useState(st.region || '')
   const [target, setTarget] = useState(st.cohort_target ?? 8)
   const sc = st.scope || {}
   // Detect a question/country-field conflict: if the question clearly names a country different
   // from the Country field, the Guardian will silently use the field. Force the user to reconcile.
   const conflict = useMemo(() => {
     const inQ = detectCountryInQuestion(q)
-    const fieldTrim = country.trim()
+    const fieldTrim = country.split(':')[0].trim()
     if (!inQ) return null
     if (!fieldTrim) return null  // only the question specifies a country — fine, let the Guardian use it
     if (inQ.canonical.toLowerCase() === fieldTrim.toLowerCase()) return null  // they agree
     return { canonical: inQ.canonical, matched: inQ.matched, field: fieldTrim }
   }, [q, country])
   // When the form drifts from what's in the backend, mark the whole stage dirty so the Run button disables.
-  const tgt = useTarget(status === 'ready' ? q : st.question, status === 'ready' ? country : st.country)
+  const tgt = useTarget(status === 'ready' ? q : st.question, status === 'ready' ? country : st.country, status === 'ready' ? region : st.region)
   const unclear = status === 'ready' && !!tgt?.problem
-  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || target !== (st.cohort_target ?? 8))
+  const dirty = status === 'ready' && (q !== st.question || country !== (st.country || '') || region !== (st.region || '') || target !== (st.cohort_target ?? 8))
   useEffect(() => { onDirtyChange && onDirtyChange(dirty) }, [dirty, onDirtyChange])
   useEffect(() => { onBlockedChange && onBlockedChange(!!conflict || unclear) }, [conflict, unclear, onBlockedChange])
   if (status === 'ready') return (
@@ -273,6 +280,8 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
       <div className="row" style={{ gap: 14, alignItems: 'flex-end' }}>
         <div className="ctl"><label htmlFor="scope-country">Target country <span className="muted" style={{ fontWeight: 400 }}>(or name it in the question)</span></label>
           <input id="scope-country" value={country} onChange={e => setCountry(e.target.value)} placeholder='e.g. Indonesia, or "Worldwide" for all countries' style={{ minWidth: 320 }} /></div>
+        <div className="ctl"><label htmlFor="scope-region">Region <span className="muted" style={{ fontWeight: 400 }}>(optional: province, state…)</span></label>
+          <input id="scope-region" value={region} onChange={e => setRegion(e.target.value)} placeholder="e.g. West Java" style={{ minWidth: 200 }} /></div>
         <div className="ctl"><label htmlFor="scope-target">Cohort target</label>
           <input id="scope-target" type="number" min="1" value={target} onChange={e => setTarget(Number(e.target.value) || 1)} style={{ width: 80 }} /></div>
       </div>
@@ -285,7 +294,7 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
         </div>
       </div>}
       {!conflict && <TargetNote t={tgt} />}
-      <div className="row"><button className="btn small primary" disabled={!dirty || !!conflict} onClick={() => act(() => api.setScope({ question: q, country, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
+      <div className="row"><button className="btn small primary" disabled={!dirty || !!conflict} onClick={() => act(() => api.setScope({ question: q, country, region, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
         <span className="muted" style={{ fontSize: '.82rem' }}>
           {conflict ? 'Resolve the conflict above before saving.' : unclear ? 'Set a clear target population before running.' : (dirty ? 'Unsaved changes — Save scope before Run agents.' : 'Scope saved. Click Run agents to kick off the Scope Guardian.')}
         </span></div></div>)
