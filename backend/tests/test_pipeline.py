@@ -12,7 +12,7 @@ from tbamr.core.decisions import Decision, DecisionLog, GuardrailViolation, Outc
 from tbamr.core.models import Finding, Sample
 from tbamr.core.orchestrator import PermissionDenied, StageError
 from tbamr.llm.client import ReplayClient
-from tbamr.tools.demo import DemoDataTools
+from tbamr.tools.demo import SCENARIOS, DemoDataTools
 from tbamr.tools.ena import DataTools
 from tbamr.tools.tbprofiler import parse_result
 
@@ -47,10 +47,10 @@ def test_agents_cannot_use_human_outcomes():
 def test_full_demo_flow(orch):
     rep = run_to_report(orch)
     st = orch.state
-    assert {s.run for s in st.samples if s.eligibility == "Excluded"} == {"DEMO-R06", "DEMO-R07", "DEMO-R08"}
-    assert {s.run for s in st.samples if s.eligibility == "Hold"} == {"DEMO-R15", "DEMO-R16"}
+    assert {s.run for s in st.samples if s.eligibility == "Excluded"} == {"DEMO-R06", "DEMO-R07", "DEMO-R08", "DEMO-R18", "DEMO-R19", "DEMO-R23", "DEMO-R24"}
+    assert {s.run for s in st.samples if s.eligibility == "Hold"} == {"DEMO-R15", "DEMO-R16", "DEMO-R20", "DEMO-R21", "DEMO-R22"}
     assert st.sample("DEMO-R04").qc == "Escalated"  # 27x borderline
-    assert rep["counts"]["analysed"] == 10
+    assert rep["counts"] == {"candidates": 42, "verified": 30, "qc_passed": 26, "analysed": 24}
     assert [d["drug"] for d in rep["drugs"]][:2] == ["RIF", "INH"]
     pending = {(f["run"], f["variant"]) for f in rep["unresolved"]}
     assert ("DEMO-R14", "rpoB p.Ser450Leu") in pending  # low depth
@@ -113,6 +113,30 @@ def test_import_and_review(orch):
     assert "dr_variants" in raw["data"]
     orch.review("tbexpert", "Dewi", f.fid, "Needs more data", "Request deeper sequencing")
     assert orch.state.report["superseded"] is True
+
+
+def test_every_demo_scenario_reaches_its_expected_outcome(orch):
+    """The demo data is a scenario catalogue (tools/demo.py SCENARIOS); each run must land where it says."""
+    run_to_report(orch)
+    problems = []
+    for run, sc in SCENARIOS.items():
+        s = orch.state.sample(run)
+        assert s, f"{run} was not discovered"
+        got = {"elig": s.eligibility, "qc": s.qc or None, "prof": s.profiling or None}
+        problems += [f"{run} ({sc['what']}): {k} expected {v}, got {got[k]}" for k, v in sc["expect"].items() if k != "review" and got[k] != v]
+        reviews = {f"{f.gene} {f.change}": f.review for f in s.findings}
+        problems += [f"{run} ({sc['what']}): {v} expected {want}, got {reviews.get(v)}" for v, want in sc["expect"].get("review", {}).items() if reviews.get(v) != want]
+    assert not problems, "\n".join(problems)
+    assert {s.run for s in orch.state.samples} == set(SCENARIOS), "every demo run needs a documented scenario"
+
+
+def test_demo_report_covers_discordance_and_extra_drugs(orch):
+    rep = run_to_report(orch)
+    by = {d["drug"]: d for d in rep["drugs"]}
+    assert {"FLQ", "BDQ", "LZD", "PZA", "EMB", "STM", "AMK", "ETO"} <= set(by)
+    assert by["RIF"]["dst_n"] > by["RIF"]["concordant"]  # R09 (genotype R, DST S) and R38 (genotype S, DST R) disagree
+    assert orch.state.sample("DEMO-R31").profile_meta["db"] == "not in file"  # TB-Profiler 4.x layout
+    assert orch.state.sample("DEMO-R41").lineage == "La1.8.BCG"
 
 
 # ---------------------------------------------------------------- agentic behaviour + guardrails
@@ -404,3 +428,4 @@ def test_report_article_404s_when_no_report_exists(orch):
     c = TestClient(create_app(orch))
     r = c.get("/api/report/1/article.html")
     assert r.status_code == 404 and "Stage 6" in r.json()["detail"]
+

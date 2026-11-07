@@ -20,7 +20,7 @@ from ..agents.reporting import ReportingOrchestrator
 from ..agents.scope_guardian import ScopeGuardian
 from ..agents.verification import VerificationTasker
 from ..tools.demo import DST as DEMO_DST
-from ..tools.demo import demo_tbprofiler_json
+from ..tools.demo import demo_tbprofiler_failure, demo_tbprofiler_json
 from ..tools.tbprofiler import parse_result
 from .decisions import Decision, DecisionLog, Outcome
 from .models import GATES, ROLES, RULES, STAGES, THRESHOLDS, PipelineState, Sample
@@ -275,11 +275,15 @@ class Orchestrator:
 
     def _s4(self):
         n = self.agents["profiling"].queue(self.state.samples)
-        if self.demo:  # simulate the analyst importing TB-Profiler files
+        if self.demo:  # simulate the analyst importing TB-Profiler files (some runs fail, some have no file yet)
+            prof = self.agents["profiling"]
             for s in self.state.samples:
-                j = demo_tbprofiler_json(s.run) if s.profiling == "Awaiting results" else None
-                if j:
-                    self.agents["profiling"].apply_result(s, parse_result(j, f"{s.run}.results.json"), "simulated demo result", j)
+                if s.profiling != "Awaiting results":
+                    continue
+                if err := demo_tbprofiler_failure(s.run):
+                    prof.fail(s, err)
+                elif j := demo_tbprofiler_json(s.run):
+                    prof.apply_result(s, parse_result(j, f"{s.run}.results.json"), "simulated demo result", j)
         self._set(4, "wait")
         return {"queued": n}
 
