@@ -511,7 +511,7 @@ def test_region_matching_is_a_whole_phrase():
 def test_region_scope_verifies_matching_runs_and_holds_the_rest(tmp_path):
     o = build_orchestrator("demo", "replay", str(tmp_path / "r.db"))
     o.state.question, o.state.country, o.state.region = "Which rifampicin mutations are present?", "Indonesia", "West Java"
-    run_to_report(o)
+    rep = run_to_report(o)
     st = o.state
     assert st.region == "West Java" and st.scope["target"]["region"] == "West Java"
     verified = {s.run for s in st.samples if s.eligibility == "Verified"}
@@ -519,4 +519,13 @@ def test_region_scope_verifies_matching_runs_and_holds_the_rest(tmp_path):
     assert st.sample("DEMO-R04").eligibility == "Hold"  # Central Java: a person decides, never excluded by guesswork
     assert "does not name the target region" in st.sample("DEMO-R04").eligibility_note
     assert st.sample("DEMO-R06").eligibility == "Excluded"  # other country still excluded by rule
+    assert {r["place"] for r in rep["by_place"]} == {"West Java", "Bandung, West Java"} and rep["place_kind"] == "region"
+
+
+def test_report_breaks_country_scope_down_by_region(orch):
+    rep = run_to_report(orch)
+    rows = {r["place"]: r for r in rep["by_place"]}
+    assert rep["place_kind"] == "region" and sum(r["n"] for r in rep["by_place"]) == rep["counts"]["analysed"]
+    assert rows["Jakarta"]["resistant"]["RIF"] >= 1  # R01, R12, R33 are Jakarta MDR/XDR
+    assert any("counts, not rates" in l for l in rep["limitations"])
 
