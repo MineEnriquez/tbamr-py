@@ -11,6 +11,7 @@ from typing import Any
 
 from ..core.decisions import Outcome
 from ..core.models import RULES
+from ..logutil import logged
 from .base import LLMAgent, Tool
 
 
@@ -67,6 +68,7 @@ class DiscoveryAssistant(LLMAgent):
         return {"candidate_runs": cands, "rows": [seen[a] for a in cands], "studies": sub.get("studies") or [],
                 "search_notes": sub.get("search_notes", ""), "concerns": concerns, "total_in_ena": max([t for t in totals if t] or [0])}
 
+    @logged("tbamr.agents")
     def discover(self, country: str, question: str, already_known: list[str] | None = None, focus: str = "",
                  exclude_studies: list[str] | None = None, region: str = "") -> dict[str, Any]:
         scope = (f"from {region}, {country}" if region else f"from {country}") if country else "worldwide"

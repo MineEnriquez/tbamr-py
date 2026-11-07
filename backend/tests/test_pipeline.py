@@ -641,3 +641,42 @@ def test_definitions_describe_what_the_pipeline_does(orch):
     assert "Kept in the cohort" in rules["missing_dst"] and not st.sample("DEMO-R02").dst and st.sample("DEMO-R02").profiling == "Done"
     # duplicates: the first run is kept, the later one excluded when the agent confirms (R01 kept, R07 excluded)
     assert "first run seen" in rules["duplicates"] and st.sample("DEMO-R01").eligibility == "Verified" and st.sample("DEMO-R07").eligibility == "Excluded"
+
+
+# ---------------------------------------------------------------- logging: every agent logs what it does
+def test_every_agent_logs_its_actions(orch, caplog):
+    """Each agent (and the orchestrator and humans) must leave a readable log of its actions in the Logs tab."""
+    import logging
+    caplog.set_level(logging.INFO, logger="tbamr")
+    run_to_report(orch)
+    by = {}
+    for r in caplog.records:
+        by.setdefault(r.name, []).append(r.getMessage())
+    minimum = {"tbamr.orchestrator": 20, "tbamr.agents.scope_guardian": 3, "tbamr.agents.discovery": 5,
+               "tbamr.agents.verification": 20, "tbamr.agents.qc": 20, "tbamr.agents.profiling": 20,
+               "tbamr.agents.evidence": 20, "tbamr.agents.reporting": 5, "tbamr.humans": 5}
+    short = {k: len(by.get(k, [])) for k, n in minimum.items() if len(by.get(k, [])) < n}
+    assert not short, f"too few log lines: {short}"
+    joined = "\n".join(m for msgs in by.values() for m in msgs)
+    for needle in ("decision stage=2 sample=DEMO-R01", "tool ena_search_runs", "outcome=Approve", "raw data viewed by",
+                   "report v1 RIF:", "Stage 3 finished", "→ Orchestrator.run_stage(", "← QCAnalyst.assess ok"):
+        assert needle in joined, f"missing log: {needle!r}"
+
+
+def test_worker_thread_logs_reach_the_execution(tmp_path):
+    """Thread-pool work (TB-Profiler batches) must log into the execution that started it, not vanish."""
+    import logging
+    import threading
+    from tbamr.core.executions import attach_buffer, capture_execution, current_buffer
+    log = DecisionLog(str(tmp_path / "x.db"))
+    with capture_execution(log, "batch"):
+        buf = current_buffer()
+
+        def worker():
+            with attach_buffer(buf):
+                logging.getLogger("tbamr.profiling").info("worker says hi")
+
+        t = threading.Thread(target=worker)
+        t.start(); t.join()
+    ex = log.get_execution(log.list_executions(1)[0]["id"])
+    assert "worker says hi" in ex["log_text"]

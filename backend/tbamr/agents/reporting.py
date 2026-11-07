@@ -5,6 +5,7 @@ QC-passed, profiled samples only). Claude may draft a plain-language summary, la
 """
 from __future__ import annotations
 
+import logging
 import time
 from collections import Counter
 from typing import Any
@@ -12,8 +13,11 @@ from typing import Any
 from ..core.decisions import Outcome
 from ..core.geo import WORLDWIDE, country_of, place_label
 from ..core.models import RULES, PipelineState
+from ..logutil import logged
 from ..tools.tbprofiler import DRUG_NAMES
 from .base import RuleAgent
+
+_LOG = logging.getLogger("tbamr.agents.reporting")
 
 
 class ReportingOrchestrator(RuleAgent):
@@ -25,6 +29,7 @@ class ReportingOrchestrator(RuleAgent):
         super().__init__(log)
         self.client = client
 
+    @logged("tbamr.agents")
     def build(self, st: PipelineState, version: int) -> dict[str, Any]:
         cohort = [s for s in st.samples if s.in_cohort and s.eligibility == "Verified"]
         qc = [s for s in cohort if s.qc == "Pass"]
@@ -68,6 +73,13 @@ class ReportingOrchestrator(RuleAgent):
                            "databases": sorted({str(s.profile_meta.get("db")) for s in analysed if s.profile_meta.get("db")}), "rules": RULES},
             "gates": st.gates, "summary_draft": None,
         }
+        _LOG.info("report v%s counts: candidates=%d verified=%d qc_passed=%d analysed=%d", version, len(st.samples), len(cohort), len(qc), n)
+        for r in rows:
+            _LOG.info("report v%s %s: predicted resistant %d/%d, uncertain/pending %d, reviewed %d, DST %d (concordant %s)",
+                      version, r["drug"], r["predicted_resistant"], r["n"], r["uncertain_or_pending"], r["reviewed"], r["dst_n"], r["concordant"])
+        _LOG.info("report v%s by %s: %s", version, place_kind, ", ".join(f"{p['place']}={p['n']}" for p in by_place) or "none")
+        _LOG.info("report v%s: %d unresolved finding(s), %d exclusion/hold row(s), %d limitation(s), top mutations %s",
+                  version, len(pending), len(report["exclusions"]), len(limitations), [m for m, _ in muts[:5]])
         self.decide("—", Outcome.INFO, RULES["rpt"], f"Draft report v{version} assembled: {n} analysed of {len(cohort)} verified; {len(pending)} unresolved finding(s).", stage=6)
         return report
 
@@ -88,11 +100,14 @@ class ReportingOrchestrator(RuleAgent):
         no_region = 0 if worldwide else len(groups.get("not recorded", []))
         return rows, kind, no_region
 
+    @logged("tbamr.agents")
     def draft_summary(self, report: dict[str, Any]) -> str:
         brief = {k: report[k] for k in ("counts", "drugs", "top_mutations", "lineages", "limitations")}
         system = ("You draft plain-language summaries of TB genomic resistance evidence reports for researchers. Use only the numbers given, "
                   "state denominators, never claim clinical relevance or prevalence, and call nothing confirmed unless 'reviewed' > 0. About 150 words.")
+        _LOG.info("drafting plain-language summary for report v%s with %s", report.get("version"), getattr(self.client, "mode", "?"))
         text = self.client.text(system, f"Report data: {brief}")
+        _LOG.info("summary drafted for report v%s (%d characters)", report.get("version"), len(text or ""))
         if getattr(self.client, "mode", "") == "replay":
             c = report["counts"]
             text += (f" Counts: {c['candidates']} candidates, {c['verified']} verified, {c['qc_passed']} passed QC, {c['analysed']} profiled and evaluated. "

@@ -8,11 +8,13 @@
 """
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
 from ..core.decisions import Outcome
 from ..core.models import RULES, THRESHOLDS, Finding, Sample
+from ..logutil import logged
 from ..tools.tbprofiler import DRUG_NAMES
 from .base import LLMAgent
 
@@ -61,8 +63,12 @@ class EvidenceAnalyst(LLMAgent):
 
     def validate(self, sub: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
         allowed = {f["fid"] for f in ctx.get("findings", [])}
-        return {"notes": [n for n in sub.get("notes", []) if n.get("fid") in allowed]}
+        notes = [n for n in sub.get("notes", []) if n.get("fid") in allowed]
+        if len(notes) < len(sub.get("notes", [])):
+            logging.getLogger("tbamr.agents.evidence").warning("guardrail dropped %d note(s) for unknown findings", len(sub.get("notes", [])) - len(notes))
+        return {"notes": notes}
 
+    @logged("tbamr.agents")
     def evaluate(self, samples: list[Sample]) -> dict[str, int]:
         todo = [s for s in samples if s.profiling == "Done" and not s.findings and s.profile_meta.get("evaluated") is not True]
         for s in todo:

@@ -6,11 +6,13 @@ model leaves one out (guardrail).
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from ..core.decisions import Outcome
 from ..core.geo import resolve_target
 from ..core.models import RULES
+from ..logutil import logged
 from .base import LLMAgent
 
 # The playbook's four required definitions, worded as the rules in this codebase actually apply them.
@@ -72,6 +74,10 @@ class ScopeGuardian(LLMAgent):
             if text and text != applied:
                 g["suggestion"] = text
             gaps.append(g)
+        n_sug = sum(1 for g in gaps if g.get("suggestion"))
+        if n_sug or proposed:
+            logging.getLogger("tbamr.agents.scope_guardian").info(
+                "definitions applied by rule; %d model suggestion(s) kept but not applied, %d extra point(s) raised", n_sug, len(proposed))
         for g in proposed.values():  # extra gaps the model raised: suggestions only
             if str(g.get("proposal") or g.get("gap") or "").strip():
                 gaps.append({"key": g.get("key") or "other", "gap": g.get("gap") or "Other", "proposal": "", "applied": False,
@@ -92,6 +98,7 @@ class ScopeGuardian(LLMAgent):
         return {"blocking": sorted(set(blocking)), "gaps": gaps, "warnings": warnings,
                 "asks_comparison_across_places": bool(sub.get("asks_comparison_across_places")), "target": target}
 
+    @logged("tbamr.agents")
     def review(self, question: str, country: str, target_drugs: list[str], cohort_target: int, region: str = "") -> dict[str, Any]:
         target = resolve_target(question, country, region)
         ctx = {"question": question, "country": country, "region": region, "target": target, "target_drugs": target_drugs, "cohort_target": cohort_target,

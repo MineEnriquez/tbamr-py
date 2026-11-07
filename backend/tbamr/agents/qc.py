@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from ..core.decisions import Outcome
 from ..core.models import RULES, THRESHOLDS, Sample
+from ..logutil import logged
 from .base import RuleAgent
 
 
@@ -15,6 +16,7 @@ class QCAnalyst(RuleAgent):
     title = "Sequencing Quality Assessment Analyst"
     description = "Applies the approved coverage gate to every verified run and records checksum availability. It never changes thresholds."
 
+    @logged("tbamr.agents")
     def assess(self, samples: list[Sample], min_cov: float | None = None) -> dict[str, int]:
         min_cov = min_cov or THRESHOLDS["min_cov"]
         border = THRESHOLDS["border_cov"]
