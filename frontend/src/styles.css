@@ -387,3 +387,5 @@ details.defs[open] summary{margin-bottom:8px}
 .fstatus.marker{color:var(--ex);background:var(--ex-bg)}
 td.why{font-size:.82rem;max-width:420px}
 td.mono{white-space:nowrap}
+.locked-note{border-left:3px solid var(--line)}
+.locked-note p{margin:0}

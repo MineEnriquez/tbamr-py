@@ -246,6 +246,16 @@ function Feed({ decisions }) {
   )
 }
 
+/* What a locked stage is waiting for: [text before the role, role, text after]. Stage 6 has no human gate before it:
+ * Stage 5 completes as soon as it runs, so the report stage opens then. */
+const UNLOCK = {
+  2: ['after the', 'pi', 'approves the scope in Stage 1.'],
+  3: ['after the', 'pi', 'approves the cohort in Stage 2.'],
+  4: ['after the', 'analyst', 'confirms Quality Control in Stage 3.'],
+  5: ['after the', 'analyst', 'closes the profiling batch in Stage 4.'],
+  6: ['as soon as Stage 5 has run (no gate in between; findings pending review are handled by the', 'tbexpert', 'in the Review queue).'],
+}
+
 function Stage({ n, snap, act, who, busy, openSample }) {
   const st = snap.state, meta = snap.stages[n - 1], status = st.stage_status[String(n)]
   const agents = meta.agents
@@ -259,15 +269,15 @@ function Stage({ n, snap, act, who, busy, openSample }) {
     ? (scopeBlocked ? 'Set a clear target population (and resolve any country/question conflict) first' : (scopeDirty ? 'Save the scope first' : ''))
     : (busy ? 'A stage is running' : '')
   const runBtn = <button className="btn primary" disabled={status !== 'ready' || !!busy || disabled} title={disabledReason || undefined}
-                   onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'ready' ? 'Run agents' : 'Ran'}</button>
+                   onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'ready' ? 'Run agents' : status === 'locked' ? 'Locked' : 'Ran'}</button>
   return (
     <section className="panel">
       <div className="row between"><div><span className="eyebrow">Stage {n} · owner: {ROLE_LABEL[meta.owner]}</span><h2>{meta.name}</h2></div>{runBtn}</div>
       <div className="tools">{agents.map(a => <span className="tool" key={a}>{a.replace(/_/g, ' ')}</span>)}</div>
       {busy && <div className="working" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span>Working on <b>{busy}</b>… agents are reasoning and calling tools; watch the Agent team tab for live traces.</span></div>}
-      {status === 'locked' && <div className="box note"><p className="muted">This stage unlocks when the previous stage's human gate is passed.</p></div>}
+      {status === 'locked' && <div className="box note locked-note" role="note"><p><b>Locked.</b> {UNLOCK[n] ? <>This stage opens {UNLOCK[n][0]} <RoleBadge role={UNLOCK[n][1]} /> {UNLOCK[n][2]}</> : "This stage opens when the previous stage is complete."} Here is what will happen when it runs:</p></div>}
       {n === 1 && <S1 key={[status, st.question, st.country, st.region || '', st.cohort_target].join('|')} st={st} status={status} act={act} who={who} onDirtyChange={setScopeDirty} onBlockedChange={setScopeBlocked} />}
-      {n === 2 && status === 'ready' && (
+      {n === 2 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
           <p><b>Run agents</b> will hand the pipeline to <b>two</b> Claude-powered agents in sequence:</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
@@ -278,7 +288,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
         </div>
       )}
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
-      {n === 3 && status === 'ready' && (
+      {n === 3 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
           <p><b>Run agents</b> hands this stage to <b>one</b> rules-only agent (no Claude):</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
@@ -289,7 +299,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
         </div>
       )}
       {n === 3 && ['wait', 'done'].includes(status) && <S3 st={st} status={status} act={act} who={who} openSample={openSample} />}
-      {n === 4 && status === 'ready' && (
+      {n === 4 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
           <p><b>Run agents</b> hands this stage to <b>one</b> tool-runner agent (no Claude), which <b>queues</b> every QC-passed run as <i>Awaiting results</i>. It does not start TB-Profiler by itself{snap.mode.data === 'demo' ? ' (in demo mode, simulated results are filled in immediately, including one failure and one run left without a result)' : ''}.</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
@@ -299,7 +309,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
           <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see what each run reported (lineage, resistance calls, depth) and which catalogue was used. <RoleBadge role="analyst" /> can close the batch once at least one result exists; results imported later are evaluated automatically.</p>
         </div>
       )}
-      {n === 5 && status === 'ready' && (
+      {n === 5 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
           <p><b>Run agents</b> hands this stage to the <b>Evidence Analyst</b> (rules plus Claude), for every run with a TB-Profiler result:</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
@@ -311,17 +321,18 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       )}
       {n === 4 && ['wait', 'done'].includes(status) && <S4 snap={snap} status={status} act={act} who={who} openSample={openSample} />}
       {n === 5 && status === 'done' && <S5 st={st} act={act} openSample={openSample} />}
-      {n === 6 && status === 'ready' && (
+      {n === 6 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>Run agents</b> will hand the pipeline to the Reporting Orchestrator, which assembles the evidence report from everything approved in Stages 1 – 5. You'll then see, on the <b>Report</b> tab:</p>
+          <p><b>Run agents</b> hands the pipeline to the <b>Reporting Orchestrator</b> (rules; Claude only drafts the optional summary). It builds the evidence report from everything approved in Stages 1–5, and you'll find it on the <b>Report</b> tab:</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
-            <li>Sample counts: candidates → verified → QC-passed → profiled.</li>
-            <li>Per-drug resistance: predicted resistant, uncertain / pending, reviewed, and concordance with any matched DST.</li>
-            <li>The most frequent mutations and lineages observed in the cohort.</li>
-            <li>Unresolved findings, exclusions / holds, and the policy limitations the Scope Guardian wrote.</li>
-            <li>A plain-language summary (optional — Claude drafts it, you can edit).</li>
+            <li><b>How resistance is called</b>: the definition used and the mutation-catalogue version, with a warning if runs were called with different versions.</li>
+            <li><b>Sample counts</b>: candidates → verified → QC-passed → analysed, against the planned minimum cohort ({st.cohort_target}).</li>
+            <li><b>Per drug</b>: runs predicted resistant (only calls not awaiting review), uncertain or pending, reviewed, and agreement with phenotypic DST over the runs that have it; plus counts by region.</li>
+            <li>The most frequent mutations and the lineages (tool-assigned, descriptive only), unresolved findings, exclusions and holds.</li>
+            <li>The Scope Guardian's warnings and how each was answered, and the limitations that apply.</li>
+            <li>An optional plain-language summary that Claude drafts and you can edit.</li>
           </ul>
-          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>Every number is derived by rule from the decision log, so the report is reproducible. Release stays with <RoleBadge role="pi" />.</p>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>Every number is computed by rule from the pipeline's data, so the report is reproducible. <RoleBadge role="pi" /> can share the current (not superseded) report as an exploratory draft; final release is blocked while any finding is pending review.</p>
         </div>
       )}
       {n === 6 && ['wait', 'done'].includes(status) && <S6 st={st} act={act} who={who} />}
