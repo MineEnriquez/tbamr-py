@@ -40,6 +40,9 @@ atexit.register(shutil.rmtree, _TEST_DB_DIR, True)
 # to opt in deliberately.
 os.environ["TBAMR_BRAIN"] = os.environ.get("TBAMR_TEST_BRAIN", "replay")
 
+# Rule-threshold settings live in their own file; tests must never read or write the developer's real one.
+os.environ["TBAMR_RULES_FILE"] = os.path.join(_TEST_DB_DIR, "tbamr-rules.json")
+
 
 def _free_port() -> int:
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
