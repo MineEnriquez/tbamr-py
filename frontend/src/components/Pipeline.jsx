@@ -260,6 +260,12 @@ const UNLOCK = {
 const RUN_LABEL = { 1: 'Run Scope Guardian', 2: 'Run Discovery & Verification', 3: 'Run QC Analyst', 4: 'Run Profiling Tasker',
   5: 'Run Evidence Analyst', 6: 'Run Reporting Orchestrator' }
 
+/* Provisional / validated tag next to a rule-set version (set on the Admin page). */
+function RuleStatus({ meta }) {
+  if (!meta) return null
+  return <span className={'rule-status ' + meta.status} title={meta.basis}>{meta.status === 'validated' ? 'validated' : 'provisional: not benchmarked'}</span>
+}
+
 function Stage({ n, snap, act, who, busy, openSample }) {
   const st = snap.state, meta = snap.stages[n - 1], status = st.stage_status[String(n)]
   const agents = meta.agents
@@ -313,7 +319,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
       {n === 3 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>{runLabel}</b> starts <b>one</b> deterministic, rules-only agent (no AI), applying rule set <span className="mono">{(snap.rules || {}).qc || 'QC'}</span> to every run in the approved cohort:</p>
+          <p><b>{runLabel}</b> starts <b>one</b> deterministic, rules-only agent (no AI), applying rule set <span className="mono">{(snap.rules || {}).qc || 'QC'}</span> <RuleStatus meta={snap.rule_meta?.qc} /> to every run in the approved cohort:</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
             <li><b>What it measures.</b> Estimated mean depth = <span className="mono">base_count</span> from the ENA run record ÷ {(th.genome_bp || 4411532).toLocaleString()} bp, the length of the <i>M. tuberculosis</i> H37Rv reference genome (NC_000962.3). It is a pre-alignment screen on archive metadata: nothing is downloaded at this stage.</li>
             <li><b>Decision rule.</b> At least <b>{th.min_cov}×</b>: <b>Pass</b>. From {th.border_cov}× to below {th.min_cov}×, or no <span className="mono">base_count</span> in the record: <b>Escalate</b> to the analyst. Below {th.border_cov}×: <b>Exclude</b>. Whether an MD5 checksum is listed is recorded as file-integrity metadata, never as a QC criterion.</li>
@@ -336,7 +342,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       )}
       {n === 5 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>{runLabel}</b> starts <b>one</b> agent, the <b>Evidence Analyst</b> (rules plus Claude), for every run with a TB-Profiler result:</p>
+          <p><b>{runLabel}</b> starts <b>one</b> agent, the <b>Evidence Analyst</b> (rules plus Claude), applying rule set <span className="mono">{(snap.rules || {}).evid || 'EVID'}</span> <RuleStatus meta={snap.rule_meta?.evid} /> to every run with a TB-Profiler result:</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
             <li><b>Rules classify each resistance call.</b> WHO catalogue Group 1 or 2, at least <b>{th.min_depth}</b> supporting reads, in at least <b>{Math.round((th.min_freq ?? 0.9) * 100)}%</b> of reads, and no conflicting phenotypic DST: <b>counted as resistant</b>. Group 3 (uncertain), fewer reads, a minor variant, or DST that disagrees: <b>pending review</b>, counted as uncertain. Group 5 lineage markers: <b>not counted</b>.</li>
             <li><b>Claude</b> writes a short note on each finding for the reviewer and can send a finding to review. It can never clear a finding from review or confirm resistance.</li>

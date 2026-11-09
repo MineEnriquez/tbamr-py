@@ -133,7 +133,7 @@ export default function App() {
         {tab === 'report' && <Report st={st} act={act} brain={snap.mode.brain} />}
         {tab === 'insights' && <Insights m={metrics} decisions={decisions} />}
         {tab === 'logs' && <Logs version={version} />}
-        {tab === 'admin' && <Admin />}
+        {tab === 'admin' && <Admin who={who} />}
         {tab === 'about' && <About />}
       </main>
       {sel && <Drawer run={sel} st={st} pending={snap.pending_overrides} act={act} who={who} close={() => setSel(null)} version={version} />}

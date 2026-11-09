@@ -27,6 +27,11 @@ from ..tools.tbprofiler import parse_result
 from ..logutil import logged
 from .decisions import Decision, DecisionLog, Outcome
 from .geo import search_country
+
+
+def _rule_meta() -> dict:
+    from . import rulesettings
+    return rulesettings.current()["meta"]
 from .models import GATES, ROLES, RULES, STAGES, THRESHOLDS, PipelineState, Sample
 
 _LOG = logging.getLogger("tbamr.orchestrator")
@@ -342,6 +347,28 @@ class Orchestrator:
 
     # ------------------------------------------------------------------ human gates
     @logged("tbamr.orchestrator")
+    def change_rules(self, role: str, person: str, changes: dict[str, Any], rationale: str,
+                     status: dict[str, str] | None = None, basis: dict[str, str] | None = None) -> dict[str, Any]:
+        """PI changes editable thresholds / rule provenance. Versions bump, the change is a logged decision, and an
+        existing report is marked superseded (stages already run keep the results and versions they were decided with)."""
+        from . import rulesettings
+        with self.lock:
+            if self.busy:
+                raise StageError("A stage is running; change the rules when it has finished.")
+            try:
+                res = rulesettings.update(changes, rationale, person, role, status, basis)
+            except rulesettings.RuleSettingError as e:
+                raise StageError(str(e))
+            parts = [f"{k} {v['from']} -> {v['to']}" for k, v in res["changed"].items()]
+            parts += [f"{r} {m}" for r, m in res["meta"].items()]
+            vers = ", ".join(f"{r.upper()} {v['from']} -> {v['to']}" for r, v in res["versions"].items())
+            self.human(role, person, "RULES", Outcome.OVERRIDE, vers or "rules",
+                       f"Pipeline rules changed ({'; '.join(parts)}); versions {vers}. Rationale: {rationale.strip()}", 0)
+            if self.state.report:
+                self.state.report["superseded"] = True
+            self.save()
+            return res
+
     def respond_warning(self, role: str, person: str, idx: int, decision: str, rationale: str = "") -> None:
         """The PI's response to one Scope Guardian warning: accept the limit, or disagree with a rationale."""
         with self.lock:
@@ -766,7 +793,7 @@ class Orchestrator:
 
     def snapshot(self) -> dict[str, Any]:
         default_conc = max(1, (os.cpu_count() or 2) // 2)
-        return {"state": self.state.to_dict(), "pending_overrides": self.pending_overrides, "busy": self.busy, "thresholds": THRESHOLDS, "rules": RULES,
+        return {"state": self.state.to_dict(), "pending_overrides": self.pending_overrides, "busy": self.busy, "thresholds": THRESHOLDS, "rules": RULES, "rule_meta": _rule_meta(),
                 "mode": {"data": "demo" if self.demo else "live", "brain": self.client.mode, "tbprofiler": self.agents["profiling"].runner.available()},
                 "profiler_concurrency": int(os.environ.get("TBAMR_PROFILER_CONCURRENCY", str(default_conc))),
                 "profiler_threads": self.agents["profiling"].runner.threads,

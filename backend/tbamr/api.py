@@ -33,6 +33,8 @@ def build_orchestrator(data_mode: str | None = None, brain: str | None = None, d
     data_mode = (data_mode or os.environ.get("TBAMR_DATA", "demo")).lower()
     db_path = db_path or os.environ.get("TBAMR_DB", f"tbamr-{data_mode}.db")
     log = DecisionLog(db_path)
+    from .core import rulesettings
+    rulesettings.apply()  # load the PI's saved thresholds / rule versions before any stage runs
     return Orchestrator(log, client or make_client(brain), data or (DemoDataTools() if data_mode == "demo" else DataTools()))
 
 
@@ -57,6 +59,13 @@ def _run_label_from_state(orch: Orchestrator) -> str:
 class Who(BaseModel):
     role: str
     person: str = ""
+
+
+class RuleChange(Who):
+    changes: dict[str, float] = {}
+    rationale: str = ""
+    status: dict[str, str] = {}
+    basis: dict[str, str] = {}
 
 
 class CacheToggle(BaseModel):
@@ -383,6 +392,17 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
     # ---- Admin: Mongo + cache -------------------------------------------------
     # Everything here is best-effort against Mongo; if Mongo is down the endpoints still return 200
     # with `connected: false` so the admin UI can render a helpful "Mongo not reachable" state.
+    @app.get("/api/admin/rules")
+    def rules_current():
+        """Editable thresholds, rule versions, provenance (provisional / validated + basis) and change history."""
+        from .core import rulesettings
+        return rulesettings.current()
+
+    @app.post("/api/admin/rules")
+    def rules_change(b: RuleChange):
+        with capture_execution(O().log, "Change pipeline rules"):
+            return guard(O().change_rules, b.role, b.person, b.changes, b.rationale, b.status, b.basis)
+
     @app.get("/api/admin/mongo")
     def mongo_status():
         return mongo_module.status()

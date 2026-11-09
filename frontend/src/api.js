@@ -42,6 +42,8 @@ export const api = {
   runProfiler: (b) => call('POST', '/profiling/run', b),
   reset: (data) => call('POST', '/reset', undefined, { data }),
   // Admin: Mongo health, cache per-namespace toggle/clear, pipeline-result archive.
+  adminRules: () => call('GET', '/admin/rules'),
+  adminRulesChange: (b) => call('POST', '/admin/rules', b),
   adminMongo: () => call('GET', '/admin/mongo'),
   adminMongoReconnect: () => call('POST', '/admin/mongo/reconnect'),
   adminCache: () => call('GET', '/admin/cache'),
