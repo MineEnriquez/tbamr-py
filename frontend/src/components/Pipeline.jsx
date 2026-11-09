@@ -297,7 +297,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
         </div>
       )}
       {n === 4 && ['wait', 'done'].includes(status) && <S4 snap={snap} status={status} act={act} who={who} openSample={openSample} />}
-      {n === 5 && status === 'done' && <S5 st={st} act={act} />}
+      {n === 5 && status === 'done' && <S5 st={st} act={act} openSample={openSample} />}
       {n === 6 && status === 'ready' && (
         <div className="box note">
           <p><b>Run agents</b> will hand the pipeline to the Reporting Orchestrator, which assembles the evidence report from everything approved in Stages 1 – 5. You'll then see, on the <b>Report</b> tab:</p>
@@ -518,6 +518,9 @@ function S3({ st, status, act, who, openSample }) {
 
 function S4({ snap, status, act, who, openSample }) {
   const st = snap.state, q = st.samples.filter(s => s.qc === 'Pass'), done = q.filter(s => s.profiling === 'Done')
+  const failed = q.filter(s => s.profiling === 'Failed')
+  const byRun = Object.fromEntries(q.map(s => [s.run, s]))
+  const catalogues = Object.entries(done.reduce((m, s) => { const k = `${s.profile_meta?.db || 'not recorded'} · ${s.profile_meta?.tool || 'tool not recorded'}`; m[k] = (m[k] || 0) + 1; return m }, {}))
   const [over, setOver] = useState(false)
   const input = useRef(null)
   const upload = files => act(() => api.importFiles(who, files).then(r => { if (r.skipped.length) throw new Error(`Imported ${r.imported.length}; skipped: ${r.skipped.join('; ')}`) }), 'Results imported')
@@ -532,7 +535,8 @@ function S4({ snap, status, act, who, openSample }) {
     <>
       <div className="metrics"><div className="metric"><span className="v">{q.length}</span><span className="l">Quality Control-passed runs</span></div>
         <div className="metric"><span className="v" style={{ color: 'var(--ok)' }}>{done.length}</span><span className="l">TB-Profiler results</span></div>
-        <div className="metric"><span className="v" style={{ color: 'var(--hold)' }}>{q.length - done.length}</span><span className="l">Awaiting results</span></div></div>
+        <div className="metric"><span className="v" style={{ color: 'var(--hold)' }}>{q.length - done.length - failed.length}</span><span className="l">Awaiting results</span></div>
+        <div className="metric"><span className="v" style={{ color: 'var(--esc)' }}>{failed.length}</span><span className="l">Failed</span></div></div>
       <div className="box"><h3>Run TB-Profiler</h3>
         {canRun ? <>
           <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
@@ -550,6 +554,8 @@ function S4({ snap, status, act, who, openSample }) {
                 <tr key={r} className="click" onClick={() => toggle(r)}>
                   <td style={{ width: 32 }}><input type="checkbox" checked={selected.has(r)} onChange={() => toggle(r)} onClick={e => e.stopPropagation()} aria-label={`Select ${r}`} /></td>
                   <td className="mono">{r}</td>
+                  <td>{byRun[r]?.profiling === 'Failed' ? <span className="prof-failed">Failed</span> : <span className="muted">Awaiting results</span>}</td>
+                  <td className="muted" style={{ fontSize: '.8rem' }}>{byRun[r]?.profiling === 'Failed' ? byRun[r].profiling_note : ''}</td>
                 </tr>
               ))}
             </tbody></table>
@@ -563,8 +569,16 @@ function S4({ snap, status, act, who, openSample }) {
         onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}>
         <p><b>Drop TB-Profiler result files here</b> (.results.json) or click to choose</p></div>
       <input ref={input} type="file" accept=".json" multiple hidden onChange={e => { upload(e.target.files); e.target.value = '' }} />
-      {done.length > 0 && <div className="tw"><table><thead><tr><th>Run</th><th>Lineage</th><th>Source</th><th></th></tr></thead><tbody>
-        {done.map(s => <tr className="click" key={s.run} onClick={() => openSample(s.run)}><td className="mono">{s.run}</td><td className="mono">{s.lineage || '—'}</td><td className="muted" style={{ fontSize: '.82rem' }}>{s.profiling_note}</td><td><RawLink kind="tbprofiler" k={s.run} label="Raw JSON" /></td></tr>)}</tbody></table></div>}
+      {done.length > 0 && <p className="muted cat-line">Called with {catalogues.map(([k, n]) => <span key={k} className="mono"> {k} ({n} run{n > 1 ? 's' : ''})</span>).reduce((a, b) => [a, ' ·', b])}</p>}
+      {catalogues.length > 1 && <div className="box esc" role="alert"><p><b>Mixed catalogue versions.</b> These results were called with different (or unrecorded) mutation-catalogue versions, so their calls aren't comparable. Re-profile all runs with one version before the report.</p></div>}
+      {done.length > 0 && <div className="tw"><table><thead><tr><th>Run</th><th>Lineage</th><th>Resistance calls reported by TB-Profiler</th><th className="num">Median depth</th><th></th></tr></thead><tbody>
+        {done.map(s => { const muts = s.profile_meta?.mutations || []
+          return <tr className="click" key={s.run} onClick={() => openSample(s.run)} title={s.profiling_note}>
+            <td className="mono">{s.run}</td><td className="mono">{s.lineage || '—'}</td>
+            <td>{muts.length ? <span className="calls">{muts.map((m, k) => <span key={k} className={'call' + (m.grade === 5 ? ' marker' : m.grade === 3 ? ' uncertain' : '')} title={`${DRUG[m.drug] || m.drug} · ${m.confidence || 'grading not in file'} · depth ${m.depth ?? 'n/a'} · ${Math.round((m.freq ?? 1) * 100)}% of reads`}><b>{m.drug}</b> {m.gene} {m.change}</span>)}</span> : <span className="muted">none reported</span>}</td>
+            <td className="num">{s.profile_meta?.median_depth ?? '—'}</td>
+            <td><RawLink kind="tbprofiler" k={s.run} label="Raw JSON" /></td></tr> })}
+      </tbody></table><p className="muted" style={{ fontSize: '.8rem', margin: '6px 10px' }}>Calls as reported by the tool, before evaluation: grey = lineage marker (not counted), amber = uncertain grading. Stage 5 decides what counts.</p></div>}
       {status === 'wait' && <div className="box gate"><h3>Gate · Close profiling batch</h3>
         <p className="role-reqd">Only <RoleBadge role="analyst" /> can close the batch.</p>
         <p>Results imported later are evaluated automatically.</p>
@@ -574,11 +588,59 @@ function S4({ snap, status, act, who, openSample }) {
   )
 }
 
-function S5({ st, act }) {
-  const f = st.samples.flatMap(s => s.findings)
-  return <><div className="metrics"><div className="metric"><span className="v">{f.filter(x => x.cls !== 'other').length}</span><span className="l">Resistance findings</span></div>
-    <div className="metric"><span className="v" style={{ color: 'var(--pend)' }}>{f.filter(x => x.review === 'Pending').length}</span><span className="l">Pending review</span></div>
-    <div className="metric"><span className="v" style={{ color: 'var(--ok)' }}>{f.filter(x => x.review === 'Reviewed').length}</span><span className="l">Reviewed</span></div></div>
+const DRUG = { RIF: 'Rifampicin', INH: 'Isoniazid', EMB: 'Ethambutol', PZA: 'Pyrazinamide', FLQ: 'Fluoroquinolones', BDQ: 'Bedaquiline',
+  LZD: 'Linezolid', DLM: 'Delamanid', CFZ: 'Clofazimine', AMK: 'Amikacin', STM: 'Streptomycin', ETO: 'Ethionamide', KAN: 'Kanamycin', CAP: 'Capreomycin' }
+const FLAG = {
+  low_depth: ['Too few reads', 'Fewer than 10 reads support the call at the resistance position.'],
+  minor_variant: ['Minor variant', 'Present in under 90% of reads: possible mixed infection or heteroresistance.'],
+  dst_discordant: ['DST disagrees', 'The genotype predicts resistance but the matched phenotypic DST is susceptible.'],
+  uncertain_grade: ['Uncertain WHO grade', 'Graded Group 3 (uncertain significance) in the catalogue.'],
+  agent_review: ['Flagged by the agent', 'The Evidence Analyst asked for a human look (e.g. interim grading).'],
+}
+// Same rule as the report's counts_as_resistant(): a technical call that is not awaiting review.
+const counted = f => f.cls === 'tech' && ['Not required', 'Reviewed'].includes(f.review)
+const statusOf = f => f.cls === 'other' ? ['Not counted', 'marker'] : f.review === 'Not supported' ? ['Not supported', 'marker']
+  : f.review === 'Pending' || f.review === 'Needs more data' ? ['Pending review', 'pending'] : counted(f) ? [f.review === 'Reviewed' ? 'Reviewed · counted' : 'Counted', 'counted'] : ['Uncertain', 'pending']
+
+function S5({ st, act, openSample }) {
+  const f = st.samples.flatMap(s => s.findings || [])
+  const [show, setShow] = useState('pending')
+  const drugs = [...new Set(f.map(x => x.drug))].sort((a, b) => (['RIF', 'INH'].indexOf(a) + 1 || 9) - (['RIF', 'INH'].indexOf(b) + 1 || 9) || a.localeCompare(b))
+  const runs = (pred) => new Set(f.filter(pred).map(x => x.sample_id)).size
+  const pending = f.filter(x => x.review === 'Pending' || x.review === 'Needs more data')
+  const reasons = Object.entries(pending.reduce((m, x) => { const k = x.flag || 'other'; m[k] = (m[k] || 0) + 1; return m }, {})).sort((a, b) => b[1] - a[1])
+  const filters = { all: () => true, pending: x => statusOf(x)[1] === 'pending', counted: counted, notcounted: x => statusOf(x)[1] === 'marker' }
+  const rows = f.filter(filters[show]).sort((a, b) => a.sample_id.localeCompare(b.sample_id) || a.drug.localeCompare(b.drug))
+  const analysed = st.samples.filter(s => s.profiling === 'Done' && s.profile_meta?.evaluated).length
+  return <>
+    <div className="metrics">
+      <div className="metric"><span className="v" style={{ color: 'var(--ok)' }}>{f.filter(counted).length}</span><span className="l">Calls counted as resistant</span></div>
+      <div className="metric"><span className="v" style={{ color: 'var(--pend)' }}>{pending.length}</span><span className="l">Pending review</span></div>
+      <div className="metric"><span className="v">{f.filter(x => x.review === 'Reviewed').length}</span><span className="l">Reviewed</span></div>
+      <div className="metric"><span className="v muted">{f.filter(x => x.cls === 'other').length}</span><span className="l">Lineage markers (not counted)</span></div></div>
+    {drugs.length > 0 && <div className="tw"><table><thead><tr><th>Drug</th><th className="num">Runs predicted resistant</th><th className="num">Runs uncertain / pending</th><th className="num">Runs reviewed</th><th className="num">Not supported</th></tr></thead><tbody>
+      {drugs.map(d => <tr key={d}><td>{DRUG[d] || d}</td>
+        <td className="num">{runs(x => x.drug === d && counted(x))} / {analysed}</td>
+        <td className="num">{runs(x => x.drug === d && (x.cls === 'uncertain' || x.review === 'Pending' || x.review === 'Needs more data'))}</td>
+        <td className="num">{runs(x => x.drug === d && x.review === 'Reviewed')}</td>
+        <td className="num">{runs(x => x.drug === d && x.review === 'Not supported')}</td></tr>)}
+    </tbody></table></div>}
+    {reasons.length > 0 && <div className="box hold"><h3>Why {pending.length} finding{pending.length > 1 ? 's are' : ' is'} waiting for the TB Microbiologist</h3>
+      <ul className="clean reason-list">{reasons.map(([k, n]) => <li key={k}><b>{(FLAG[k] || ['Other'])[0]}</b> · {n} — <span className="muted">{(FLAG[k] || ['', 'See the finding for details.'])[1]}</span></li>)}</ul>
+      <p className="muted" style={{ margin: 0, fontSize: '.84rem' }}>Pending findings count as uncertain, not resistant, until reviewed in the Review queue tab.</p></div>}
+    {f.length > 0 && <div>
+      <div className="seg" role="radiogroup" aria-label="Show findings" style={{ marginBottom: 8 }}>{[['pending', `Pending (${f.filter(filters.pending).length})`], ['counted', `Counted (${f.filter(counted).length})`], ['notcounted', `Not counted (${f.filter(filters.notcounted).length})`], ['all', `All (${f.length})`]].map(([k, l]) =>
+        <button key={k} role="radio" aria-checked={show === k} aria-selected={show === k} onClick={() => setShow(k)}>{l}</button>)}</div>
+      <div className="tw"><table><thead><tr><th>Run</th><th>Drug</th><th>Variant</th><th>WHO group</th><th className="num">Depth</th><th className="num">Reads</th><th>Status</th><th>Why / agent's note</th></tr></thead><tbody>
+        {rows.map(x => { const [label, kind] = statusOf(x)
+          return <tr key={x.fid} className="click" onClick={() => openSample(x.sample_id)}>
+            <td className="mono">{x.sample_id}</td><td>{x.drug}</td><td className="mono">{x.gene} {x.change}</td>
+            <td>{x.grade ? x.grade : <span className="muted">not in file</span>}</td>
+            <td className="num">{x.depth ?? '—'}</td><td className="num">{Math.round((x.freq ?? 1) * 100)}%</td>
+            <td><span className={'fstatus ' + kind}>{label}</span></td>
+            <td className="why" title={x.interpretation ? `Agent's note: ${x.interpretation}` : x.reason}>{x.reason}{x.interpretation && <span className="muted"> · Agent's note: {x.interpretation.length > 110 ? x.interpretation.slice(0, 110).trimEnd() + '…' : x.interpretation}</span>}</td></tr> })}
+        {!rows.length && <tr><td colSpan={8} className="muted">Nothing in this view.</td></tr>}
+      </tbody></table></div></div>}
     <div className="row"><button className="btn small" onClick={() => act(() => api.run(5), 'New results evaluated')}>Evaluate newly imported results</button></div></>
 }
 
