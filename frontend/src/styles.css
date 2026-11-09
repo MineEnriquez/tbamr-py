@@ -401,3 +401,7 @@ td.mono{white-space:nowrap}
 .agent-arrow{align-self:center;font-size:1.4rem;color:var(--muted)}
 .agent-out{font-size:.82rem;color:var(--muted);margin:0;border-top:1px dashed var(--line);padding-top:6px}
 @media (max-width:760px){.agent-arrow{transform:rotate(90deg);width:100%;text-align:center}}
+/* Output card: opens the Report tab once a report exists */
+.report-node .report-status{font-size:.76rem}
+.report-node .report-status.final{color:var(--ok);font-weight:600}
+.report-node .report-status.superseded{color:var(--hold);font-weight:600}
