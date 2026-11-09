@@ -300,7 +300,9 @@ function Stage({ n, snap, act, who, busy, openSample }) {
               <p className="agent-out">Hands on: the verified cohort and the runs on Hold.</p>
             </div>
           </div>
-          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>Then cohort checks run (one location or one study only, below the planned minimum). If the cohort can't answer the question or falls short, the orchestrator re-plans once and asks Discovery for other studies. You'll see candidate counts (Verified / On hold / Excluded), each run's archive record and the checks before the <RoleBadge role="pi" /> gate opens.</p>
+          <p className="muted" style={{ fontSize: '.86rem', margin: '0 0 4px' }}><b>Then cohort checks</b> run on the verified runs: fewer than the planned minimum ({st.cohort_target}) is <b>flagged</b>; all runs from one location is flagged only if the question compares places (otherwise a note); all from one study, and ENA listing more matching runs than were retrieved, are notes.</p>
+          <p className="muted" style={{ fontSize: '.86rem', margin: '0 0 4px' }}><b>Re-plan, at most once:</b> if the cohort is below the minimum, or the question compares places but every verified run comes from one location, the orchestrator asks Discovery for runs from studies not already in the cohort and verifies any new ones.</p>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>With the results you'll see the counts (Verified / On hold / Excluded), the runs on hold with the agent's evidence, the cohort checks, and the <RoleBadge role="pi" /> gate to approve the cohort. Only verified runs enter the cohort; runs on hold are left out unless you resolve them.</p>
         </div>
       )}
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
