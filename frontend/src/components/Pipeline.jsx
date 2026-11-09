@@ -256,11 +256,16 @@ const UNLOCK = {
   6: ['as soon as Stage 5 has run (no gate in between; findings pending review are handled by the', 'tbexpert', 'in the Review queue).'],
 }
 
+/* The run button names the agent(s) it starts: only Stage 2 runs two agents, every other stage runs one. */
+const RUN_LABEL = { 1: 'Run Scope Guardian', 2: 'Run Discovery & Verification', 3: 'Run QC Analyst', 4: 'Run Profiling Tasker',
+  5: 'Run Evidence Analyst', 6: 'Run Reporting Orchestrator' }
+
 function Stage({ n, snap, act, who, busy, openSample }) {
   const st = snap.state, meta = snap.stages[n - 1], status = st.stage_status[String(n)]
   const agents = meta.agents
   const th = snap.thresholds || {}
-  // Stage 1 "Run agents" is only enabled when the current scope form is saved AND has no
+  const runLabel = RUN_LABEL[n] || 'Run'
+  // Stage 1 "Run Scope Guardian" is only enabled when the current scope form is saved AND has no
   // country/question conflict (the Guardian would otherwise silently use the field and ignore the question).
   const [scopeDirty, setScopeDirty] = useState(false)
   const [scopeBlocked, setScopeBlocked] = useState(false)
@@ -269,7 +274,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
     ? (scopeBlocked ? 'Set a clear target population (and resolve any country/question conflict) first' : (scopeDirty ? 'Save the scope first' : ''))
     : (busy ? 'A stage is running' : '')
   const runBtn = <button className="btn primary" disabled={status !== 'ready' || !!busy || disabled} title={disabledReason || undefined}
-                   onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'ready' ? 'Run agents' : status === 'locked' ? 'Locked' : 'Ran'}</button>
+                   onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'ready' ? runLabel : status === 'locked' ? 'Locked' : 'Ran'}</button>
   return (
     <section className="panel">
       <div className="row between"><div><span className="eyebrow">Stage {n} · owner: {ROLE_LABEL[meta.owner]}</span><h2>{meta.name}</h2></div>{runBtn}</div>
@@ -279,7 +284,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       {n === 1 && <S1 key={[status, st.question, st.country, st.region || '', st.cohort_target].join('|')} st={st} status={status} act={act} who={who} onDirtyChange={setScopeDirty} onBlockedChange={setScopeBlocked} />}
       {n === 2 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>Run agents</b> hands this stage to <b>two agents, one after the other</b>:</p>
+          <p><b>{runLabel}</b> starts <b>two agents, one after the other</b>:</p>
           <div className="agent-steps">
             <div className="agent-step">
               <div className="agent-head"><span className="agent-num">1</span><b>Discovery Assistant</b><span className="agent-kind llm">✦ Claude</span></div>
@@ -308,7 +313,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
       {n === 3 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>Run agents</b> hands this stage to <b>one</b> rules-only agent (no Claude):</p>
+          <p><b>{runLabel}</b> starts <b>one</b> rules-only agent (no Claude):</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
             <li><b>QC Analyst</b> — for every run in the approved cohort it estimates coverage as <span className="mono">base_count ÷ {(th.genome_bp || 4411532).toLocaleString()} bp</span>. At least <b>{th.min_cov}×</b>: <b>Pass</b>. Between {th.border_cov}× and {th.min_cov}×, or no base count in the archive: <b>Escalate</b> for a person. Below {th.border_cov}×: <b>Exclude</b>. Whether an <span className="mono">MD5</span> checksum is listed is recorded, but it is never a reason to escalate.</li>
             <li>If fewer runs pass than the planned minimum cohort ({st.cohort_target}), a shortfall check is added for the gate.</li>
@@ -319,7 +324,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       {n === 3 && ['wait', 'done'].includes(status) && <S3 st={st} status={status} act={act} who={who} openSample={openSample} />}
       {n === 4 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>Run agents</b> hands this stage to <b>one</b> tool-runner agent (no Claude), which <b>queues</b> every QC-passed run as <i>Awaiting results</i>. It does not start TB-Profiler by itself{snap.mode.data === 'demo' ? ' (in demo mode, simulated results are filled in immediately, including one failure and one run left without a result)' : ''}.</p>
+          <p><b>{runLabel}</b> starts <b>one</b> tool-runner agent (no Claude), which <b>queues</b> every QC-passed run as <i>Awaiting results</i>. It does not start TB-Profiler by itself{snap.mode.data === 'demo' ? ' (in demo mode, simulated results are filled in immediately, including one failure and one run left without a result)' : ''}.</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
             <li><b>Produce results</b> in either of two ways. Select runs and click <i>Run TB-Profiler</i>: each run is downloaded with <span className="mono">fasterq-dump</span> and profiled with TB-Profiler (Docker image <span className="mono">staphb/tbprofiler</span>, or a local <span className="mono">tb-profiler</span>), about 15–30 min per run, several in parallel; successful results are cached. Or <i>import</i> <span className="mono">.results.json</span> files: only runs in this cohort that passed QC are accepted.</li>
             <li><b>Profiling Tasker</b> records each result with its tool and mutation-catalogue version, and records failures with the reason; failed runs can be selected and run again. It never interprets resistance: that is Stage 5.</li>
@@ -329,7 +334,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       )}
       {n === 5 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>Run agents</b> hands this stage to the <b>Evidence Analyst</b> (rules plus Claude), for every run with a TB-Profiler result:</p>
+          <p><b>{runLabel}</b> starts <b>one</b> agent, the <b>Evidence Analyst</b> (rules plus Claude), for every run with a TB-Profiler result:</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
             <li><b>Rules classify each resistance call.</b> WHO catalogue Group 1 or 2, at least <b>{th.min_depth}</b> supporting reads, in at least <b>{Math.round((th.min_freq ?? 0.9) * 100)}%</b> of reads, and no conflicting phenotypic DST: <b>counted as resistant</b>. Group 3 (uncertain), fewer reads, a minor variant, or DST that disagrees: <b>pending review</b>, counted as uncertain. Group 5 lineage markers: <b>not counted</b>.</li>
             <li><b>Claude</b> writes a short note on each finding for the reviewer and can send a finding to review. It can never clear a finding from review or confirm resistance.</li>
@@ -341,7 +346,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       {n === 5 && status === 'done' && <S5 st={st} act={act} openSample={openSample} />}
       {n === 6 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>Run agents</b> hands the pipeline to the <b>Reporting Orchestrator</b> (rules; Claude only drafts the optional summary). It builds the evidence report from everything approved in Stages 1–5, and you'll find it on the <b>Report</b> tab:</p>
+          <p><b>{runLabel}</b> starts <b>one</b> agent, the <b>Reporting Orchestrator</b> (rules; Claude only drafts the optional summary). It builds the evidence report from everything approved in Stages 1–5, and you'll find it on the <b>Report</b> tab:</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
             <li><b>How resistance is called</b>: the definition used and the mutation-catalogue version, with a warning if runs were called with different versions.</li>
             <li><b>Sample counts</b>: candidates → verified → QC-passed → analysed, against the planned minimum cohort ({st.cohort_target}).</li>
@@ -446,7 +451,7 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
       {!conflict && <TargetNote t={tgt} />}
       <div className="row"><button className="btn small primary" disabled={!dirty || !!conflict} onClick={() => act(() => api.setScope({ question: q, country, region, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
         <span className="muted" style={{ fontSize: '.82rem' }}>
-          {conflict ? 'Resolve the conflict above before saving.' : unclear ? 'Set a clear target population before running.' : (dirty ? 'Unsaved changes — Save scope before Run agents.' : 'Scope saved. Click Run agents to kick off the Scope Guardian.')}
+          {conflict ? 'Resolve the conflict above before saving.' : unclear ? 'Set a clear target population before running.' : (dirty ? 'Unsaved changes — Save scope before running the Scope Guardian.' : 'Scope saved. Click Run Scope Guardian to start the review.')}
         </span></div></div>)
   return (
     <>
