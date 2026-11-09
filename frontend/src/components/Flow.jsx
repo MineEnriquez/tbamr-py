@@ -49,7 +49,7 @@ export default function Flow({ snap, team, view, onPick, pending }) {
                   <div className="fbtip-title">Agents in this stage</div>
                   <div className="fbtip-agents">{s.agents.map(a => {
                     const m = byName[a]
-                    return <span key={a} className={'fbtip-ag ' + (m?.kind || 'rule')}>{m?.kind === 'llm' ? '✦' : '⚙'} {SHORT[a] || a}</span>
+                    return <span key={a} className={'fbtip-ag ' + (m?.kind || 'rule')}>{m?.kind === 'llm' ? '✦' : '⚙\uFE0F'} {SHORT[a] || a}</span>
                   })}</div>
                 </div>
               </button>
