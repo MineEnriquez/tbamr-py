@@ -249,6 +249,7 @@ function Feed({ decisions }) {
 function Stage({ n, snap, act, who, busy, openSample }) {
   const st = snap.state, meta = snap.stages[n - 1], status = st.stage_status[String(n)]
   const agents = meta.agents
+  const th = snap.thresholds || {}
   // Stage 1 "Run agents" is only enabled when the current scope form is saved AND has no
   // country/question conflict (the Guardian would otherwise silently use the field and ignore the question).
   const [scopeDirty, setScopeDirty] = useState(false)
@@ -279,21 +280,33 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
       {n === 3 && status === 'ready' && (
         <div className="box note">
-          <p><b>Run agents</b> will hand this stage to <b>one</b> rules-only agent (no Claude):</p>
+          <p><b>Run agents</b> hands this stage to <b>one</b> rules-only agent (no Claude):</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
-            <li><b>QC Analyst</b> — for every verified run it estimates coverage from <span className="mono">base_count ÷ genome_size</span> and checks that an <span className="mono">MD5</span> is listed in the archive record. Runs below the coverage threshold or missing a checksum are <b>Escalated</b>; the rest pass.</li>
+            <li><b>QC Analyst</b> — for every run in the approved cohort it estimates coverage as <span className="mono">base_count ÷ {(th.genome_bp || 4411532).toLocaleString()} bp</span>. At least <b>{th.min_cov}×</b>: <b>Pass</b>. Between {th.border_cov}× and {th.min_cov}×, or no base count in the archive: <b>Escalate</b> for a person. Below {th.border_cov}×: <b>Exclude</b>. Whether an <span className="mono">MD5</span> checksum is listed is recorded, but it is never a reason to escalate.</li>
+            <li>If fewer runs pass than the planned minimum cohort ({st.cohort_target}), a shortfall check is added for the gate.</li>
           </ul>
-          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see a per-run table (coverage, MD5, QC chip). Resolve each escalation with a short rationale, then <RoleBadge role="analyst" /> confirms the batch.</p>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see a per-run table (coverage, checksum, QC status). Each escalation needs a short rationale, then <RoleBadge role="analyst" /> confirms QC.</p>
         </div>
       )}
       {n === 3 && ['wait', 'done'].includes(status) && <S3 st={st} status={status} act={act} who={who} openSample={openSample} />}
       {n === 4 && status === 'ready' && (
         <div className="box note">
-          <p><b>Run agents</b> will hand this stage to <b>one</b> tool-runner agent (no Claude):</p>
+          <p><b>Run agents</b> hands this stage to <b>one</b> tool-runner agent (no Claude), which <b>queues</b> every QC-passed run as <i>Awaiting results</i>. It does not start TB-Profiler by itself{snap.mode.data === 'demo' ? ' (in demo mode, simulated results are filled in immediately, including one failure and one run left without a result)' : ''}.</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
-            <li><b>Profiling Tasker</b> — runs <b>TB-Profiler</b> on every QC-passed run, either as a subprocess (Docker image <span className="mono">staphb/tbprofiler</span>, or a local <span className="mono">tb-profiler</span> binary) or by parsing JSON results you drop into the import area. It only produces results; it never interprets resistance — that is the Evidence Analyst's job in Stage 5.</li>
+            <li><b>Produce results</b> in either of two ways. Select runs and click <i>Run TB-Profiler</i>: each run is downloaded with <span className="mono">fasterq-dump</span> and profiled with TB-Profiler (Docker image <span className="mono">staphb/tbprofiler</span>, or a local <span className="mono">tb-profiler</span>), about 15–30 min per run, several in parallel; successful results are cached. Or <i>import</i> <span className="mono">.results.json</span> files: only runs in this cohort that passed QC are accepted.</li>
+            <li><b>Profiling Tasker</b> records each result with its tool and mutation-catalogue version, and records failures with the reason; failed runs can be selected and run again. It never interprets resistance: that is Stage 5.</li>
           </ul>
-          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see per-run status (Awaiting / Done / Failed) and the import drop zone. <RoleBadge role="analyst" /> closes the batch when every run has a result or is explicitly skipped.</p>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see what each run reported (lineage, resistance calls, depth) and which catalogue was used. <RoleBadge role="analyst" /> can close the batch once at least one result exists; results imported later are evaluated automatically.</p>
+        </div>
+      )}
+      {n === 5 && status === 'ready' && (
+        <div className="box note">
+          <p><b>Run agents</b> hands this stage to the <b>Evidence Analyst</b> (rules plus Claude), for every run with a TB-Profiler result:</p>
+          <ul className="clean" style={{ fontSize: '.9rem' }}>
+            <li><b>Rules classify each resistance call.</b> WHO catalogue Group 1 or 2, at least <b>{th.min_depth}</b> supporting reads, in at least <b>{Math.round((th.min_freq ?? 0.9) * 100)}%</b> of reads, and no conflicting phenotypic DST: <b>counted as resistant</b>. Group 3 (uncertain), fewer reads, a minor variant, or DST that disagrees: <b>pending review</b>, counted as uncertain. Group 5 lineage markers: <b>not counted</b>.</li>
+            <li><b>Claude</b> writes a short note on each finding for the reviewer and can send a finding to review. It can never clear a finding from review or confirm resistance.</li>
+          </ul>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>The stage completes without a gate. Findings pending review go to the <b>Review queue</b>, where <RoleBadge role="tbexpert" /> marks each one Supports resistance, Not supported or Needs more data. Final release is blocked while any finding is pending.</p>
         </div>
       )}
       {n === 4 && ['wait', 'done'].includes(status) && <S4 snap={snap} status={status} act={act} who={who} openSample={openSample} />}
