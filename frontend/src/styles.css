@@ -12,8 +12,8 @@
   --shadow-lg:0 16px 40px rgb(27 36 48 / .14), 0 2px 8px rgb(27 36 48 / .06);
   --radius:8px;
   --topbar-bg:#0b4a8b; --topbar-ink:#ffffff; --topbar-muted:rgba(255,255,255,.72); --topbar-link:#cfe2ff; --topbar-line:#083a6e; --topbar-pick:#1f7ae0;
-  --shadow-lift:0 14px 32px rgb(15 50 110 / .22), 0 4px 10px rgb(15 50 110 / .12), 0 0 0 1px var(--blue);
-  --shadow-card:0 1px 2px rgb(27 36 48 / .06), 0 3px 10px rgb(27 36 48 / .07);
+  --shadow-lift:0 0 0 2px var(--blue), 0 0 0 7px rgb(15 98 201 / .18), 0 0 28px 4px rgb(15 98 201 / .3), 0 24px 48px rgb(15 50 110 / .38);
+  --shadow-card:0 1px 3px rgb(27 36 48 / .16), 0 6px 16px rgb(27 36 48 / .2), 0 0 22px rgb(27 36 48 / .12);
   --f-display:"IBM Plex Sans","Segoe UI",system-ui,sans-serif; --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
   color-scheme:light;
 }
@@ -27,8 +27,8 @@
   --shadow-sm:0 1px 2px rgb(0 0 0 / .4);
   --shadow-md:0 4px 12px rgb(0 0 0 / .45), 0 1px 2px rgb(0 0 0 / .3);
   --shadow-lg:0 16px 40px rgb(0 0 0 / .55), 0 2px 8px rgb(0 0 0 / .35);
-  --shadow-lift:0 16px 36px rgb(0 0 0 / .75), 0 0 0 1px var(--blue), 0 0 26px 3px rgb(92 156 240 / .45);
-  --shadow-card:0 2px 4px rgb(0 0 0 / .45), 0 6px 18px rgb(0 0 0 / .55), inset 0 1px 0 rgb(255 255 255 / .04);
+  --shadow-lift:0 0 0 2px var(--blue), 0 0 0 7px rgb(92 156 240 / .22), 0 0 44px 8px rgb(92 156 240 / .55), 0 24px 52px rgb(0 0 0 / .9);
+  --shadow-card:0 0 0 1px rgb(255 255 255 / .08), 0 4px 10px rgb(0 0 0 / .7), 0 0 26px rgb(0 0 0 / .8), inset 0 1px 0 rgb(255 255 255 / .08);
   --topbar-bg:#14375f; --topbar-ink:#ffffff; --topbar-muted:rgba(255,255,255,.7); --topbar-link:#a9cbff; --topbar-line:#0d2846; --topbar-pick:#2f7fdf;
   color-scheme:dark}}
 :root[data-theme=dark]{
@@ -41,8 +41,8 @@
   --shadow-sm:0 1px 2px rgb(0 0 0 / .4);
   --shadow-md:0 4px 12px rgb(0 0 0 / .45), 0 1px 2px rgb(0 0 0 / .3);
   --shadow-lg:0 16px 40px rgb(0 0 0 / .55), 0 2px 8px rgb(0 0 0 / .35);
-  --shadow-lift:0 16px 36px rgb(0 0 0 / .75), 0 0 0 1px var(--blue), 0 0 26px 3px rgb(92 156 240 / .45);
-  --shadow-card:0 2px 4px rgb(0 0 0 / .45), 0 6px 18px rgb(0 0 0 / .55), inset 0 1px 0 rgb(255 255 255 / .04);
+  --shadow-lift:0 0 0 2px var(--blue), 0 0 0 7px rgb(92 156 240 / .22), 0 0 44px 8px rgb(92 156 240 / .55), 0 24px 52px rgb(0 0 0 / .9);
+  --shadow-card:0 0 0 1px rgb(255 255 255 / .08), 0 4px 10px rgb(0 0 0 / .7), 0 0 26px rgb(0 0 0 / .8), inset 0 1px 0 rgb(255 255 255 / .08);
   --topbar-bg:#14375f; --topbar-ink:#ffffff; --topbar-muted:rgba(255,255,255,.7); --topbar-link:#a9cbff; --topbar-line:#0d2846; --topbar-pick:#2f7fdf;
   color-scheme:dark}
 *{box-sizing:border-box}
