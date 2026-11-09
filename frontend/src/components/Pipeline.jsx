@@ -274,13 +274,13 @@ function Stage({ n, snap, act, who, busy, openSample }) {
     ? (scopeBlocked ? 'Set a clear target population (and resolve any country/question conflict) first' : (scopeDirty ? 'Save the scope first' : ''))
     : (busy ? 'A stage is running' : '')
   const runBtn = <button className="btn primary" disabled={status !== 'ready' || !!busy || disabled} title={disabledReason || undefined}
-                   onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'ready' ? runLabel : status === 'locked' ? 'Locked' : 'Ran'}</button>
+                   onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'done' || status === 'wait' ? 'Ran' : runLabel}</button>
   return (
     <section className="panel">
       <div className="row between"><div><span className="eyebrow">Stage {n} · owner: {ROLE_LABEL[meta.owner]}</span><h2>{meta.name}</h2></div>{runBtn}</div>
       <div className="tools">{agents.map(a => <span className="tool" key={a}>{a.replace(/_/g, ' ')}</span>)}</div>
       {busy && <div className="working" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span>Working on <b>{busy}</b>… agents are reasoning and calling tools; watch the Agent team tab for live traces.</span></div>}
-      {status === 'locked' && <div className="box note locked-note" role="note"><p><b>Locked.</b> {UNLOCK[n] ? <>This stage opens {UNLOCK[n][0]} <RoleBadge role={UNLOCK[n][1]} /> {UNLOCK[n][2]}</> : "This stage opens when the previous stage is complete."} Here is what will happen when it runs:</p></div>}
+      {status === 'locked' && <div className="box note locked-note" role="note"><p>{UNLOCK[n] ? <>This stage opens {UNLOCK[n][0]} <RoleBadge role={UNLOCK[n][1]} /> {UNLOCK[n][2]}</> : "This stage opens when the previous stage is complete."} Here is what will happen when it runs:</p></div>}
       {n === 1 && <S1 key={[status, st.question, st.country, st.region || '', st.cohort_target].join('|')} st={st} status={status} act={act} who={who} onDirtyChange={setScopeDirty} onBlockedChange={setScopeBlocked} />}
       {n === 2 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
