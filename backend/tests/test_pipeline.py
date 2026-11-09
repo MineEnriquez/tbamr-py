@@ -913,4 +913,6 @@ def test_findings_carry_the_reason_flag_shown_on_stage_5(orch):
 def test_state_exposes_the_rule_thresholds_quoted_by_the_stage_notes(tmp_path):
     from tbamr.core.models import THRESHOLDS
     c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "t.db"))))
-    assert c.get("/api/state").json()["thresholds"] == THRESHOLDS
+    from tbamr.core.models import RULES
+    state = c.get("/api/state").json()
+    assert state["thresholds"] == THRESHOLDS and state["rules"] == RULES  # the notes quote these, so they can't drift

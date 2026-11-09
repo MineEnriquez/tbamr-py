@@ -766,7 +766,7 @@ class Orchestrator:
 
     def snapshot(self) -> dict[str, Any]:
         default_conc = max(1, (os.cpu_count() or 2) // 2)
-        return {"state": self.state.to_dict(), "pending_overrides": self.pending_overrides, "busy": self.busy, "thresholds": THRESHOLDS,
+        return {"state": self.state.to_dict(), "pending_overrides": self.pending_overrides, "busy": self.busy, "thresholds": THRESHOLDS, "rules": RULES,
                 "mode": {"data": "demo" if self.demo else "live", "brain": self.client.mode, "tbprofiler": self.agents["profiling"].runner.available()},
                 "profiler_concurrency": int(os.environ.get("TBAMR_PROFILER_CONCURRENCY", str(default_conc))),
                 "profiler_threads": self.agents["profiling"].runner.threads,
