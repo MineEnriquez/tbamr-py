@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import threading
+import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -228,7 +229,8 @@ class Orchestrator:
     def _s1(self):
         st = self.state
         self.orch("—", Outcome.INFO, RULES["scope"], "Handing the research scope to the Scope Guardian.", 1)
-        st.scope = self.agents["scope_guardian"].review(st.question, st.country, st.target_drugs, st.cohort_target, st.region)
+        st.scope = self.agents["scope_guardian"].review(st.question, st.country, st.target_drugs, st.cohort_target, st.region,
+                                                         revision_rounds=st.revision_rounds)
         target = st.scope.get("target") or {}
         if target.get("country") and not target.get("problem"):
             st.country = target["country"]  # canonical INSDC name or "Worldwide"; downstream agents read st.country
@@ -244,19 +246,25 @@ class Orchestrator:
         where = search_country(st.country)
         label = (f"{st.region}, {where}" if st.region else where) or "worldwide, as requested"
         self.orch("—", Outcome.INFO, RULES["elig"], f"Asking the Discovery Assistant for candidate runs ({label}).", 2)
-        found = self.agents["discovery"].discover(where, st.question, region=st.region)
+        found = self.agents["discovery"].discover(where, st.question, region=st.region, minimum=st.cohort_target)
         self._add_rows(found["rows"])
         self.orch("—", Outcome.INFO, RULES["elig"], f"Handing {len(st.samples)} candidate(s) to the Verification Tasker.", 2)
         self.agents["verification"].verify(st.samples, st.country, st.region)
         st.cohort_checks = self._cohort_checks(found.get("total_in_ena", 0))
-        # re-plan: the cohort cannot answer a comparison across places → ask Discovery to widen the search once
-        if any(c["kind"] == "single_location" and c["outcome"] == "Escalate" for c in st.cohort_checks) and st.replans < self.max_replans:
+        # re-plan once when the cohort can't answer the question: one location for a comparison across places, or fewer
+        # verified isolates than the planned minimum. It widens the search (other studies); it never relaxes criteria.
+        one_place = any(c["kind"] == "single_location" and c["outcome"] == "Escalate" for c in st.cohort_checks)
+        short = any(c["kind"] == "below_minimum" for c in st.cohort_checks)
+        if (one_place or short) and st.replans < self.max_replans:
             st.replans += 1
             studies = sorted({s.study for s in st.samples if s.eligibility == "Verified"})
-            self.orch("COHORT", Outcome.RETRY, RULES["cohort"], f"Re-planning: asking Discovery for studies other than {', '.join(studies)} to support the comparison.", 2)
-            more = self.agents["discovery"].discover(where, st.question, already_known=[s.run for s in st.samples],
-                                                     focus=f"The verified cohort comes from one location. Find runs from other studies than {', '.join(studies)}.",
-                                                     exclude_studies=studies, region=st.region)
+            n_ok = sum(s.eligibility == "Verified" for s in st.samples)
+            why = (f"The verified cohort comes from one location. Find runs from other studies than {', '.join(studies)}." if one_place else
+                   f"Only {n_ok} verified isolate(s) against a planned minimum of {st.cohort_target}. Find additional eligible runs from other studies.")
+            self.orch("COHORT", Outcome.RETRY, RULES["cohort"], f"Re-planning: asking Discovery for studies other than {', '.join(studies) or 'those found'} "
+                      + ("to support the comparison." if one_place else f"to reach the planned minimum of {st.cohort_target}."), 2)
+            more = self.agents["discovery"].discover(where, st.question, already_known=[s.run for s in st.samples], focus=why,
+                                                     exclude_studies=studies, region=st.region, minimum=st.cohort_target)
             new = self._add_rows(more["rows"])
             if new:
                 self.agents["verification"].verify(new, st.country, st.region)
@@ -287,11 +295,19 @@ class Orchestrator:
     @logged("tbamr.orchestrator")
     def _cohort_checks(self, total: int) -> list[dict[str, Any]]:
         asks = bool(self.state.scope.get("asks_comparison_across_places"))
-        return self.agents["verification"].cohort_checks(self.state.samples, asks, total)
+        return self.agents["verification"].cohort_checks(self.state.samples, asks, total, minimum=self.state.cohort_target)
 
     @logged("tbamr.orchestrator")
     def _s3(self):
         res = self.agents["qc"].assess(self.state.samples)
+        st = self.state
+        passed = sum(s.qc == "Pass" for s in st.samples if s.in_cohort)
+        st.cohort_checks = [c for c in st.cohort_checks if c.get("kind") != "below_minimum_qc"]
+        if st.cohort_target and passed < st.cohort_target:
+            text = (f"{passed} isolate(s) passed QC, below the planned minimum of {st.cohort_target}: estimates will be less precise "
+                    "than planned. QC thresholds were not relaxed.")
+            st.cohort_checks.append({"outcome": "Escalate", "kind": "below_minimum_qc", "text": text})
+            self.orch("COHORT", Outcome.ESCALATE, RULES["cohort"], text, 3)
         self._set(3, "wait")
         return res
 
@@ -326,11 +342,51 @@ class Orchestrator:
 
     # ------------------------------------------------------------------ human gates
     @logged("tbamr.orchestrator")
+    def respond_warning(self, role: str, person: str, idx: int, decision: str, rationale: str = "") -> None:
+        """The PI's response to one Scope Guardian warning: accept the limit, or disagree with a rationale."""
+        with self.lock:
+            self.require(role, GATES["scope"])
+            if self._status(1) != "wait":
+                raise StageError("Warnings can only be answered while the scope is awaiting approval.")
+            warnings = self.state.scope.get("warnings") or []
+            if not 0 <= idx < len(warnings):
+                raise StageError("No such warning.")
+            if decision not in ("accept", "disagree"):
+                raise StageError("Choose Accept or Disagree.")
+            if decision == "disagree" and not rationale.strip():
+                raise StageError("Say why the warning does not apply.")
+            self.state.scope.setdefault("responses", {})[str(idx)] = {
+                "decision": decision, "rationale": rationale.strip(), "role": role, "person": person, "ts": time.time()}
+            verb = "accepted" if decision == "accept" else "disputed"
+            self.human(role, person, f"WARNING-{idx + 1}", Outcome.APPROVE if decision == "accept" else Outcome.OVERRIDE, RULES["scope"],
+                       f"Scope warning {idx + 1} {verb}: {warnings[idx][:200]}" + (f" | Rationale: {rationale.strip()}" if rationale.strip() else ""), 1)
+            self.save()
+
+    def adopt_revised_question(self, role: str, person: str) -> str:
+        """Replace the question with the Guardian's revised wording and reopen the scope for a new review round."""
+        with self.lock:
+            self.require(role, GATES["scope"])
+            if self._status(1) != "wait":
+                raise StageError("The revised wording can only be adopted while the scope is awaiting approval.")
+            revised = (self.state.scope or {}).get("revised_question") or ""
+            if not revised:
+                raise StageError("The Scope Guardian did not propose a revised question.")
+            old = self.state.question
+            self.human(role, person, "SCOPE", Outcome.OVERRIDE, RULES["scope"],
+                       f"Research question revised to the Scope Guardian's wording. Before: {old} | After: {revised}", 1)
+            self.state.question = revised
+            self.state.revision_rounds += 1
+        self.reopen_scope()
+        return revised
+
     def approve_scope(self, role: str, person: str) -> None:
         with self.lock:
             self.require(role, GATES["scope"])
             if self._status(1) != "wait":
                 raise StageError("The scope has not been reviewed yet.")
+            unanswered = [i + 1 for i in range(len(self.state.scope.get("warnings") or [])) if str(i) not in (self.state.scope.get("responses") or {})]
+            if unanswered:
+                raise StageError(f"Respond to every Scope Guardian warning first (still open: {', '.join(map(str, unanswered))}).")
             if self.state.scope.get("blocking"):
                 raise StageError("Fix the blocking gaps first.")
             ev = self.note_raw(role, person, "scope", "guardian", "the Scope Guardian's result")
@@ -710,7 +766,7 @@ class Orchestrator:
 
     def snapshot(self) -> dict[str, Any]:
         default_conc = max(1, (os.cpu_count() or 2) // 2)
-        return {"state": self.state.to_dict(), "pending_overrides": self.pending_overrides, "busy": self.busy,
+        return {"state": self.state.to_dict(), "pending_overrides": self.pending_overrides, "busy": self.busy, "thresholds": THRESHOLDS,
                 "mode": {"data": "demo" if self.demo else "live", "brain": self.client.mode, "tbprofiler": self.agents["profiling"].runner.available()},
                 "profiler_concurrency": int(os.environ.get("TBAMR_PROFILER_CONCURRENCY", str(default_conc))),
                 "profiler_threads": self.agents["profiling"].runner.threads,

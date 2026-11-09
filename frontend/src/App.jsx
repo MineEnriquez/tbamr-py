@@ -123,7 +123,7 @@ export default function App() {
         }} />
         <span className={'tag ' + snap.mode.brain}>{snap.mode.brain === 'claude' ? 'Claude agents (live reasoning)' : 'Replay agents (scripted, no API key)'}</span>
       </div>
-      <Flow snap={snap} team={team} view={tab === 'pipeline' ? view : null} pending={pending} onPick={n => { setView(n); setTab(n === 5 && pending ? 'review' : 'pipeline') }} />
+      <Flow snap={snap} team={team} view={tab === 'pipeline' ? view : null} pending={pending} onPick={n => { setView(n); setTab(n === 5 && pending ? 'review' : 'pipeline') }} onReport={() => setTab('report')} />
       <nav className="tabs" role="tablist">{tabs.map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}{k === 'review' && pending ? <span className="count">{pending}</span> : null}</button>)}</nav>
       <main>
         {tab === 'team' && <Team team={team} version={version} />}

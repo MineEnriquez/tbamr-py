@@ -38,6 +38,10 @@ RULES = {
     "rpt": "RPT-v1.2",
 }
 
+# Default cohort size (unique isolates): with 100 isolates a 95% confidence interval for a proportion is at most
+# about +/-10 percentage points (worst case at 50%); with 8 it is +/-30 or more.
+DEFAULT_COHORT_TARGET = 100
+
 THRESHOLDS = {"min_cov": 30.0, "border_cov": 25.0, "min_depth": 10, "min_freq": 0.9, "genome_bp": 4_411_532}
 
 
@@ -55,6 +59,9 @@ class Finding:
     cls: str = "tech"  # tech | uncertain | other
     review: str = "Not required"  # Not required | Pending | Reviewed | Not supported | Needs more data
     reason: str = ""
+    # why the rule classified it this way: "" (clean call) | lineage_marker | uncertain_grade | low_depth | minor_variant |
+    # dst_discordant | no_grading | agent_review. Shown on the Stage 5 panel; older saved findings default to "".
+    flag: str = ""
     interpretation: str = ""  # Evidence Analyst's draft note (AI draft, never a decision)
     reviewer: str | None = None
     rationale: str = ""
@@ -110,9 +117,10 @@ class PipelineState:
         "and which mutations are associated with resistance to rifampicin and isoniazid?"
     )
     country: str = ""  # target population: INSDC country or "Worldwide" (explicit only); resolved at Stage 1
-    region: str = ""  # optional subnational target inside `country` (free text, matched against ENA "Country: Region")
+    region: str = ""
+    revision_rounds: int = 0  # times the question was replaced by the Scope Guardian's wording (0 = the researcher's own)  # optional subnational target inside `country` (free text, matched against ENA "Country: Region")
     target_drugs: list[str] = field(default_factory=lambda: ["Rifampicin", "Isoniazid"])
-    cohort_target: int = 8
+    cohort_target: int = DEFAULT_COHORT_TARGET
     stage_status: dict[str, str] = field(
         default_factory=lambda: {"1": "ready", "2": "locked", "3": "locked", "4": "locked", "5": "locked", "6": "locked"}
     )

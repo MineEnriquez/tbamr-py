@@ -20,6 +20,7 @@ from .article import render_article_html
 from .core.decisions import DecisionLog, GuardrailViolation
 from .core.executions import capture_execution
 from .core.geo import country_catalogue, regions_for, resolve_target
+from .core.models import DEFAULT_COHORT_TARGET
 from .core.orchestrator import Orchestrator, PermissionDenied, StageError
 from .llm.client import make_client
 from .stores import cache as cache_module, mongo as mongo_module, results as results_module
@@ -58,6 +59,15 @@ class Who(BaseModel):
     person: str = ""
 
 
+class CacheToggle(BaseModel):
+    enabled: bool
+
+
+class WarningResponse(Who):
+    decision: str  # "accept" | "disagree"
+    rationale: str = ""
+
+
 class Resolve(Who):
     run: str
     decision: str
@@ -90,7 +100,7 @@ class Scope(BaseModel):
     country: str = ""  # INSDC country name or "Worldwide"; empty → must be named in the question, else Stage 1 blocks
     region: str = ""  # optional subnational target inside the country (free text, e.g. "West Java")
     target_drugs: list[str] = ["Rifampicin", "Isoniazid"]
-    cohort_target: int = 8
+    cohort_target: int = DEFAULT_COHORT_TARGET
 
 
 class RunProfiler(Who):
@@ -153,6 +163,8 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         st = O().state
         if st.stage_status["1"] != "ready":
             raise HTTPException(409, "The scope can only be edited before the Guardian runs. Use /api/scope/reopen to go back.")
+        if s.question.strip() != (st.question or "").strip():
+            st.revision_rounds = 0  # the researcher wrote their own question: it is no longer the Guardian's wording
         st.question, st.country, st.region, st.target_drugs, st.cohort_target = s.question, s.country, s.region, s.target_drugs, s.cohort_target
         O().save()
         return {"ok": True}
@@ -171,6 +183,17 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
     def scope_target(question: str = "", country: str = "", region: str = ""):
         """Resolve the target population the same way Stage 1 will, so the form can show it before running."""
         return resolve_target(question, country, region)
+
+    @app.post("/api/scope/warnings/{idx}")
+    def respond_warning(idx: int, b: WarningResponse):
+        with capture_execution(O().log, f"Respond to scope warning {idx + 1}"):
+            guard(O().respond_warning, b.role, b.person, idx, b.decision, b.rationale)
+        return {"ok": True}
+
+    @app.post("/api/scope/revised-question")
+    def adopt_revised_question(b: Who):
+        with capture_execution(O().log, "Adopt revised question"):
+            return {"question": guard(O().adopt_revised_question, b.role, b.person)}
 
     @app.post("/api/scope/reopen")
     def reopen_scope():
@@ -371,9 +394,6 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
     @app.get("/api/admin/cache")
     def cache_overview():
         return {"mongo": mongo_module.status(), "caches": cache_module.cache.stats()}
-
-    class CacheToggle(BaseModel):
-        enabled: bool
 
     @app.post("/api/admin/cache/{ns}/toggle")
     def cache_toggle(ns: str, t: CacheToggle):

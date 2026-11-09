@@ -19,10 +19,16 @@ function Arrow() {
   return <span className="farrow" aria-hidden="true"><i /><svg viewBox="0 0 10 10" width="10" height="10"><path d="M1 1l6 4-6 4" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
 }
 
-export default function Flow({ snap, team, view, onPick, pending }) {
+export default function Flow({ snap, team, view, onPick, pending, onReport }) {
   const st = snap.state
   const byName = Object.fromEntries(team.map(a => [a.name, a]))
-  const released = !!st.gates?.release
+  // The output card opens the Report tab once a report exists, and says what state it is in.
+  const rep = st.report
+  const rel = st.gates?.release
+  const finalOut = !!rep && rel?.kind === 'final' && String(rel.version) === String(rep.version) && !rep.superseded
+  const reportStatus = !rep ? '' : rep.superseded ? 'superseded: regenerate in Stage 6'
+    : finalOut ? 'final release'
+    : rel && String(rel.version) === String(rep.version) ? 'exploratory draft shared' : 'not yet released'
   const startCur = view === 0
   return (
     <section className="flow" aria-label="Workflow diagram">
@@ -49,7 +55,7 @@ export default function Flow({ snap, team, view, onPick, pending }) {
                   <div className="fbtip-title">Agents in this stage</div>
                   <div className="fbtip-agents">{s.agents.map(a => {
                     const m = byName[a]
-                    return <span key={a} className={'fbtip-ag ' + (m?.kind || 'rule')}>{m?.kind === 'llm' ? '✦' : '⚙'} {SHORT[a] || a}</span>
+                    return <span key={a} className={'fbtip-ag ' + (m?.kind || 'rule')}>{m?.kind === 'llm' ? '✦' : '⚙\uFE0F'} {SHORT[a] || a}</span>
                   })}</div>
                 </div>
               </button>
@@ -58,10 +64,16 @@ export default function Flow({ snap, team, view, onPick, pending }) {
           )
         })}
         <Arrow />
-        <div className={'fnode cap' + (released ? ' done' : '')}>
-          <span className="fcap">output</span>
-          <span className="fnode-body">Evidence report</span>
-        </div>
+        {rep ? <button className={'fnode cap clickable report-node' + (finalOut ? ' done' : '')} onClick={onReport}
+            aria-label={`Evidence report v${rep.version}: ${reportStatus}. Open the Report tab`}>
+            <span className="fcap">output</span>
+            <span className="fnode-body">Evidence report</span>
+            <span className={'fnode-meta report-status' + (rep.superseded ? ' superseded' : finalOut ? ' final' : '')}>v{rep.version} · {reportStatus}</span>
+          </button>
+          : <div className="fnode cap">
+            <span className="fcap">output</span>
+            <span className="fnode-body">Evidence report</span>
+          </div>}
       </div>
       <div className="flegend">
         <span className="sw"><i className="s-done" /><span>done</span></span>

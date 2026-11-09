@@ -84,19 +84,24 @@ export default function Report({ st, act, brain }) {
         </div></div>
       {r.superseded && <div className="box esc"><p><b>Superseded.</b> Something changed after this version; regenerate it in Stage 6.</p></div>}
       <div className="box note"><p>Computational predictions from public genomes: not laboratory-confirmed susceptibility, not a national prevalence estimate.</p></div>
+      {r.resistance_definition && <div className="box defs-report"><p><b>How resistance is called.</b> {r.resistance_definition}</p>
+        <p className="muted" style={{ margin: 0 }}>Catalogue: <span className="mono">{r.provenance.databases.join(', ') || 'not recorded'}</span> · {r.provenance.tools.join(', ') || 'tool not recorded'}</p></div>}
+      {r.catalogue_consistent === false && <div className="box esc" role="alert"><p><b>Mixed catalogue versions.</b> Runs in this report were called with different or unrecorded mutation-catalogue versions, so their calls are not comparable. Re-profile all runs with one version before release.</p></div>}
       <Summary r={r} act={act} />
       <History currentVersion={r.version} />
-      <div><h3>Sample counts</h3>{bar('Total candidates', c.candidates)}{bar('Verified eligible', c.verified)}{bar('Quality Control-passed', c.qc_passed)}{bar('Profiled & evaluated', c.analysed, true)}</div>
+      <div><h3>Sample counts</h3>{bar('Total candidates', c.candidates)}{bar('Verified eligible', c.verified)}{bar('Quality Control-passed', c.qc_passed)}{bar('Profiled & evaluated', c.analysed, true)}{c.planned_minimum ? <p className={c.analysed < c.planned_minimum ? 'below-min' : 'muted'} style={{ fontSize: '.84rem', margin: '4px 0 0' }}>Planned minimum cohort: {c.planned_minimum}{c.analysed < c.planned_minimum ? ` · ${c.analysed} analysed, below the minimum` : ' · reached'}</p> : null}</div>
       <div><h3>Resistance evidence by drug <span className="muted" style={{ fontWeight: 400 }}>(n = {c.analysed})</span></h3>
-        <div className="tw"><table><thead><tr><th>Drug</th><th className="num">Predicted resistant</th><th className="num">Uncertain / pending</th><th className="num">Reviewed</th><th className="num">Matched DST</th><th className="num">Concordance</th></tr></thead><tbody>
+        <div className="tw"><table><thead><tr><th>Drug</th><th className="num" title="Excludes calls pending review: those are counted under Uncertain / pending">Predicted resistant</th><th className="num">Uncertain / pending</th><th className="num">Reviewed</th><th className="num">Matched DST</th><th className="num">Concordance</th></tr></thead><tbody>
           {r.drugs.map(d => <tr key={d.drug}><td>{d.name}</td><td className="num">{d.predicted_resistant} / {d.n}</td><td className="num">{d.uncertain_or_pending}</td><td className="num">{d.reviewed}</td><td className="num">{d.dst_n} / {d.n}</td><td className="num">{d.dst_n ? `${d.concordant} / ${d.dst_n}` : 'n/a'}</td></tr>)}
         </tbody></table></div></div>
       {r.by_place?.length > 0 && <ByPlace r={r} />}
       <div className="grid2" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))' }}>
         <div className="box"><h3>Most frequent mutations</h3>{r.top_mutations.length ? <ul className="clean">{r.top_mutations.map(([k, v]) => <li key={k}><span className="mono">{k}</span> — {v}</li>)}</ul> : <p className="muted">None yet.</p>}</div>
-        <div className="box"><h3>Lineages</h3>{r.lineages.length ? <ul className="clean">{r.lineages.map(([k, v]) => <li key={k}><span className="mono">{k}</span> — {v}</li>)}</ul> : <p className="muted">None yet.</p>}</div>
+        <div className="box"><h3>Lineages <span className="muted" style={{ fontWeight: 400 }}>(tool-assigned, descriptive only)</span></h3>{r.lineages.length ? <ul className="clean">{r.lineages.map(([k, v]) => <li key={k}><span className="mono">{k}</span> — {v}</li>)}</ul> : <p className="muted">None yet.</p>}</div>
         <div className="box"><h3>Limitations</h3><ul className="clean">{r.limitations.map(l => <li key={l}>{l}</li>)}</ul></div>
       </div>
+      {r.scope_warnings?.length > 0 && <div><h3>Scope warnings and how they were handled</h3><ul className="clean">{r.scope_warnings.map((w, i) => <li key={i}>
+        {w.warning} <b className={w.decision === 'disagree' ? 'warn-disputed' : 'warn-accepted'}>{w.decision === 'accept' ? 'Accepted' : w.decision === 'disagree' ? 'Disputed' : 'Not answered'}</b>{w.person ? ` by ${w.person}` : ''}{w.rationale ? ` — ${w.rationale}` : ''}</li>)}</ul></div>}
       <div><h3>Unresolved findings</h3>{r.unresolved.length ? <ul className="clean">{r.unresolved.map(u => <li key={u.run + u.variant}><span className="mono">{u.run}</span> · {u.variant} ({u.drug}) — {u.reason}</li>)}</ul> : <p className="muted">None.</p>}</div>
       <div><h3>Exclusions and holds</h3><div className="tw"><table><thead><tr><th>Run</th><th>Status</th><th>Reason</th></tr></thead><tbody>
         {r.exclusions.map(x => <tr key={x.run}><td className="mono">{x.run}</td><td><Chip label={x.status || '—'} /></td><td style={{ fontSize: '.86rem' }}>{x.reason}</td></tr>)}
