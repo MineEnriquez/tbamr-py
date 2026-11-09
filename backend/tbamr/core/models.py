@@ -59,6 +59,9 @@ class Finding:
     cls: str = "tech"  # tech | uncertain | other
     review: str = "Not required"  # Not required | Pending | Reviewed | Not supported | Needs more data
     reason: str = ""
+    # why the rule classified it this way: "" (clean call) | lineage_marker | uncertain_grade | low_depth | minor_variant |
+    # dst_discordant | no_grading | agent_review. Shown on the Stage 5 panel; older saved findings default to "".
+    flag: str = ""
     interpretation: str = ""  # Evidence Analyst's draft note (AI draft, never a decision)
     reviewer: str | None = None
     rationale: str = ""

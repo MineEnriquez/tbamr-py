@@ -899,3 +899,18 @@ def test_discovery_is_told_the_minimum_and_never_to_drop_candidates():
         return [{"type": "tool_use", "name": "submit", "input": {"candidate_runs": [], "studies": [], "search_notes": "", "concerns": []}}]
     DiscoveryAssistant(DecisionLog(), ReplayClient({"discovery": policy}), DemoDataTools()).discover("Indonesia", "q?", minimum=100)
     assert "at least 100 isolates" in seen[0] and "Never drop candidates" in seen[0]
+
+
+def test_findings_carry_the_reason_flag_shown_on_stage_5(orch):
+    run_to_report(orch)
+    flag = lambda run, gene: next(f.flag for f in orch.state.sample(run).findings if f.gene == gene)
+    assert flag("DEMO-R14", "rpoB") == "low_depth" and flag("DEMO-R11", "katG") == "minor_variant"
+    assert flag("DEMO-R09", "rpoB") == "dst_discordant" and flag("DEMO-R12", "Rv0678") == "uncertain_grade"
+    assert flag("DEMO-R34", "rpoB") == "agent_review" and flag("DEMO-R13", "katG") == "lineage_marker"
+    assert flag("DEMO-R32", "rpoB") == "no_grading" and flag("DEMO-R01", "rpoB") == ""
+
+
+def test_state_exposes_the_rule_thresholds_quoted_by_the_stage_notes(tmp_path):
+    from tbamr.core.models import THRESHOLDS
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "t.db"))))
+    assert c.get("/api/state").json()["thresholds"] == THRESHOLDS

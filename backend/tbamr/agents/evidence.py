@@ -27,17 +27,17 @@ def classify(s: Sample, m: dict[str, Any]) -> Finding:
                 depth=m.get("depth"), freq=m.get("freq", 1.0), confidence=m.get("confidence", ""))
     dst = s.dst.get(m["drug"])
     if f.grade == 5:
-        f.cls, f.reason = "other", "Catalogued as not associated with resistance (lineage marker); not counted."
+        f.cls, f.flag, f.reason = "other", "lineage_marker", "Catalogued as not associated with resistance (lineage marker); not counted."
     elif f.grade == 3:
-        f.cls, f.review, f.reason = "uncertain", "Pending", "WHO group 3 — uncertain significance; cannot be promoted automatically."
+        f.cls, f.review, f.flag, f.reason = "uncertain", "Pending", "uncertain_grade", "WHO group 3 — uncertain significance; cannot be promoted automatically."
     elif f.depth is not None and f.depth < THRESHOLDS["min_depth"]:
-        f.review, f.reason = "Pending", f"Only {f.depth:g} reads at the resistance position (min {THRESHOLDS['min_depth']})."
+        f.review, f.flag, f.reason = "Pending", "low_depth", f"Only {f.depth:g} reads at the resistance position (min {THRESHOLDS['min_depth']})."
     elif f.freq < THRESHOLDS["min_freq"]:
-        f.review, f.reason = "Pending", f"Variant in {round(f.freq * 100)}% of reads — possible mixed infection or heteroresistance."
+        f.review, f.flag, f.reason = "Pending", "minor_variant", f"Variant in {round(f.freq * 100)}% of reads — possible mixed infection or heteroresistance."
     elif dst == "S":
-        f.review, f.reason = "Pending", "Genotype predicts resistance but matched DST is susceptible (discordance)."
+        f.review, f.flag, f.reason = "Pending", "dst_discordant", "Genotype predicts resistance but matched DST is susceptible (discordance)."
     elif f.grade == 0:
-        f.reason = "Tool classifies this variant as resistance-associated; catalogue grading not in the result file."
+        f.flag, f.reason = "no_grading", "Tool classifies this variant as resistance-associated; catalogue grading not in the result file."
     else:
         f.reason = "QC passing; established catalogue grading."
     return f
@@ -89,7 +89,7 @@ class EvidenceAnalyst(LLMAgent):
                 if n:
                     f.interpretation = n.get("interpretation", "")
                     if n.get("request_review") and f.review == "Not required" and f.cls != "other":  # more cautious only
-                        f.review, f.reason = "Pending", f"{f.reason} Agent requested review: {n.get('why', '')}".strip()
+                        f.review, f.flag, f.reason = "Pending", "agent_review", f"{f.reason} Agent requested review: {n.get('why', '')}".strip()
                 self.decide(s.run, Outcome.ESCALATE if f.review == "Pending" else Outcome.PROCEED, RULES["evid"],
                             f"{f.gene} {f.change} ({f.drug}): {f.reason}", f"{GRADE.get(f.grade, f.confidence)}; depth {f.depth}; read fraction {f.freq}", stage=5)
         pending = sum(f.review == "Pending" for s in samples for f in s.findings)

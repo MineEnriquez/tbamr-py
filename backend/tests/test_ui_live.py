@@ -54,18 +54,18 @@ def test_toggle_to_live_then_discovery_returns_real_ENA_accessions(page, live_se
     page.locator('textarea[aria-label="Research question"]').fill(
         "What patterns of drug resistance can we identify in Mycobacterium tuberculosis genomes?"
     )
-    page.locator('#start-country, #scope-country').first.fill("Peru")
+    page.locator('#start-country, #scope-country').first.select_option("Peru")
     page.get_by_role("button", name="Save scope").click()
     assert _wait(lambda: _state(live_server)["country"] == "Peru"), "scope never saved"
 
-    page.get_by_role("button", name="Run agents").click()
+    page.get_by_role("button", name="Run Scope Guardian").click()
     assert _wait(lambda: _state(live_server)["stage_status"]["1"] in ("wait", "done")), "stage 1 never finished"
 
     page.get_by_role("button", name="Approve scope", exact=True).click()
     assert _wait(lambda: _state(live_server)["gates"].get("scope")), "scope gate never approved"
 
     page.locator('button[aria-label*="Stage 2"]').first.click()
-    page.get_by_role("button", name="Run agents").click()
+    page.get_by_role("button", name="Run Discovery & Verification").click()
     assert _wait(lambda: _state(live_server)["stage_status"]["2"] in ("wait", "done") and _state(live_server)["samples"], timeout=180), \
         "stage 2 discovery never finished or returned no samples"
 

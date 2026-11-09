@@ -246,10 +246,26 @@ function Feed({ decisions }) {
   )
 }
 
+/* What a locked stage is waiting for: [text before the role, role, text after]. Stage 6 has no human gate before it:
+ * Stage 5 completes as soon as it runs, so the report stage opens then. */
+const UNLOCK = {
+  2: ['after the', 'pi', 'approves the scope in Stage 1.'],
+  3: ['after the', 'pi', 'approves the cohort in Stage 2.'],
+  4: ['after the', 'analyst', 'confirms Quality Control in Stage 3.'],
+  5: ['after the', 'analyst', 'closes the profiling batch in Stage 4.'],
+  6: ['as soon as Stage 5 has run (no gate in between; findings pending review are handled by the', 'tbexpert', 'in the Review queue).'],
+}
+
+/* The run button names the agent(s) it starts: only Stage 2 runs two agents, every other stage runs one. */
+const RUN_LABEL = { 1: 'Run Scope Guardian', 2: 'Run Discovery & Verification', 3: 'Run QC Analyst', 4: 'Run Profiling Tasker',
+  5: 'Run Evidence Analyst', 6: 'Run Reporting Orchestrator' }
+
 function Stage({ n, snap, act, who, busy, openSample }) {
   const st = snap.state, meta = snap.stages[n - 1], status = st.stage_status[String(n)]
   const agents = meta.agents
-  // Stage 1 "Run agents" is only enabled when the current scope form is saved AND has no
+  const th = snap.thresholds || {}
+  const runLabel = RUN_LABEL[n] || 'Run'
+  // Stage 1 "Run Scope Guardian" is only enabled when the current scope form is saved AND has no
   // country/question conflict (the Guardian would otherwise silently use the field and ignore the question).
   const [scopeDirty, setScopeDirty] = useState(false)
   const [scopeBlocked, setScopeBlocked] = useState(false)
@@ -258,57 +274,88 @@ function Stage({ n, snap, act, who, busy, openSample }) {
     ? (scopeBlocked ? 'Set a clear target population (and resolve any country/question conflict) first' : (scopeDirty ? 'Save the scope first' : ''))
     : (busy ? 'A stage is running' : '')
   const runBtn = <button className="btn primary" disabled={status !== 'ready' || !!busy || disabled} title={disabledReason || undefined}
-                   onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'ready' ? 'Run agents' : 'Ran'}</button>
+                   onClick={() => act(() => api.run(n), `Stage ${n} finished`)}>{status === 'done' || status === 'wait' ? 'Ran' : runLabel}</button>
   return (
     <section className="panel">
       <div className="row between"><div><span className="eyebrow">Stage {n} · owner: {ROLE_LABEL[meta.owner]}</span><h2>{meta.name}</h2></div>{runBtn}</div>
       <div className="tools">{agents.map(a => <span className="tool" key={a}>{a.replace(/_/g, ' ')}</span>)}</div>
       {busy && <div className="working" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span>Working on <b>{busy}</b>… agents are reasoning and calling tools; watch the Agent team tab for live traces.</span></div>}
-      {status === 'locked' && <div className="box note"><p className="muted">This stage unlocks when the previous stage's human gate is passed.</p></div>}
+      {status === 'locked' && <div className="box note locked-note" role="note"><p>{UNLOCK[n] ? <>This stage opens {UNLOCK[n][0]} <RoleBadge role={UNLOCK[n][1]} /> {UNLOCK[n][2]}</> : "This stage opens when the previous stage is complete."} Here is what will happen when it runs:</p></div>}
       {n === 1 && <S1 key={[status, st.question, st.country, st.region || '', st.cohort_target].join('|')} st={st} status={status} act={act} who={who} onDirtyChange={setScopeDirty} onBlockedChange={setScopeBlocked} />}
-      {n === 2 && status === 'ready' && (
+      {n === 2 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>Run agents</b> will hand the pipeline to <b>two</b> Claude-powered agents in sequence:</p>
-          <ul className="clean" style={{ fontSize: '.9rem' }}>
-            <li><b>Discovery Assistant</b> — queries the <span className="mono">ENA Portal API</span> for <i>M. tuberculosis</i> read runs matching your scope (country + any extra constraints), aiming for at least the minimum cohort and searching further studies when it falls short (it never drops eligible runs to fit the number). For each candidate it may also call <span className="mono">ena_study</span> and <span className="mono">find_publications</span> (Europe PMC) to attach provenance.</li>
-            <li><b>Verification Tasker</b> — rule checks + Claude agent — treats a run as <b>Verified</b> only when the ENA/BioSample country field confirms the scope. Missing or conflicting origin → <b>Hold</b> for your review; the Guardian's policy on inferred origin is enforced here. If too few runs clear verification, the Orchestrator can re-plan once and ask Discovery to broaden the search.</li>
-          </ul>
-          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see candidate counts (Verified / On hold / Excluded), per-run archive records, and any cohort-level checks before the <RoleBadge role="pi" /> gate opens.</p>
+          <p><b>{runLabel}</b> starts <b>two agents, one after the other</b>:</p>
+          <div className="agent-steps">
+            <div className="agent-step">
+              <div className="agent-head"><span className="agent-num">1</span><b>Discovery Assistant</b><span className="agent-kind llm">✦ Claude</span></div>
+              <ul className="clean">
+                <li>Searches the <span className="mono">ENA Portal API</span> for <i>M. tuberculosis</i> read runs from your target ({st.country || 'the target country'}{st.region ? `, ${st.region}` : ''}).</li>
+                <li>Aims for at least the minimum cohort ({st.cohort_target}) and searches further studies when short; it never drops eligible runs to fit the number.</li>
+                <li>Looks up the studies (<span className="mono">ena_study</span>) and related publications (<span className="mono">find_publications</span>, Europe PMC) for provenance.</li>
+              </ul>
+              <p className="agent-out">Hands on: every candidate run its searches returned.</p>
+            </div>
+            <div className="agent-arrow" aria-hidden="true">→</div>
+            <div className="agent-step">
+              <div className="agent-head"><span className="agent-num">2</span><b>Verification Tasker</b><span className="agent-kind rule">⚙️ rules</span><span className="agent-kind llm">✦ Claude for unclear cases</span></div>
+              <ul className="clean">
+                <li><b>Rules</b> check each run: WGS library, ENA country names the target{st.region ? ` and the location names ${st.region}` : ''}, Illumina platform, and one run per BioSample. Clear passes are <b>Verified</b>; another country or a non-WGS library is <b>Excluded</b>.</li>
+                <li><b>Claude</b> investigates the unclear ones (missing country or region, repeated BioSample, other platforms) with study and publication look-ups. They go on <b>Hold</b> for you; a confirmed repeat of an isolate is Excluded. A publication alone never verifies a run.</li>
+              </ul>
+              <p className="agent-out">Hands on: the verified cohort and the runs on Hold.</p>
+            </div>
+          </div>
+          <p className="muted" style={{ fontSize: '.86rem', margin: '0 0 4px' }}><b>Then cohort checks</b> run on the verified runs: fewer than the planned minimum ({st.cohort_target}) is <b>flagged</b>; all runs from one location is flagged only if the question compares places (otherwise a note); all from one study, and ENA listing more matching runs than were retrieved, are notes.</p>
+          <p className="muted" style={{ fontSize: '.86rem', margin: '0 0 4px' }}><b>Re-plan, at most once:</b> if the cohort is below the minimum, or the question compares places but every verified run comes from one location, the orchestrator asks Discovery for runs from studies not already in the cohort and verifies any new ones.</p>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>With the results you'll see the counts (Verified / On hold / Excluded), the runs on hold with the agent's evidence, the cohort checks, and the <RoleBadge role="pi" /> gate to approve the cohort. Only verified runs enter the cohort; runs on hold are left out unless you resolve them.</p>
         </div>
       )}
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
-      {n === 3 && status === 'ready' && (
+      {n === 3 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>Run agents</b> will hand this stage to <b>one</b> rules-only agent (no Claude):</p>
+          <p><b>{runLabel}</b> starts <b>one</b> rules-only agent (no Claude):</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
-            <li><b>QC Analyst</b> — for every verified run it estimates coverage from <span className="mono">base_count ÷ genome_size</span> and checks that an <span className="mono">MD5</span> is listed in the archive record. Runs below the coverage threshold or missing a checksum are <b>Escalated</b>; the rest pass.</li>
+            <li><b>QC Analyst</b> — for every run in the approved cohort it estimates coverage as <span className="mono">base_count ÷ {(th.genome_bp || 4411532).toLocaleString()} bp</span>. At least <b>{th.min_cov}×</b>: <b>Pass</b>. Between {th.border_cov}× and {th.min_cov}×, or no base count in the archive: <b>Escalate</b> for a person. Below {th.border_cov}×: <b>Exclude</b>. Whether an <span className="mono">MD5</span> checksum is listed is recorded, but it is never a reason to escalate.</li>
+            <li>If fewer runs pass than the planned minimum cohort ({st.cohort_target}), a shortfall check is added for the gate.</li>
           </ul>
-          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see a per-run table (coverage, MD5, QC chip). Resolve each escalation with a short rationale, then <RoleBadge role="analyst" /> confirms the batch.</p>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see a per-run table (coverage, checksum, QC status). Each escalation needs a short rationale, then <RoleBadge role="analyst" /> confirms QC.</p>
         </div>
       )}
       {n === 3 && ['wait', 'done'].includes(status) && <S3 st={st} status={status} act={act} who={who} openSample={openSample} />}
-      {n === 4 && status === 'ready' && (
+      {n === 4 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>Run agents</b> will hand this stage to <b>one</b> tool-runner agent (no Claude):</p>
+          <p><b>{runLabel}</b> starts <b>one</b> tool-runner agent (no Claude), which <b>queues</b> every QC-passed run as <i>Awaiting results</i>. It does not start TB-Profiler by itself{snap.mode.data === 'demo' ? ' (in demo mode, simulated results are filled in immediately, including one failure and one run left without a result)' : ''}.</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
-            <li><b>Profiling Tasker</b> — runs <b>TB-Profiler</b> on every QC-passed run, either as a subprocess (Docker image <span className="mono">staphb/tbprofiler</span>, or a local <span className="mono">tb-profiler</span> binary) or by parsing JSON results you drop into the import area. It only produces results; it never interprets resistance — that is the Evidence Analyst's job in Stage 5.</li>
+            <li><b>Produce results</b> in either of two ways. Select runs and click <i>Run TB-Profiler</i>: each run is downloaded with <span className="mono">fasterq-dump</span> and profiled with TB-Profiler (Docker image <span className="mono">staphb/tbprofiler</span>, or a local <span className="mono">tb-profiler</span>), about 15–30 min per run, several in parallel; successful results are cached. Or <i>import</i> <span className="mono">.results.json</span> files: only runs in this cohort that passed QC are accepted.</li>
+            <li><b>Profiling Tasker</b> records each result with its tool and mutation-catalogue version, and records failures with the reason; failed runs can be selected and run again. It never interprets resistance: that is Stage 5.</li>
           </ul>
-          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see per-run status (Awaiting / Done / Failed) and the import drop zone. <RoleBadge role="analyst" /> closes the batch when every run has a result or is explicitly skipped.</p>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see what each run reported (lineage, resistance calls, depth) and which catalogue was used. <RoleBadge role="analyst" /> can close the batch once at least one result exists; results imported later are evaluated automatically.</p>
+        </div>
+      )}
+      {n === 5 && (status === 'ready' || status === 'locked') && (
+        <div className="box note">
+          <p><b>{runLabel}</b> starts <b>one</b> agent, the <b>Evidence Analyst</b> (rules plus Claude), for every run with a TB-Profiler result:</p>
+          <ul className="clean" style={{ fontSize: '.9rem' }}>
+            <li><b>Rules classify each resistance call.</b> WHO catalogue Group 1 or 2, at least <b>{th.min_depth}</b> supporting reads, in at least <b>{Math.round((th.min_freq ?? 0.9) * 100)}%</b> of reads, and no conflicting phenotypic DST: <b>counted as resistant</b>. Group 3 (uncertain), fewer reads, a minor variant, or DST that disagrees: <b>pending review</b>, counted as uncertain. Group 5 lineage markers: <b>not counted</b>.</li>
+            <li><b>Claude</b> writes a short note on each finding for the reviewer and can send a finding to review. It can never clear a finding from review or confirm resistance.</li>
+          </ul>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>The stage completes without a gate. Findings pending review go to the <b>Review queue</b>, where <RoleBadge role="tbexpert" /> marks each one Supports resistance, Not supported or Needs more data. Final release is blocked while any finding is pending.</p>
         </div>
       )}
       {n === 4 && ['wait', 'done'].includes(status) && <S4 snap={snap} status={status} act={act} who={who} openSample={openSample} />}
-      {n === 5 && status === 'done' && <S5 st={st} act={act} />}
-      {n === 6 && status === 'ready' && (
+      {n === 5 && status === 'done' && <S5 st={st} act={act} openSample={openSample} />}
+      {n === 6 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>Run agents</b> will hand the pipeline to the Reporting Orchestrator, which assembles the evidence report from everything approved in Stages 1 – 5. You'll then see, on the <b>Report</b> tab:</p>
+          <p><b>{runLabel}</b> starts <b>one</b> agent, the <b>Reporting Orchestrator</b> (rules; Claude only drafts the optional summary). It builds the evidence report from everything approved in Stages 1–5, and you'll find it on the <b>Report</b> tab:</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
-            <li>Sample counts: candidates → verified → QC-passed → profiled.</li>
-            <li>Per-drug resistance: predicted resistant, uncertain / pending, reviewed, and concordance with any matched DST.</li>
-            <li>The most frequent mutations and lineages observed in the cohort.</li>
-            <li>Unresolved findings, exclusions / holds, and the policy limitations the Scope Guardian wrote.</li>
-            <li>A plain-language summary (optional — Claude drafts it, you can edit).</li>
+            <li><b>How resistance is called</b>: the definition used and the mutation-catalogue version, with a warning if runs were called with different versions.</li>
+            <li><b>Sample counts</b>: candidates → verified → QC-passed → analysed, against the planned minimum cohort ({st.cohort_target}).</li>
+            <li><b>Per drug</b>: runs predicted resistant (only calls not awaiting review), uncertain or pending, reviewed, and agreement with phenotypic DST over the runs that have it; plus counts by region.</li>
+            <li>The most frequent mutations and the lineages (tool-assigned, descriptive only), unresolved findings, exclusions and holds.</li>
+            <li>The Scope Guardian's warnings and how each was answered, and the limitations that apply.</li>
+            <li>An optional plain-language summary that Claude drafts and you can edit.</li>
           </ul>
-          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>Every number is derived by rule from the decision log, so the report is reproducible. Release stays with <RoleBadge role="pi" />.</p>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>Every number is computed by rule from the pipeline's data, so the report is reproducible. <RoleBadge role="pi" /> can share the current (not superseded) report as an exploratory draft; final release is blocked while any finding is pending review.</p>
         </div>
       )}
       {n === 6 && ['wait', 'done'].includes(status) && <S6 st={st} act={act} who={who} />}
@@ -404,7 +451,7 @@ function S1({ st, status, act, who, onDirtyChange, onBlockedChange }) {
       {!conflict && <TargetNote t={tgt} />}
       <div className="row"><button className="btn small primary" disabled={!dirty || !!conflict} onClick={() => act(() => api.setScope({ question: q, country, region, target_drugs: st.target_drugs, cohort_target: target }), 'Scope saved')}>{dirty ? 'Save scope' : '✓ Scope saved'}</button>
         <span className="muted" style={{ fontSize: '.82rem' }}>
-          {conflict ? 'Resolve the conflict above before saving.' : unclear ? 'Set a clear target population before running.' : (dirty ? 'Unsaved changes — Save scope before Run agents.' : 'Scope saved. Click Run agents to kick off the Scope Guardian.')}
+          {conflict ? 'Resolve the conflict above before saving.' : unclear ? 'Set a clear target population before running.' : (dirty ? 'Unsaved changes — Save scope before running the Scope Guardian.' : 'Scope saved. Click Run Scope Guardian to start the review.')}
         </span></div></div>)
   return (
     <>
@@ -518,6 +565,9 @@ function S3({ st, status, act, who, openSample }) {
 
 function S4({ snap, status, act, who, openSample }) {
   const st = snap.state, q = st.samples.filter(s => s.qc === 'Pass'), done = q.filter(s => s.profiling === 'Done')
+  const failed = q.filter(s => s.profiling === 'Failed')
+  const byRun = Object.fromEntries(q.map(s => [s.run, s]))
+  const catalogues = Object.entries(done.reduce((m, s) => { const k = `${s.profile_meta?.db || 'not recorded'} · ${s.profile_meta?.tool || 'tool not recorded'}`; m[k] = (m[k] || 0) + 1; return m }, {}))
   const [over, setOver] = useState(false)
   const input = useRef(null)
   const upload = files => act(() => api.importFiles(who, files).then(r => { if (r.skipped.length) throw new Error(`Imported ${r.imported.length}; skipped: ${r.skipped.join('; ')}`) }), 'Results imported')
@@ -532,7 +582,8 @@ function S4({ snap, status, act, who, openSample }) {
     <>
       <div className="metrics"><div className="metric"><span className="v">{q.length}</span><span className="l">Quality Control-passed runs</span></div>
         <div className="metric"><span className="v" style={{ color: 'var(--ok)' }}>{done.length}</span><span className="l">TB-Profiler results</span></div>
-        <div className="metric"><span className="v" style={{ color: 'var(--hold)' }}>{q.length - done.length}</span><span className="l">Awaiting results</span></div></div>
+        <div className="metric"><span className="v" style={{ color: 'var(--hold)' }}>{q.length - done.length - failed.length}</span><span className="l">Awaiting results</span></div>
+        <div className="metric"><span className="v" style={{ color: 'var(--esc)' }}>{failed.length}</span><span className="l">Failed</span></div></div>
       <div className="box"><h3>Run TB-Profiler</h3>
         {canRun ? <>
           <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
@@ -550,6 +601,8 @@ function S4({ snap, status, act, who, openSample }) {
                 <tr key={r} className="click" onClick={() => toggle(r)}>
                   <td style={{ width: 32 }}><input type="checkbox" checked={selected.has(r)} onChange={() => toggle(r)} onClick={e => e.stopPropagation()} aria-label={`Select ${r}`} /></td>
                   <td className="mono">{r}</td>
+                  <td>{byRun[r]?.profiling === 'Failed' ? <span className="prof-failed">Failed</span> : <span className="muted">Awaiting results</span>}</td>
+                  <td className="muted" style={{ fontSize: '.8rem' }}>{byRun[r]?.profiling === 'Failed' ? byRun[r].profiling_note : ''}</td>
                 </tr>
               ))}
             </tbody></table>
@@ -563,8 +616,16 @@ function S4({ snap, status, act, who, openSample }) {
         onDragOver={e => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)} onDrop={e => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}>
         <p><b>Drop TB-Profiler result files here</b> (.results.json) or click to choose</p></div>
       <input ref={input} type="file" accept=".json" multiple hidden onChange={e => { upload(e.target.files); e.target.value = '' }} />
-      {done.length > 0 && <div className="tw"><table><thead><tr><th>Run</th><th>Lineage</th><th>Source</th><th></th></tr></thead><tbody>
-        {done.map(s => <tr className="click" key={s.run} onClick={() => openSample(s.run)}><td className="mono">{s.run}</td><td className="mono">{s.lineage || '—'}</td><td className="muted" style={{ fontSize: '.82rem' }}>{s.profiling_note}</td><td><RawLink kind="tbprofiler" k={s.run} label="Raw JSON" /></td></tr>)}</tbody></table></div>}
+      {done.length > 0 && <p className="muted cat-line">Called with {catalogues.map(([k, n]) => <span key={k} className="mono"> {k} ({n} run{n > 1 ? 's' : ''})</span>).reduce((a, b) => [a, ' ·', b])}</p>}
+      {catalogues.length > 1 && <div className="box esc" role="alert"><p><b>Mixed catalogue versions.</b> These results were called with different (or unrecorded) mutation-catalogue versions, so their calls aren't comparable. Re-profile all runs with one version before the report.</p></div>}
+      {done.length > 0 && <div className="tw"><table><thead><tr><th>Run</th><th>Lineage</th><th>Resistance calls reported by TB-Profiler</th><th className="num">Median depth</th><th></th></tr></thead><tbody>
+        {done.map(s => { const muts = s.profile_meta?.mutations || []
+          return <tr className="click" key={s.run} onClick={() => openSample(s.run)} title={s.profiling_note}>
+            <td className="mono">{s.run}</td><td className="mono">{s.lineage || '—'}</td>
+            <td>{muts.length ? <span className="calls">{muts.map((m, k) => <span key={k} className={'call' + (m.grade === 5 ? ' marker' : m.grade === 3 ? ' uncertain' : '')} title={`${DRUG[m.drug] || m.drug} · ${m.confidence || 'grading not in file'} · depth ${m.depth ?? 'n/a'} · ${Math.round((m.freq ?? 1) * 100)}% of reads`}><b>{m.drug}</b> {m.gene} {m.change}</span>)}</span> : <span className="muted">none reported</span>}</td>
+            <td className="num">{s.profile_meta?.median_depth ?? '—'}</td>
+            <td><RawLink kind="tbprofiler" k={s.run} label="Raw JSON" /></td></tr> })}
+      </tbody></table><p className="muted" style={{ fontSize: '.8rem', margin: '6px 10px' }}>Calls as reported by the tool, before evaluation: grey = lineage marker (not counted), amber = uncertain grading. Stage 5 decides what counts.</p></div>}
       {status === 'wait' && <div className="box gate"><h3>Gate · Close profiling batch</h3>
         <p className="role-reqd">Only <RoleBadge role="analyst" /> can close the batch.</p>
         <p>Results imported later are evaluated automatically.</p>
@@ -574,11 +635,59 @@ function S4({ snap, status, act, who, openSample }) {
   )
 }
 
-function S5({ st, act }) {
-  const f = st.samples.flatMap(s => s.findings)
-  return <><div className="metrics"><div className="metric"><span className="v">{f.filter(x => x.cls !== 'other').length}</span><span className="l">Resistance findings</span></div>
-    <div className="metric"><span className="v" style={{ color: 'var(--pend)' }}>{f.filter(x => x.review === 'Pending').length}</span><span className="l">Pending review</span></div>
-    <div className="metric"><span className="v" style={{ color: 'var(--ok)' }}>{f.filter(x => x.review === 'Reviewed').length}</span><span className="l">Reviewed</span></div></div>
+const DRUG = { RIF: 'Rifampicin', INH: 'Isoniazid', EMB: 'Ethambutol', PZA: 'Pyrazinamide', FLQ: 'Fluoroquinolones', BDQ: 'Bedaquiline',
+  LZD: 'Linezolid', DLM: 'Delamanid', CFZ: 'Clofazimine', AMK: 'Amikacin', STM: 'Streptomycin', ETO: 'Ethionamide', KAN: 'Kanamycin', CAP: 'Capreomycin' }
+const FLAG = {
+  low_depth: ['Too few reads', 'Fewer than 10 reads support the call at the resistance position.'],
+  minor_variant: ['Minor variant', 'Present in under 90% of reads: possible mixed infection or heteroresistance.'],
+  dst_discordant: ['DST disagrees', 'The genotype predicts resistance but the matched phenotypic DST is susceptible.'],
+  uncertain_grade: ['Uncertain WHO grade', 'Graded Group 3 (uncertain significance) in the catalogue.'],
+  agent_review: ['Flagged by the agent', 'The Evidence Analyst asked for a human look (e.g. interim grading).'],
+}
+// Same rule as the report's counts_as_resistant(): a technical call that is not awaiting review.
+const counted = f => f.cls === 'tech' && ['Not required', 'Reviewed'].includes(f.review)
+const statusOf = f => f.cls === 'other' ? ['Not counted', 'marker'] : f.review === 'Not supported' ? ['Not supported', 'marker']
+  : f.review === 'Pending' || f.review === 'Needs more data' ? ['Pending review', 'pending'] : counted(f) ? [f.review === 'Reviewed' ? 'Reviewed · counted' : 'Counted', 'counted'] : ['Uncertain', 'pending']
+
+function S5({ st, act, openSample }) {
+  const f = st.samples.flatMap(s => s.findings || [])
+  const [show, setShow] = useState('pending')
+  const drugs = [...new Set(f.map(x => x.drug))].sort((a, b) => (['RIF', 'INH'].indexOf(a) + 1 || 9) - (['RIF', 'INH'].indexOf(b) + 1 || 9) || a.localeCompare(b))
+  const runs = (pred) => new Set(f.filter(pred).map(x => x.sample_id)).size
+  const pending = f.filter(x => x.review === 'Pending' || x.review === 'Needs more data')
+  const reasons = Object.entries(pending.reduce((m, x) => { const k = x.flag || 'other'; m[k] = (m[k] || 0) + 1; return m }, {})).sort((a, b) => b[1] - a[1])
+  const filters = { all: () => true, pending: x => statusOf(x)[1] === 'pending', counted: counted, notcounted: x => statusOf(x)[1] === 'marker' }
+  const rows = f.filter(filters[show]).sort((a, b) => a.sample_id.localeCompare(b.sample_id) || a.drug.localeCompare(b.drug))
+  const analysed = st.samples.filter(s => s.profiling === 'Done' && s.profile_meta?.evaluated).length
+  return <>
+    <div className="metrics">
+      <div className="metric"><span className="v" style={{ color: 'var(--ok)' }}>{f.filter(counted).length}</span><span className="l">Calls counted as resistant</span></div>
+      <div className="metric"><span className="v" style={{ color: 'var(--pend)' }}>{pending.length}</span><span className="l">Pending review</span></div>
+      <div className="metric"><span className="v">{f.filter(x => x.review === 'Reviewed').length}</span><span className="l">Reviewed</span></div>
+      <div className="metric"><span className="v muted">{f.filter(x => x.cls === 'other').length}</span><span className="l">Lineage markers (not counted)</span></div></div>
+    {drugs.length > 0 && <div className="tw"><table><thead><tr><th>Drug</th><th className="num">Runs predicted resistant</th><th className="num">Runs uncertain / pending</th><th className="num">Runs reviewed</th><th className="num">Not supported</th></tr></thead><tbody>
+      {drugs.map(d => <tr key={d}><td>{DRUG[d] || d}</td>
+        <td className="num">{runs(x => x.drug === d && counted(x))} / {analysed}</td>
+        <td className="num">{runs(x => x.drug === d && (x.cls === 'uncertain' || x.review === 'Pending' || x.review === 'Needs more data'))}</td>
+        <td className="num">{runs(x => x.drug === d && x.review === 'Reviewed')}</td>
+        <td className="num">{runs(x => x.drug === d && x.review === 'Not supported')}</td></tr>)}
+    </tbody></table></div>}
+    {reasons.length > 0 && <div className="box hold"><h3>Why {pending.length} finding{pending.length > 1 ? 's are' : ' is'} waiting for the TB Microbiologist</h3>
+      <ul className="clean reason-list">{reasons.map(([k, n]) => <li key={k}><b>{(FLAG[k] || ['Other'])[0]}</b> · {n} — <span className="muted">{(FLAG[k] || ['', 'See the finding for details.'])[1]}</span></li>)}</ul>
+      <p className="muted" style={{ margin: 0, fontSize: '.84rem' }}>Pending findings count as uncertain, not resistant, until reviewed in the Review queue tab.</p></div>}
+    {f.length > 0 && <div>
+      <div className="seg" role="radiogroup" aria-label="Show findings" style={{ marginBottom: 8 }}>{[['pending', `Pending (${f.filter(filters.pending).length})`], ['counted', `Counted (${f.filter(counted).length})`], ['notcounted', `Not counted (${f.filter(filters.notcounted).length})`], ['all', `All (${f.length})`]].map(([k, l]) =>
+        <button key={k} role="radio" aria-checked={show === k} aria-selected={show === k} onClick={() => setShow(k)}>{l}</button>)}</div>
+      <div className="tw"><table><thead><tr><th>Run</th><th>Drug</th><th>Variant</th><th>WHO group</th><th className="num">Depth</th><th className="num">Reads</th><th>Status</th><th>Why / agent's note</th></tr></thead><tbody>
+        {rows.map(x => { const [label, kind] = statusOf(x)
+          return <tr key={x.fid} className="click" onClick={() => openSample(x.sample_id)}>
+            <td className="mono">{x.sample_id}</td><td>{x.drug}</td><td className="mono">{x.gene} {x.change}</td>
+            <td>{x.grade ? x.grade : <span className="muted">not in file</span>}</td>
+            <td className="num">{x.depth ?? '—'}</td><td className="num">{Math.round((x.freq ?? 1) * 100)}%</td>
+            <td><span className={'fstatus ' + kind}>{label}</span></td>
+            <td className="why" title={x.interpretation ? `Agent's note: ${x.interpretation}` : x.reason}>{x.reason}{x.interpretation && <span className="muted"> · Agent's note: {x.interpretation.length > 110 ? x.interpretation.slice(0, 110).trimEnd() + '…' : x.interpretation}</span>}</td></tr> })}
+        {!rows.length && <tr><td colSpan={8} className="muted">Nothing in this view.</td></tr>}
+      </tbody></table></div></div>}
     <div className="row"><button className="btn small" onClick={() => act(() => api.run(5), 'New results evaluated')}>Evaluate newly imported results</button></div></>
 }
 
