@@ -389,3 +389,15 @@ td.why{font-size:.82rem;max-width:420px}
 td.mono{white-space:nowrap}
 .locked-note{border-left:3px solid var(--line)}
 .locked-note p{margin:0}
+/* Multi-agent stage notes: one card per agent, in order */
+.agent-steps{display:flex;gap:10px;align-items:stretch;margin:4px 0 10px;flex-wrap:wrap}
+.agent-step{flex:1 1 320px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.agent-step ul{font-size:.88rem;margin:6px 0}
+.agent-step li{margin-bottom:4px}
+.agent-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.agent-num{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:700 .78rem/1 var(--f-body)}
+.agent-kind{font-size:.72rem;font-weight:600;padding:1px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--muted)}
+.agent-kind.llm{background:var(--pend-bg);color:var(--pend);border-color:color-mix(in srgb,var(--pend) 30%,transparent)}
+.agent-arrow{align-self:center;font-size:1.4rem;color:var(--muted)}
+.agent-out{font-size:.82rem;color:var(--muted);margin:0;border-top:1px dashed var(--line);padding-top:6px}
+@media (max-width:760px){.agent-arrow{transform:rotate(90deg);width:100%;text-align:center}}

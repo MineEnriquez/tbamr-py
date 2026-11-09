@@ -279,12 +279,28 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       {n === 1 && <S1 key={[status, st.question, st.country, st.region || '', st.cohort_target].join('|')} st={st} status={status} act={act} who={who} onDirtyChange={setScopeDirty} onBlockedChange={setScopeBlocked} />}
       {n === 2 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>Run agents</b> will hand the pipeline to <b>two</b> Claude-powered agents in sequence:</p>
-          <ul className="clean" style={{ fontSize: '.9rem' }}>
-            <li><b>Discovery Assistant</b> — queries the <span className="mono">ENA Portal API</span> for <i>M. tuberculosis</i> read runs matching your scope (country + any extra constraints), aiming for at least the minimum cohort and searching further studies when it falls short (it never drops eligible runs to fit the number). For each candidate it may also call <span className="mono">ena_study</span> and <span className="mono">find_publications</span> (Europe PMC) to attach provenance.</li>
-            <li><b>Verification Tasker</b> — rule checks + Claude agent — treats a run as <b>Verified</b> only when the ENA/BioSample country field confirms the scope. Missing or conflicting origin → <b>Hold</b> for your review; the Guardian's policy on inferred origin is enforced here. If too few runs clear verification, the Orchestrator can re-plan once and ask Discovery to broaden the search.</li>
-          </ul>
-          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see candidate counts (Verified / On hold / Excluded), per-run archive records, and any cohort-level checks before the <RoleBadge role="pi" /> gate opens.</p>
+          <p><b>Run agents</b> hands this stage to <b>two agents, one after the other</b>:</p>
+          <div className="agent-steps">
+            <div className="agent-step">
+              <div className="agent-head"><span className="agent-num">1</span><b>Discovery Assistant</b><span className="agent-kind llm">✦ Claude</span></div>
+              <ul className="clean">
+                <li>Searches the <span className="mono">ENA Portal API</span> for <i>M. tuberculosis</i> read runs from your target ({st.country || 'the target country'}{st.region ? `, ${st.region}` : ''}).</li>
+                <li>Aims for at least the minimum cohort ({st.cohort_target}) and searches further studies when short; it never drops eligible runs to fit the number.</li>
+                <li>Looks up the studies (<span className="mono">ena_study</span>) and related publications (<span className="mono">find_publications</span>, Europe PMC) for provenance.</li>
+              </ul>
+              <p className="agent-out">Hands on: every candidate run its searches returned.</p>
+            </div>
+            <div className="agent-arrow" aria-hidden="true">→</div>
+            <div className="agent-step">
+              <div className="agent-head"><span className="agent-num">2</span><b>Verification Tasker</b><span className="agent-kind rule">⚙️ rules</span><span className="agent-kind llm">✦ Claude for unclear cases</span></div>
+              <ul className="clean">
+                <li><b>Rules</b> check each run: WGS library, ENA country names the target{st.region ? ` and the location names ${st.region}` : ''}, Illumina platform, and one run per BioSample. Clear passes are <b>Verified</b>; another country or a non-WGS library is <b>Excluded</b>.</li>
+                <li><b>Claude</b> investigates the unclear ones (missing country or region, repeated BioSample, other platforms) with study and publication look-ups. They go on <b>Hold</b> for you; a confirmed repeat of an isolate is Excluded. A publication alone never verifies a run.</li>
+              </ul>
+              <p className="agent-out">Hands on: the verified cohort and the runs on Hold.</p>
+            </div>
+          </div>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>Then cohort checks run (one location or one study only, below the planned minimum). If the cohort can't answer the question or falls short, the orchestrator re-plans once and asks Discovery for other studies. You'll see candidate counts (Verified / On hold / Excluded), each run's archive record and the checks before the <RoleBadge role="pi" /> gate opens.</p>
         </div>
       )}
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
