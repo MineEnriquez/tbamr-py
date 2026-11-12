@@ -49,3 +49,15 @@ export function Rationale({ id, placeholder, onSubmit, buttons, extra }) {
 
 export const OUT_COLOR = { Proceed: 'var(--ok)', Hold: 'var(--hold)', Exclude: 'var(--ex)', Retry: 'var(--retry)', Escalate: 'var(--esc)', Override: 'var(--pend)', Approve: 'var(--blue)', Info: 'var(--line)' }
 export const fmtTime = ts => new Date(ts * 1000).toLocaleTimeString()
+
+/* Agent-trace entries (the run-time progress log): short kind label + one-line detail. */
+const TRACE_KIND = { tool_call: 'tool', thought: 'thought', submit: 'submit', handoff: 'handoff', guardrail: 'guardrail' }
+export const traceKind = t => TRACE_KIND[t.kind] || t.kind
+export function traceDetail(t) {
+  const p = t.payload || {}
+  if (t.kind === 'tool_call') return `${p.tool || p.name || '?'}(${Object.keys(p.input || {}).join(', ')})`
+  if (t.kind === 'submit') return Object.keys(p).slice(0, 4).join(', ')
+  if (t.kind === 'thought' || t.kind === 'handoff') return String(p.text || '').slice(0, 160)
+  if (t.kind === 'guardrail') return String(p.text || p.reason || '').slice(0, 160)
+  return ''
+}

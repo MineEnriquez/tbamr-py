@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from './api.js'
-import { ROLE_LABEL } from './components/common.jsx'
+import { ROLE_LABEL, traceKind, traceDetail } from './components/common.jsx'
 import Team from './components/Team.jsx'
 import Pipeline from './components/Pipeline.jsx'
 import Samples, { Drawer } from './components/Samples.jsx'
@@ -35,6 +35,15 @@ export default function App() {
   const [liveTraces, setLiveTraces] = useState([])
   const timer = useRef(null)
   const traceTimer = useRef(null)
+  const topRef = useRef(null)
+  useEffect(() => { // publish the sticky header's height so the Pipeline side column can fit the visible area below it
+    const el = topRef.current
+    if (!el) return
+    const set = () => document.documentElement.style.setProperty('--top-h', el.offsetHeight + 'px')
+    set()
+    const ro = new ResizeObserver(set); ro.observe(el)
+    return () => ro.disconnect()
+  }, [snap === null])
 
   const refresh = useCallback(async () => {
     try {
@@ -57,7 +66,7 @@ export default function App() {
   useEffect(() => { // stream the latest agent-trace entries while busy
     clearInterval(traceTimer.current)
     if (!snap?.busy) { setLiveTraces([]); return }
-    const pull = () => api.trace().then(ts => setLiveTraces(ts.slice(0, 8))).catch(() => {})
+    const pull = () => api.trace().then(ts => setLiveTraces(ts.slice(0, 40))).catch(() => {})
     pull()
     traceTimer.current = setInterval(pull, 1200)
     return () => clearInterval(traceTimer.current)
@@ -99,9 +108,10 @@ export default function App() {
 
   return (
     <RawCtx.Provider value={raw}>
-    {snap.busy && <BusyBar busy={snap.busy} traces={liveTraces} />}
+    {/* On the Pipeline tab the progress log sits in the side column; elsewhere a slim one-line bar */}
+    {snap.busy && tab !== 'pipeline' && <BusyBar busy={snap.busy} traces={liveTraces} />}
     <div className={'wrap' + (snap.mode.data === 'demo' ? ' demo-mode' : '') + (snap.mode.brain === 'replay' ? ' replay-mode' : '')}>
-      <div className="top">
+      <div className="top" ref={topRef}>
         <div><h1>TB-AMR Agent Team</h1>
           <p className="muted" style={{ fontSize: '.85rem' }}>
             <a href="#about" onClick={e => { e.preventDefault(); setTab('about') }}>What is this?</a>
@@ -127,7 +137,7 @@ export default function App() {
       <nav className="tabs" role="tablist">{tabs.map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}{k === 'review' && pending ? <span className="count">{pending}</span> : null}</button>)}</nav>
       <main>
         {tab === 'team' && <Team team={team} version={version} />}
-        {tab === 'pipeline' && <Pipeline snap={snap} decisions={decisions} view={view} setView={setView} act={act} who={who} busy={snap.busy} openSample={setSel} />}
+        {tab === 'pipeline' && <Pipeline snap={snap} decisions={decisions} traces={liveTraces} view={view} setView={setView} act={act} who={who} busy={snap.busy} openSample={setSel} />}
         {tab === 'samples' && <Samples st={st} openSample={setSel} />}
         {tab === 'review' && <Review st={st} act={act} who={who} openSample={setSel} />}
         {tab === 'report' && <Report st={st} act={act} brain={snap.mode.brain} />}
@@ -166,16 +176,6 @@ function ModeSwitch({ mode, busy, onSwitch }) {
 }
 
 function BusyBar({ busy, traces }) {
-  const kindLabel = { tool_call: 'tool', thought: 'thought', submit: 'submit', handoff: 'handoff', guardrail: 'guardrail' }
-  const kindDetail = (t) => {
-    const p = t.payload || {}
-    if (t.kind === 'tool_call') return `${p.tool || p.name || '?'}(${Object.keys(p.input || {}).join(', ')})`
-    if (t.kind === 'thought') return String(p.text || '').slice(0, 160)
-    if (t.kind === 'submit') return `${Object.keys(p).slice(0, 4).join(', ')}`
-    if (t.kind === 'handoff') return String(p.text || '').slice(0, 160)
-    if (t.kind === 'guardrail') return String(p.text || p.reason || '').slice(0, 160)
-    return ''
-  }
   const latest = traces[0]
   return (
     <div className="running" role="status" aria-live="polite" aria-label={`Working: ${busy}`}>
@@ -183,18 +183,8 @@ function BusyBar({ busy, traces }) {
       <div className="runrow">
         <span className="rundot" aria-hidden="true" />
         <span>Working on <b>{busy}</b>…</span>
-        {latest && <span className="runsub">· {latest.agent?.replace(/_/g, ' ')} <code>{kindLabel[latest.kind] || latest.kind}</code> {kindDetail(latest)}</span>}
+        {latest && <span className="runsub">· {latest.agent?.replace(/_/g, ' ')} <code>{traceKind(latest)}</code> {traceDetail(latest)}</span>}
       </div>
-      {traces.length > 1 && <ul className="runlog">
-        {traces.slice(0, 5).map(t => (
-          <li key={t.id} className={'rl-' + t.kind}>
-            <span className="rltime">{new Date(t.ts * 1000).toLocaleTimeString(undefined, { hour12: false })}</span>
-            <span className="rlagent">{t.agent?.replace(/_/g, ' ')}</span>
-            <span className="rlkind">{kindLabel[t.kind] || t.kind}</span>
-            <span className="rldetail">{kindDetail(t)}</span>
-          </li>
-        ))}
-      </ul>}
     </div>
   )
 }

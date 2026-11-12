@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api.js'
-import { Chip, Rationale, RoleBadge, actorLabel, ROLE_LABEL } from './common.jsx'
+import { Chip, Rationale, RoleBadge, actorLabel, ROLE_LABEL, traceKind, traceDetail } from './common.jsx'
 import { RawLink } from './Raw.jsx'
 
 const STATUS = { locked: 'Locked', ready: 'Ready to run', wait: 'Waiting for human', done: 'Done' }
@@ -155,18 +155,26 @@ function stripCountryFromQuestion(question, alias) {
     .replace(/\s+/g, ' ').trim()
 }
 
-export default function Pipeline({ snap, decisions, view, setView, act, who, busy, openSample }) {
+export default function Pipeline({ snap, decisions, traces, view, setView, act, who, busy, openSample }) {
   const st = snap.state
   // view===0 is the Start hero (research question gets full width + big typography); views 1-6 are
-  // the regular stages, which share the panel with the Live decisions feed.
+  // the regular stages, which share the panel with the side column (the collapsible Live decisions feed,
+  // then the progress log while running). The column is sticky and fits the visible height.
   // key: the form copies the saved scope into local state when it mounts, so remount it whenever the saved
   // scope changes (e.g. after adopting the Guardian's wording) or it would show, and could re-save, stale text.
   const scopeKey = st => [st.stage_status['1'], st.question, st.country, st.region || '', st.cohort_target].join('|')
-  if (view === 0) return <StartHero key={scopeKey(snap.state)} snap={snap} act={act} who={who} busy={busy} setView={setView} />
+  const side = <aside className="side">
+    <Feed decisions={decisions} />
+    {busy && <Progress busy={busy} traces={traces || []} />}
+  </aside>
+  if (view === 0) {
+    const hero = <StartHero key={scopeKey(snap.state)} snap={snap} act={act} who={who} busy={busy} setView={setView} />
+    return busy ? <div className="grid2">{hero}{side}</div> : hero
+  }
   return (
     <div className="grid2">
       <Stage n={view} snap={snap} act={act} who={who} busy={busy} openSample={openSample} />
-      <Feed decisions={decisions} />
+      {side}
     </div>
   )
 }
@@ -234,14 +242,35 @@ function StartHero({ snap, act, who, busy, setView }) {
   )
 }
 
-function Feed({ decisions }) {
+/* Run-time progress log: the latest agent-trace entries (newest first), shown only while a stage runs. */
+function Progress({ busy, traces }) {
   return (
-    <section className="panel">
-      <h3>Live decisions</h3>
-      {!decisions.length ? <p className="muted">Agent and human decisions appear here as each stage runs.</p> :
+    <section className="panel progress" role="status" aria-live="polite" aria-label={`Working: ${busy}`}>
+      <span className="runbar" aria-hidden="true" />
+      <h3 className="row" style={{ gap: 8 }}><span className="rundot" aria-hidden="true" />Progress · <span style={{ fontWeight: 400 }}>{busy}</span></h3>
+      {!traces.length ? <p className="muted">Starting… agent steps appear here as they happen.</p> :
+        <ul className="runlog">{traces.map(t => (
+          <li key={t.id} className={'rl-' + t.kind}>
+            <span className="rltime">{new Date(t.ts * 1000).toLocaleTimeString(undefined, { hour12: false })}</span>
+            <span className="rlkind">{traceKind(t)}</span>
+            <span className="rlagent">{t.agent?.replace(/_/g, ' ')}</span>
+            <span className="rldetail" title={traceDetail(t)}>{traceDetail(t)}</span>
+          </li>))}</ul>}
+    </section>
+  )
+}
+
+/* Live decisions: collapsed by default so the side column stays compact; the summary shows the count. */
+function Feed({ decisions }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className={'panel feed-panel' + (open ? ' open' : '')}>
+      <button type="button" className="feed-toggle" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+        <h3>Live decisions</h3><span className="muted">{decisions.length}</span></button>
+      {open && (!decisions.length ? <p className="muted">Agent and human decisions appear here as each stage runs.</p> :
         <div className="feed">{decisions.slice(0, 18).map(d => (
           <div className="fi" key={d.id}><span><Chip label={d.outcome} /></span>
-            <div style={{ minWidth: 0 }}><div className="who">{actorLabel(d.actor)} · <span className="mono">{d.sample_id}</span></div><div>{d.rationale}</div></div></div>))}</div>}
+            <div style={{ minWidth: 0 }}><div className="who">{actorLabel(d.actor)} · <span className="mono">{d.sample_id}</span></div><div>{d.rationale}</div></div></div>))}</div>)}
     </section>
   )
 }
