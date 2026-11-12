@@ -92,6 +92,10 @@ export ANTHROPIC_API_KEY=sk-ant-...
 TBAMR_DATA=live uvicorn tbamr.api:app --port 8000
 ```
 
+`./run.sh` can also read the key from `~/.config/tbamr/anthropic_key` (one line, `chmod 600`), so you don't have to
+export it in your shell profile, where every program (Claude Code included) would pick it up. A key already set in the
+environment takes precedence; `TBAMR_KEY_FILE` points at a different file.
+
 Command-line walkthrough (acts as each human in turn): `python -m tbamr.cli` · `python -m tbamr.cli --live --brain claude`
 
 ### TB-Profiler
