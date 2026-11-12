@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api.js'
-import { Chip, Rationale, RoleBadge, actorLabel, ROLE_LABEL } from './common.jsx'
+import { Chip, Rationale, RoleBadge, actorLabel, ROLE_LABEL, traceKind, traceDetail } from './common.jsx'
 import { RawLink } from './Raw.jsx'
 
 const STATUS = { locked: 'Locked', ready: 'Ready to run', wait: 'Waiting for human', done: 'Done' }
@@ -155,18 +155,26 @@ function stripCountryFromQuestion(question, alias) {
     .replace(/\s+/g, ' ').trim()
 }
 
-export default function Pipeline({ snap, decisions, view, setView, act, who, busy, openSample }) {
+export default function Pipeline({ snap, decisions, traces, view, setView, act, who, busy, openSample }) {
   const st = snap.state
   // view===0 is the Start hero (research question gets full width + big typography); views 1-6 are
-  // the regular stages, which share the panel with the Live decisions feed.
+  // the regular stages, which share the panel with the side column (the collapsible Live decisions feed,
+  // then the progress log while running). The column is sticky and fits the visible height.
   // key: the form copies the saved scope into local state when it mounts, so remount it whenever the saved
   // scope changes (e.g. after adopting the Guardian's wording) or it would show, and could re-save, stale text.
   const scopeKey = st => [st.stage_status['1'], st.question, st.country, st.region || '', st.cohort_target].join('|')
-  if (view === 0) return <StartHero key={scopeKey(snap.state)} snap={snap} act={act} who={who} busy={busy} setView={setView} />
+  const side = <aside className="side">
+    <Feed decisions={decisions} />
+    {busy && <Progress busy={busy} traces={traces || []} />}
+  </aside>
+  if (view === 0) {
+    const hero = <StartHero key={scopeKey(snap.state)} snap={snap} act={act} who={who} busy={busy} setView={setView} />
+    return busy ? <div className="grid2">{hero}{side}</div> : hero
+  }
   return (
     <div className="grid2">
       <Stage n={view} snap={snap} act={act} who={who} busy={busy} openSample={openSample} />
-      <Feed decisions={decisions} />
+      {side}
     </div>
   )
 }
@@ -234,14 +242,35 @@ function StartHero({ snap, act, who, busy, setView }) {
   )
 }
 
-function Feed({ decisions }) {
+/* Run-time progress log: the latest agent-trace entries (newest first), shown only while a stage runs. */
+function Progress({ busy, traces }) {
   return (
-    <section className="panel">
-      <h3>Live decisions</h3>
-      {!decisions.length ? <p className="muted">Agent and human decisions appear here as each stage runs.</p> :
+    <section className="panel progress" role="status" aria-live="polite" aria-label={`Working: ${busy}`}>
+      <span className="runbar" aria-hidden="true" />
+      <h3 className="row" style={{ gap: 8 }}><span className="rundot" aria-hidden="true" />Progress · <span style={{ fontWeight: 400 }}>{busy}</span></h3>
+      {!traces.length ? <p className="muted">Starting… agent steps appear here as they happen.</p> :
+        <ul className="runlog">{traces.map(t => (
+          <li key={t.id} className={'rl-' + t.kind}>
+            <span className="rltime">{new Date(t.ts * 1000).toLocaleTimeString(undefined, { hour12: false })}</span>
+            <span className="rlkind">{traceKind(t)}</span>
+            <span className="rlagent">{t.agent?.replace(/_/g, ' ')}</span>
+            <span className="rldetail" title={traceDetail(t)}>{traceDetail(t)}</span>
+          </li>))}</ul>}
+    </section>
+  )
+}
+
+/* Live decisions: collapsed by default so the side column stays compact; the summary shows the count. */
+function Feed({ decisions }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className={'panel feed-panel' + (open ? ' open' : '')}>
+      <button type="button" className="feed-toggle" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+        <h3>Live decisions</h3><span className="muted">{decisions.length}</span></button>
+      {open && (!decisions.length ? <p className="muted">Agent and human decisions appear here as each stage runs.</p> :
         <div className="feed">{decisions.slice(0, 18).map(d => (
           <div className="fi" key={d.id}><span><Chip label={d.outcome} /></span>
-            <div style={{ minWidth: 0 }}><div className="who">{actorLabel(d.actor)} · <span className="mono">{d.sample_id}</span></div><div>{d.rationale}</div></div></div>))}</div>}
+            <div style={{ minWidth: 0 }}><div className="who">{actorLabel(d.actor)} · <span className="mono">{d.sample_id}</span></div><div>{d.rationale}</div></div></div>))}</div>)}
     </section>
   )
 }
@@ -259,6 +288,12 @@ const UNLOCK = {
 /* The run button names the agent(s) it starts: only Stage 2 runs two agents, every other stage runs one. */
 const RUN_LABEL = { 1: 'Run Scope Guardian', 2: 'Run Discovery & Verification', 3: 'Run QC Analyst', 4: 'Run Profiling Tasker',
   5: 'Run Evidence Analyst', 6: 'Run Reporting Orchestrator' }
+
+/* Provisional / validated tag next to a rule-set version (set on the Admin page). */
+function RuleStatus({ meta }) {
+  if (!meta) return null
+  return <span className={'rule-status ' + meta.status} title={meta.basis}>{meta.status === 'validated' ? 'validated' : 'provisional: not benchmarked'}</span>
+}
 
 function Stage({ n, snap, act, who, busy, openSample }) {
   const st = snap.state, meta = snap.stages[n - 1], status = st.stage_status[String(n)]
@@ -313,12 +348,14 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       {n === 2 && status !== 'locked' && status !== 'ready' && <S2 st={st} status={status} act={act} who={who} openSample={openSample} />}
       {n === 3 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>{runLabel}</b> starts <b>one</b> rules-only agent (no Claude):</p>
+          <p><b>{runLabel}</b> starts <b>one</b> deterministic, rules-only agent (no AI), applying rule set <span className="mono">{(snap.rules || {}).qc || 'QC'}</span> <RuleStatus meta={snap.rule_meta?.qc} /> to every run in the approved cohort:</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
-            <li><b>QC Analyst</b> — for every run in the approved cohort it estimates coverage as <span className="mono">base_count ÷ {(th.genome_bp || 4411532).toLocaleString()} bp</span>. At least <b>{th.min_cov}×</b>: <b>Pass</b>. Between {th.border_cov}× and {th.min_cov}×, or no base count in the archive: <b>Escalate</b> for a person. Below {th.border_cov}×: <b>Exclude</b>. Whether an <span className="mono">MD5</span> checksum is listed is recorded, but it is never a reason to escalate.</li>
-            <li>If fewer runs pass than the planned minimum cohort ({st.cohort_target}), a shortfall check is added for the gate.</li>
+            <li><b>What it measures.</b> Estimated mean depth = <span className="mono">base_count</span> from the ENA run record ÷ {(th.genome_bp || 4411532).toLocaleString()} bp, the length of the <i>M. tuberculosis</i> H37Rv reference genome (NC_000962.3). It is a pre-alignment screen on archive metadata: nothing is downloaded at this stage.</li>
+            <li><b>Decision rule.</b> At least <b>{th.min_cov}×</b>: <b>Pass</b>. From {th.border_cov}× to below {th.min_cov}×, or no <span className="mono">base_count</span> in the record: <b>Escalate</b> to the analyst. Below {th.border_cov}×: <b>Exclude</b>. Whether an MD5 checksum is listed is recorded as file-integrity metadata, never as a QC criterion.</li>
+            <li><b>Known limitation.</b> Raw read yield overstates usable depth when reads include contamination (e.g. human or non-tuberculous mycobacteria) or duplicates. Depth after alignment is measured later: TB-Profiler's median depth in Stage 4, and at least {th.min_depth} reads at each resistance position in Stage 5.</li>
+            <li><b>Cohort check.</b> If fewer runs pass than the planned minimum cohort ({st.cohort_target}), a shortfall check is added for the gate; thresholds are never relaxed to reach it.</li>
           </ul>
-          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}>You'll see a per-run table (coverage, checksum, QC status). Each escalation needs a short rationale, then <RoleBadge role="analyst" /> confirms QC.</p>
+          <p className="muted" style={{ fontSize: '.86rem', margin: 0 }}><b>Quality assurance:</b> same inputs give the same result. Each run's outcome is logged with the rule version, the input <span className="mono">base_count</span> and the computed coverage; the thresholds are fixed in code and changing them means a new rule version. The per-run table (coverage, checksum, QC status) and the raw inputs are open for review. Every escalation needs a written rationale, then <RoleBadge role="analyst" /> confirms QC.</p>
         </div>
       )}
       {n === 3 && ['wait', 'done'].includes(status) && <S3 st={st} status={status} act={act} who={who} openSample={openSample} />}
@@ -334,7 +371,7 @@ function Stage({ n, snap, act, who, busy, openSample }) {
       )}
       {n === 5 && (status === 'ready' || status === 'locked') && (
         <div className="box note">
-          <p><b>{runLabel}</b> starts <b>one</b> agent, the <b>Evidence Analyst</b> (rules plus Claude), for every run with a TB-Profiler result:</p>
+          <p><b>{runLabel}</b> starts <b>one</b> agent, the <b>Evidence Analyst</b> (rules plus Claude), applying rule set <span className="mono">{(snap.rules || {}).evid || 'EVID'}</span> <RuleStatus meta={snap.rule_meta?.evid} /> to every run with a TB-Profiler result:</p>
           <ul className="clean" style={{ fontSize: '.9rem' }}>
             <li><b>Rules classify each resistance call.</b> WHO catalogue Group 1 or 2, at least <b>{th.min_depth}</b> supporting reads, in at least <b>{Math.round((th.min_freq ?? 0.9) * 100)}%</b> of reads, and no conflicting phenotypic DST: <b>counted as resistant</b>. Group 3 (uncertain), fewer reads, a minor variant, or DST that disagrees: <b>pending review</b>, counted as uncertain. Group 5 lineage markers: <b>not counted</b>.</li>
             <li><b>Claude</b> writes a short note on each finding for the reviewer and can send a finding to review. It can never clear a finding from review or confirm resistance.</li>

@@ -19,6 +19,11 @@ from .base import RuleAgent
 
 _LOG = logging.getLogger("tbamr.agents.reporting")
 
+
+def _rule_meta() -> dict:
+    from ..core import rulesettings
+    return rulesettings.current()["meta"]
+
 # The study's definition of genotypic resistance, stated in every report and applied by counts_as_resistant().
 RESISTANCE_DEFINITION = (
     "Predicted resistant: a WHO-catalogue Group 1 or 2 mutation for the drug (as graded by the TB-Profiler database named "
@@ -65,6 +70,10 @@ class ReportingOrchestrator(RuleAgent):
         pending = [f for f in fx if f.review in ("Pending", "Needs more data")]
         by_place, place_kind, no_region = self._by_place(st, analysed, fx, drugs)
         limitations = [c["text"] for c in st.cohort_checks]
+        prov = [f"{RULES[r]} ({'QC coverage thresholds' if r == 'qc' else 'evidence read-depth and read-fraction thresholds'})"
+                for r, m in _rule_meta().items() if m.get("status") != "validated"]
+        if prov:
+            limitations.append(f"Provisional rule settings, not benchmarked against phenotypic DST: {', '.join(prov)}.")
         if st.cohort_target and n < st.cohort_target:
             limitations.append(f"{n} isolate(s) analysed against a planned minimum of {st.cohort_target}: estimates are less precise than planned.")
         if no_region:
@@ -90,6 +99,7 @@ class ReportingOrchestrator(RuleAgent):
             "limitations": limitations,
             "provenance": {"tools": sorted({s.profile_meta.get("tool") for s in analysed if s.profile_meta.get("tool")}),
                            "databases": sorted({str(s.profile_meta.get("db")) for s in analysed if s.profile_meta.get("db")}), "rules": RULES},
+            "rule_meta": _rule_meta(),
             "resistance_definition": RESISTANCE_DEFINITION,
             "catalogue_consistent": True,
             "scope_warnings": [{"warning": w, **({k: v for k, v in (st.scope.get("responses") or {}).get(str(i), {}).items() if k != "ts"})}

@@ -913,4 +913,76 @@ def test_findings_carry_the_reason_flag_shown_on_stage_5(orch):
 def test_state_exposes_the_rule_thresholds_quoted_by_the_stage_notes(tmp_path):
     from tbamr.core.models import THRESHOLDS
     c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "t.db"))))
-    assert c.get("/api/state").json()["thresholds"] == THRESHOLDS
+    from tbamr.core.models import RULES
+    state = c.get("/api/state").json()
+    assert state["thresholds"] == THRESHOLDS and state["rules"] == RULES  # the notes quote these, so they can't drift
+
+
+# ---------------------------------------------------------------- editable rule thresholds (Admin)
+@pytest.fixture
+def default_rules():
+    """Each test starts and ends with the default rule settings (the settings file is shared within a session)."""
+    from tbamr.core import rulesettings
+    p = rulesettings._path()
+    if p.exists():
+        p.unlink()
+    rulesettings.apply()
+    yield rulesettings
+    if p.exists():
+        p.unlink()
+    rulesettings.apply()
+
+
+def test_pi_changes_a_threshold_version_bumps_and_qc_uses_it(orch, default_rules):
+    from tbamr.core.models import RULES, THRESHOLDS
+    assert RULES["qc"] == "QC-v1.0" and THRESHOLDS["min_cov"] == 30.0
+    run_to_report(orch)
+    assert orch.state.sample("DEMO-R04").qc == "Escalated"  # 27x under the default 30x minimum
+    res = orch.change_rules("pi", "Ana", {"min_cov": 26, "border_cov": 20}, "Benchmark pending; aligning with pilot data.")
+    assert res["versions"]["qc"] == {"from": "QC-v1.0", "to": "QC-v1.1"} and RULES["qc"] == "QC-v1.1" and THRESHOLDS["min_cov"] == 26
+    assert orch.state.report["superseded"] is True
+    d = next(d for d in orch.log.all() if d["sample_id"] == "RULES")
+    assert d["actor"] == "human:pi:Ana" and "min_cov 30.0 -> 26.0" in d["rationale"] and "QC QC-v1.0 -> QC-v1.1" in d["rationale"]
+    hist = default_rules.current()["history"][0]
+    assert hist["person"] == "Ana" and hist["changes"]["min_cov"] == {"from": 30.0, "to": 26.0}
+    o2 = build_orchestrator("demo", "replay", os.path.join(tempfile.mkdtemp(), "r2.db")); o2.state.country = "Indonesia"
+    run_to_report(o2)
+    s = o2.state.sample("DEMO-R04")
+    assert s.qc == "Pass" and any(x["rule_version"] == "QC-v1.1" and x["sample_id"] == "DEMO-R04" for x in o2.log.all())
+
+
+@pytest.mark.parametrize("role,changes,rationale,status,basis,message", [
+    ("analyst", {"min_cov": 25}, "why", {}, {}, "Only the Principal Investigator"),
+    ("pi", {"min_cov": 25}, "  ", {}, {}, "Give a rationale"),
+    ("pi", {"border_cov": 35}, "why", {}, {}, "Borderline coverage must be lower"),
+    ("pi", {"genome_bp": 5000000}, "why", {}, {}, "reference value"),
+    ("pi", {"min_freq": 1.5}, "why", {}, {}, "must be between"),
+    ("pi", {"min_depth": 7.5}, "why", {}, {}, "whole number"),
+    ("pi", {}, "why", {"qc": "validated"}, {}, "needs a basis"),
+    ("pi", {"min_cov": 30}, "why", {}, {}, "Nothing changed"),
+])
+def test_rule_changes_are_validated(orch, default_rules, role, changes, rationale, status, basis, message):
+    from tbamr.core.models import RULES
+    with pytest.raises(StageError, match=message):
+        orch.change_rules(role, "Ana", changes, rationale, status, basis)
+    assert RULES["qc"] == "QC-v1.0"  # nothing applied
+
+
+def test_report_flags_provisional_rules_until_validated(orch, default_rules):
+    rep = run_to_report(orch)
+    assert any("Provisional rule settings" in l for l in rep["limitations"]) and rep["rule_meta"]["qc"]["status"] == "provisional"
+    orch.change_rules("pi", "Ana", {}, "CRyPTIC benchmark complete.", {"qc": "validated", "evid": "validated"},
+                      {"qc": "CRyPTIC 2026 benchmark, sens/spec vs DST", "evid": "CRyPTIC 2026 benchmark, sens/spec vs DST"})
+    rep2 = orch.agents["reporting"].build(orch.state, 2)
+    assert not any("Provisional rule settings" in l for l in rep2["limitations"])
+
+
+def test_rule_settings_survive_a_reset_and_have_api_endpoints(tmp_path, default_rules):
+    c = TestClient(create_app(build_orchestrator("demo", "replay", str(tmp_path / "s.db"))))
+    assert c.post("/api/admin/rules", json={"role": "analyst", "changes": {"min_depth": 12}, "rationale": "x"}).status_code == 409
+    r = c.post("/api/admin/rules", json={"role": "pi", "person": "Ana", "changes": {"min_depth": 12}, "rationale": "Stricter read support."})
+    assert r.status_code == 200 and r.json()["versions"]["evid"]["to"] == "EVID-v1.1"
+    c.post("/api/reset", params={"data": "demo"})
+    cur = c.get("/api/admin/rules").json()
+    assert cur["thresholds"]["min_depth"] == 12 and cur["rules"]["evid"] == "EVID-v1.1" and cur["history"][0]["person"] == "Ana"
+    assert c.get("/api/state").json()["rule_meta"]["evid"]["status"] == "provisional"

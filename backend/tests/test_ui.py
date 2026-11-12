@@ -139,3 +139,24 @@ def test_scope_warnings_must_be_answered_and_wording_can_be_adopted(page, live_s
     assert page.locator(".warn-answer.accept").count() >= 1
     page.get_by_role("button", name="Use this wording and review again").click()
     page.wait_for_function("document.querySelector('textarea[aria-label=\"Research question\"]')?.value.includes('WHO-catalogued')", timeout=5000)
+
+
+def test_admin_pipeline_rules_only_pi_can_change(page, live_server, reset_demo):
+    """The Admin page lists the rule thresholds; inputs are locked unless acting as PI, and saving bumps the version."""
+    import json as _json
+    page.goto(f"{live_server}/", wait_until="networkidle")
+    page.locator('select').first.select_option("analyst")
+    page.get_by_role("tab", name="Admin").click()
+    page.wait_for_selector("text=Pipeline rules")
+    assert page.get_by_label("New value for Minimum estimated coverage (Pass)").is_disabled()
+    page.locator('select').first.select_option("pi")
+    box = page.get_by_label("New value for Minimum reads at a resistance position")
+    box.fill("11")
+    page.locator("#rules-why").fill("UI test: stricter read support.")
+    page.get_by_role("button", name="Save new rule version").click()
+    page.wait_for_selector("text=EVID EVID-v1.0 → EVID-v1.1", timeout=5000)
+    rules = _json.load(urllib.request.urlopen(f"{live_server}/api/admin/rules"))
+    assert rules["thresholds"]["min_depth"] == 11 and rules["history"][0]["rationale"] == "UI test: stricter read support."
+    # restore defaults for the rest of the session
+    urllib.request.urlopen(urllib.request.Request(f"{live_server}/api/admin/rules", method="POST", headers={"Content-Type": "application/json"},
+        data=_json.dumps({"role": "pi", "person": "test", "changes": {"min_depth": 10}, "rationale": "restore default"}).encode())).read()
