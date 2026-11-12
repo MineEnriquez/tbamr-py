@@ -244,9 +244,9 @@ tbody tr.click{cursor:pointer} tbody tr.click:hover td{background:var(--surface-
 .rundot{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 30%,transparent);animation:pulse 1.2s ease-in-out infinite;flex:none}
 .runsub{color:var(--muted);font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (prefers-reduced-motion:reduce){.runbar{animation:none;background:var(--blue)}.rundot{animation:none}}
-body:has(.running) .wrap{padding-top:150px}
-.runlog{list-style:none;margin:0;padding:0 16px 8px;max-width:1536px;margin:0 auto;max-height:120px;overflow:auto;font-size:.74rem;font-family:var(--f-mono);color:var(--muted);border-top:1px dashed color-mix(in srgb,var(--blue) 25%,var(--line))}
-.runlog li{display:grid;grid-template-columns:70px 110px 60px minmax(0,1fr);gap:8px;padding:3px 0;align-items:baseline;animation:slidein .25s ease-out;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent)}
+body:has(.running) .wrap{padding-top:40px}
+.runlog{list-style:none;margin:0;padding:0;max-height:520px;overflow:auto;font-size:.74rem;font-family:var(--f-mono);color:var(--muted)}
+.runlog li{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:2px 8px;padding:5px 0;align-items:baseline;animation:slidein .25s ease-out;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent)}
 .runlog li:last-child{border-bottom:0}
 .runlog .rltime{color:var(--muted);opacity:.7}
 .runlog .rlagent{color:var(--ink);font-family:var(--f-body);font-weight:600}
@@ -256,9 +256,25 @@ body:has(.running) .wrap{padding-top:150px}
 .runlog .rl-submit .rlkind{color:var(--ok)}
 .runlog .rl-guardrail .rlkind{color:var(--esc)}
 .runlog .rl-handoff .rlkind{color:var(--muted)}
-.runlog .rldetail{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);opacity:.78}
+.runlog .rldetail{grid-column:1/-1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);opacity:.78}
 @keyframes slidein{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.runlog li{animation:none}}
+/* Pipeline side column (sticky, fits the visible height below the header): collapsible Live decisions on top, run-time progress log below */
+.side{display:flex;flex-direction:column;gap:14px;min-width:0;position:sticky;top:calc(var(--top-h,90px) + 14px);
+  max-height:calc(100vh - var(--top-h,90px) - 28px)}
+.side:has(.progress,.feed-panel.open){height:calc(100vh - var(--top-h,90px) - 28px)}
+/* each open panel takes a share of the column and scrolls inside; a collapsed one keeps its natural height */
+.side>.panel{min-height:0;flex:0 0 auto}
+.side>.progress,.side>.feed-panel.open{flex:1 1 0;overflow:hidden}
+.side .feed,.side .runlog{flex:1 1 auto;min-height:0;max-height:none;overflow:auto}
+.progress{position:relative;gap:10px;border-color:color-mix(in srgb,var(--blue) 35%,var(--line))}
+.progress .runbar{position:absolute;top:0;left:0}
+.progress h3{margin:0;flex:none}
+.feed-panel{gap:10px}
+.feed-toggle{display:flex;align-items:center;gap:8px;flex:none;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.feed-toggle::before{content:"▸";color:var(--muted);transition:transform .15s}
+.feed-toggle[aria-expanded=true]::before{transform:rotate(90deg)}
+.feed-toggle h3{margin:0}
 footer{font-size:.8rem;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
 
 /* raw data viewer */
