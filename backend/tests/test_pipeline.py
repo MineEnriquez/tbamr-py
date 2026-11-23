@@ -986,3 +986,60 @@ def test_rule_settings_survive_a_reset_and_have_api_endpoints(tmp_path, default_
     cur = c.get("/api/admin/rules").json()
     assert cur["thresholds"]["min_depth"] == 12 and cur["rules"]["evid"] == "EVID-v1.1" and cur["history"][0]["person"] == "Ana"
     assert c.get("/api/state").json()["rule_meta"]["evid"]["status"] == "provisional"
+
+
+# ---------------------------------------------------------------- target drugs: chosen by the researcher, never narrowed by a rewording
+def test_default_scope_covers_every_drug_tbprofiler_reports(tmp_path):
+    from tbamr.core.models import DRUGS
+    from tbamr.tools.tbprofiler import DRUG_NAMES
+    assert DRUGS == list(DRUG_NAMES.values())
+    o = build_orchestrator("demo", "replay", str(tmp_path / "d.db"))
+    assert o.state.target_drugs == DRUGS and o.snapshot()["drugs"] == DRUGS
+
+
+def test_drugs_named_in_reads_aliases_and_multiword_names():
+    from tbamr.tools.tbprofiler import drugs_named_in
+    q = "Which rifampin, isoniazid, moxifloxacin and para-aminosalicylic acid mutations are seen?"
+    assert drugs_named_in(q) == ["Rifampicin", "Isoniazid", "Fluoroquinolones", "Para-aminosalicylic acid"]
+    assert drugs_named_in("Patterns of drug resistance in Indonesia") == []
+
+
+def test_scope_endpoint_validates_and_canonicalises_drugs(tmp_path):
+    o = build_orchestrator("demo", "replay", str(tmp_path / "v.db"))
+    c = TestClient(create_app(o))
+    base = {"question": "Rifampicin resistance in Indonesia", "country": "Indonesia"}
+    r = c.post("/api/scope", json={**base, "target_drugs": ["Aspirin"]})
+    assert r.status_code == 400 and "Aspirin" in r.json()["detail"]
+    assert c.post("/api/scope", json={**base, "target_drugs": ["bedaquiline", "Rifampicin", "rifampicin"]}).status_code == 200
+    assert o.state.target_drugs == ["Rifampicin", "Bedaquiline"]  # canonical names, catalogue order, deduplicated
+
+
+def test_guardian_warns_when_the_question_names_an_unselected_drug():
+    sub = {"blocking": [], "asks_comparison_across_places": False, "warnings": [], "gaps": []}
+    res = _guardian_with(sub).review("Bedaquiline and rifampicin resistance in Indonesia", "Indonesia", ["Rifampicin"], 8)
+    assert any("Bedaquiline" in w and "not among the selected drugs" in w for w in res["warnings"])
+    assert not any("selected drugs" in w for w in _guardian_with(sub).review(
+        "Bedaquiline resistance in Indonesia", "Indonesia", ["Bedaquiline"], 8)["warnings"])
+
+
+def test_guardian_rewording_that_drops_a_drug_is_suppressed():
+    sub = {"blocking": [], "asks_comparison_across_places": False, "warnings": [], "gaps": [],
+           "revised_question": "Which rifampicin and isoniazid resistance mutations are observed in Indonesia?"}
+    q = "Which bedaquiline, rifampicin and isoniazid mutations are associated with resistance in Indonesia?"
+    assert _guardian_with(sub).review(q, "Indonesia", ["Rifampicin", "Isoniazid", "Bedaquiline"], 8)["revised_question"] == ""
+
+
+def test_demo_rewording_names_only_the_drugs_in_the_question(tmp_path):
+    o = _scoped(tmp_path, "What patterns of drug resistance are seen in M. tuberculosis genomes?")
+    rq = o.state.scope["revised_question"]
+    assert rq and "rifampicin" not in rq.lower() and "isoniazid" not in rq.lower()
+    (tmp_path / "b").mkdir()
+    o2 = _scoped(tmp_path / "b", "Which bedaquiline mutations are associated with resistance?")
+    assert "bedaquiline" in o2.state.scope["revised_question"].lower()
+
+
+def test_report_has_a_row_for_every_selected_drug(orch):
+    orch.state.target_drugs = ["Rifampicin", "Bedaquiline"]
+    rows = {d["drug"]: d for d in run_to_report(orch)["drugs"]}
+    assert rows["BDQ"]["predicted_resistant"] == 0  # selected but nothing found: still shown, explicitly zero
+    assert "INH" in rows  # not selected, but the demo has isoniazid findings: never hidden

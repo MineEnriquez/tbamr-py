@@ -20,6 +20,14 @@ STAGES = [
     {"n": 6, "key": "report", "name": "Assemble & deliver report", "owner": "pi", "agents": ["reporting"]},
 ]
 
+# The drugs TB-Profiler reports, by display name (same order as tools.tbprofiler.DRUG_NAMES).
+# A scope's target_drugs are chosen from these; the default is all of them.
+DRUGS = [
+    "Rifampicin", "Isoniazid", "Ethambutol", "Pyrazinamide", "Fluoroquinolones", "Bedaquiline", "Linezolid",
+    "Delamanid", "Clofazimine", "Amikacin", "Streptomycin", "Ethionamide", "Kanamycin", "Capreomycin",
+    "Para-aminosalicylic acid", "Cycloserine",
+]
+
 # Human gates: who may pass each one
 GATES = {
     "scope": ["pi", "deputy"],
@@ -114,12 +122,12 @@ class Sample:
 class PipelineState:
     question: str = (
         "What patterns of drug resistance can we identify in Mycobacterium tuberculosis genomic samples, "
-        "and which mutations are associated with resistance to rifampicin and isoniazid?"
+        "and which mutations are associated with resistance to the selected drugs?"
     )
     country: str = ""  # target population: INSDC country or "Worldwide" (explicit only); resolved at Stage 1
     region: str = ""
     revision_rounds: int = 0  # times the question was replaced by the Scope Guardian's wording (0 = the researcher's own)  # optional subnational target inside `country` (free text, matched against ENA "Country: Region")
-    target_drugs: list[str] = field(default_factory=lambda: ["Rifampicin", "Isoniazid"])
+    target_drugs: list[str] = field(default_factory=lambda: list(DRUGS))
     cohort_target: int = DEFAULT_COHORT_TARGET
     stage_status: dict[str, str] = field(
         default_factory=lambda: {"1": "ready", "2": "locked", "3": "locked", "4": "locked", "5": "locked", "6": "locked"}

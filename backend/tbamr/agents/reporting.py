@@ -14,7 +14,7 @@ from ..core.decisions import Outcome
 from ..core.geo import WORLDWIDE, country_of, place_label
 from ..core.models import RULES, PipelineState
 from ..logutil import logged
-from ..tools.tbprofiler import DRUG_NAMES
+from ..tools.tbprofiler import DRUG_NAMES, drug_code
 from .base import RuleAgent
 
 _LOG = logging.getLogger("tbamr.agents.reporting")
@@ -55,7 +55,9 @@ class ReportingOrchestrator(RuleAgent):
         n = len(analysed)
         fx = [f for s in analysed for f in s.findings]
         pri = {"RIF": 0, "INH": 1}
-        drugs = sorted({"RIF", "INH", *[f.drug for f in fx]}, key=lambda d: (pri.get(d, 2), d))
+        # one row per selected drug (so "0 predicted resistant" is explicit), plus any other drug with findings
+        selected = {drug_code(d) for d in (st.target_drugs or [])}
+        drugs = sorted(selected | {f.drug for f in fx}, key=lambda d: (pri.get(d, 2), d))
         rows = []
         for d in drugs:
             pred = {f.sample_id for f in fx if f.drug == d and counts_as_resistant(f)}

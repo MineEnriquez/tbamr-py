@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { Chip } from './common.jsx'
+import { Chip, ROLE_LABEL } from './common.jsx'
 
 /* Admin page — Mongo health, cache per-namespace toggles + stats + clear, and the pipeline-result
  * archive. Everything degrades gracefully: if Mongo is down the page still renders with a clear
@@ -21,7 +21,7 @@ const NS_HINT = {
   claude: 'Agent reasoning + plain-language summaries. Keyed by (model, system, messages, tools). Turn off for fresh runs.',
 }
 
-export default function Admin({ who }) {
+export default function Admin({ who, auth }) {
   const [mongo, setMongo] = useState(null)
   const [caches, setCaches] = useState([])
   const [releases, setReleases] = useState([])
@@ -45,6 +45,7 @@ export default function Admin({ who }) {
   }
 
   return (<>
+    <UsersAdmin auth={auth} />
     <RulesAdmin who={who} />
     <section className="panel">
       <div className="row between"><div><span className="eyebrow">Admin</span><h2>Storage & cache</h2></div>
@@ -187,5 +188,64 @@ function RulesAdmin({ who }) {
         {Object.keys(h.meta || {}).length > 0 && <> · {Object.entries(h.meta).map(([r, m]) => `${r}: ${Object.values(m).join(', ')}`).join('; ')}</>}
         <div className="muted">{h.rationale}</div></li>)}</ul></div>}
     </div>
+  )
+}
+
+/* Users & permissions. With sign-in off this only explains how to turn it on. With it on, admins create
+ * accounts, assign pipeline roles, reset passwords and disable accounts; every change is in the history. */
+function UsersAdmin({ auth }) {
+  const [d, setD] = useState(null)
+  const [msg, setMsg] = useState(null)
+  const [nu, setNu] = useState({ name: '', password: '', roles: [], admin: false })
+  const load = useCallback(() => api.adminUsers().then(setD).catch(e => setMsg({ err: true, text: e.message })), [])
+  const isAdmin = !!auth?.user?.admin
+  useEffect(() => { if (auth?.enabled && isAdmin) load() }, [auth, isAdmin, load])
+  const run = (p, ok) => p.then(() => { setMsg({ text: ok }); load() }).catch(e => setMsg({ err: true, text: e.message }))
+
+  if (!auth?.enabled) return (
+    <section className="panel users-admin">
+      <div><span className="eyebrow">Admin</span><h2>Users & permissions</h2></div>
+      <div className="box esc"><p style={{ margin: 0 }}><b>Sign-in is off.</b> Anyone using this screen can pick any role and type any name, so the decision log and the two-person rule rely on trust.</p>
+        <p className="muted" style={{ margin: 0, fontSize: '.88rem' }}>To require sign-in: create the first admin with <code>python -m tbamr.users create-admin &lt;name&gt;</code> (from the backend folder), then start the backend with <code>TBAMR_AUTH=on</code>. The admin then adds people and their roles here.</p></div>
+    </section>)
+  if (!isAdmin) return null
+
+  const toggle = (list, r) => list.includes(r) ? list.filter(x => x !== r) : [...list, r]
+  const resetPw = name => { const pw = prompt(`New password for ${name} (at least 10 characters). Their current sessions will be signed out.`); if (pw) run(api.adminUserPassword(name, pw), `Password reset for ${name}`) }
+  return (
+    <section className="panel users-admin">
+      <div><span className="eyebrow">Admin</span><h2>Users & permissions</h2></div>
+      <p className="muted" style={{ fontSize: '.88rem', margin: 0 }}>People can act only in the roles ticked here. Changes apply at once, including to people already signed in. Disabling an account or resetting a password signs that person out everywhere.</p>
+      {msg && <div className={'box ' + (msg.err ? 'esc' : 'note')} role="status">{msg.text}</div>}
+      {!d ? <p className="muted">Loading users…</p> : <>
+        <table><thead><tr><th>Name</th><th>Roles</th><th>Admin</th><th>Status</th><th></th></tr></thead><tbody>
+          {d.users.map(u => <tr key={u.name}>
+            <td><b>{u.name}</b></td>
+            <td><div className="roles">{Object.entries(ROLE_LABEL).map(([k, l]) => <label key={k}><input type="checkbox" checked={u.roles.includes(k)}
+              onChange={() => run(api.adminUserUpdate(u.name, { roles: toggle(u.roles, k) }), `${u.name}: roles updated`)} /> {l}</label>)}</div></td>
+            <td><input type="checkbox" aria-label={`${u.name} is an admin`} checked={u.admin} onChange={() => run(api.adminUserUpdate(u.name, { admin: !u.admin }), `${u.name}: admin ${u.admin ? 'removed' : 'granted'}`)} /></td>
+            <td>{u.disabled ? <Chip label="Disabled" kind="Exclude" /> : <Chip label="Active" kind="Proceed" />}</td>
+            <td className="row" style={{ gap: 6 }}>
+              <button className="btn small" onClick={() => resetPw(u.name)}>Reset password</button>
+              <button className="btn small ghost" onClick={() => run(api.adminUserUpdate(u.name, { disabled: !u.disabled }), `${u.name} ${u.disabled ? 'enabled' : 'disabled'}`)}>{u.disabled ? 'Enable' : 'Disable'}</button>
+            </td></tr>)}
+        </tbody></table>
+        <form className="box" onSubmit={e => { e.preventDefault(); run(api.adminUserCreate(nu), `Created ${nu.name}`).then(() => setNu({ name: '', password: '', roles: [], admin: false })) }}>
+          <h3 style={{ margin: 0 }}>Add a person</h3>
+          <div className="row" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div className="ctl"><label htmlFor="nu-name">Name</label><input id="nu-name" value={nu.name} onChange={e => setNu({ ...nu, name: e.target.value })} required /></div>
+            <div className="ctl"><label htmlFor="nu-pw">Initial password</label><input id="nu-pw" type="password" autoComplete="new-password" minLength={10} value={nu.password} onChange={e => setNu({ ...nu, password: e.target.value })} required /></div>
+            <div className="roles">{Object.entries(ROLE_LABEL).map(([k, l]) => <label key={k}><input type="checkbox" checked={nu.roles.includes(k)} onChange={() => setNu({ ...nu, roles: toggle(nu.roles, k) })} /> {l}</label>)}
+              <label><input type="checkbox" checked={nu.admin} onChange={() => setNu({ ...nu, admin: !nu.admin })} /> Admin</label></div>
+            <button className="btn primary">Add</button>
+          </div>
+        </form>
+        <details><summary>Permission history ({d.history.length})</summary>
+          <table><thead><tr><th>When</th><th>By</th><th>Change</th><th>User</th><th>Detail</th></tr></thead><tbody>
+            {d.history.map((h, i) => <tr key={i}><td className="mono">{new Date(h.ts * 1000).toLocaleString()}</td><td>{h.by}</td><td>{h.action}</td><td>{h.user}</td>
+              <td className="mono" style={{ fontSize: '.8rem' }}>{Object.entries(h.detail || {}).map(([k, v]) => `${k}: ${typeof v === 'object' && v && 'from' in v ? `${JSON.stringify(v.from)} → ${JSON.stringify(v.to)}` : JSON.stringify(v)}`).join('; ')}</td></tr>)}
+          </tbody></table></details>
+      </>}
+    </section>
   )
 }

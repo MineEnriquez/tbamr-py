@@ -11,3 +11,6 @@ fasterq.tmp.*
 *.errlog.txt
 tbamr-live.db.broken-*
 tbamr-backend.log*
+backend/tbamr-users.json
+backend/tbamr-secret.key
+*.tmp

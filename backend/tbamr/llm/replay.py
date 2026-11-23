@@ -11,6 +11,8 @@ import re
 from collections import Counter
 from typing import Any
 
+from ..tools.tbprofiler import drugs_named_in
+
 
 def _ctx(messages: list[dict[str, Any]]) -> dict[str, Any]:
     first = messages[0]["content"]
@@ -76,7 +78,9 @@ def scope_guardian(messages):
     if re.search(r"associat|pattern|prevalence|how common", q, re.I):
         t = c.get("target") or {}
         where = (f"{t.get('region')}, {t.get('country')}" if t.get("region") else t.get("country")) or "the target population"
-        drugs = " and ".join(d.lower() for d in c.get("target_drugs", [])) or "the target drugs"
+        # name only the drugs the question names (the selection is what gets analysed, not how the question reads)
+        named = [d.lower() for d in drugs_named_in(q)]
+        drugs = (", ".join(named[:-1]) + " and " + named[-1]) if len(named) > 1 else (named[0] if named else "drug")
         revised = (f"Among public Illumina WGS runs of M. tuberculosis from {where} that pass verification and QC, which "
                    f"WHO-catalogued {drugs} resistance mutations are observed, how often, and, where phenotypic DST is "
                    "available, how well do genotypic predictions agree with it?")
