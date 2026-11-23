@@ -98,6 +98,25 @@ Command-line walkthrough (acts as each human in turn): `python -m tbamr.cli` · 
 
 If `tb-profiler` and `fasterq-dump` are on the PATH where the backend runs, Stage 4 shows **Run TB-Profiler**. Otherwise run it yourself and drop the `results/<RUN>.results.json` files on the Stage 4 import area. The parser handles TB-Profiler 4.x–6.x layouts; check against your version.
 
+## Sign-in and permissions
+
+Sign-in is **off** by default so the offline demo keeps its "Acting as" switcher. While it's off, anyone can pick any role and type any name. The banner says so, and the decision log and the two-person rule rely on trust.
+
+To require sign-in:
+
+```bash
+cd backend
+./.venv/bin/python -m tbamr.users create-admin Root     # first admin; prompts for a password (10+ characters)
+TBAMR_AUTH=on ./.venv/bin/uvicorn tbamr.api:app --port 8000
+```
+
+- **Admins** (an account flag, separate from the four pipeline roles) add people, tick which roles each one may act in, reset passwords and disable accounts on the Admin page. Changes apply at once, and every change is kept in a permission history.
+- With sign-in on, the **person on every decision is the signed-in account**, never a typed name. You can act only in your assigned roles. A co-signature must come from a different account that holds a role owning that override.
+- Reset needs the PI role or admin. Cache and Mongo controls need admin.
+- Sessions are HMAC-signed, HttpOnly, SameSite=Strict cookies (12 h, `TBAMR_SESSION_HOURS`). Passwords are stored as scrypt hashes. Five wrong passwords lock that name for 5 minutes. Resetting a password or disabling an account signs that person out everywhere.
+- Files (git-ignored): `backend/tbamr-users.json` (`TBAMR_USERS_FILE`) and `backend/tbamr-secret.key` (`TBAMR_SECRET_FILE`, or set `TBAMR_SECRET`). Set `TBAMR_COOKIE_SECURE=1` when serving over HTTPS.
+- If you're locked out: `python -m tbamr.users set-password <name>` or `python -m tbamr.users list`.
+
 ## Tests
 
 ```bash

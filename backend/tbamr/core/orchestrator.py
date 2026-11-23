@@ -32,6 +32,7 @@ from .geo import search_country
 def _rule_meta() -> dict:
     from . import rulesettings
     return rulesettings.current()["meta"]
+from . import auth
 from .models import GATES, ROLES, RULES, STAGES, THRESHOLDS, PipelineState, Sample
 
 _LOG = logging.getLogger("tbamr.orchestrator")
@@ -717,6 +718,8 @@ class Orchestrator:
                 raise PermissionDenied("The second sign-off must come from a different, named person.")
             if role not in ROLES:
                 raise PermissionDenied("Unknown role.")
+            # the second signer must hold a role that owns this kind of override, same as the requester
+            self.require(role, GATES["cohort"] if p["field"] == "eligibility" else ["analyst"])
             self.pending_overrides.remove(p)
             self._apply_override(self._sample(p["run"]), p["field"], p["from"], p["to"], p["rationale"],
                                  [f"{ROLES[p['role']]} ({p['person']})", f"{ROLES[role]} ({person})"])
@@ -797,4 +800,5 @@ class Orchestrator:
                 "mode": {"data": "demo" if self.demo else "live", "brain": self.client.mode, "tbprofiler": self.agents["profiling"].runner.available()},
                 "profiler_concurrency": int(os.environ.get("TBAMR_PROFILER_CONCURRENCY", str(default_conc))),
                 "profiler_threads": self.agents["profiling"].runner.threads,
-                "roles": ROLES, "stages": STAGES, "gates": GATES, "rules": RULES}
+                "roles": ROLES, "stages": STAGES, "gates": GATES, "rules": RULES,
+                "auth": {"enabled": auth.enabled()}}

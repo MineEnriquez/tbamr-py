@@ -5,10 +5,22 @@ async function call(method, path, body, params) {
   else if (body !== undefined) { opts.body = JSON.stringify(body); opts.headers['Content-Type'] = 'application/json' }
   const r = await fetch(url, opts)
   const data = await r.json().catch(() => ({}))
+  // sign-in is on and the session is missing or ended: let the app show the sign-in screen
+  if (r.status === 401 && data.auth === 'required') window.dispatchEvent(new Event('tbamr:signin'))
   if (!r.ok) throw new Error(data.detail || `Request failed (${r.status})`)
   return data
 }
 export const api = {
+  // Sign-in (only active when the backend runs with TBAMR_AUTH=on)
+  authStatus: () => call('GET', '/auth/status'),
+  login: (name, password) => call('POST', '/auth/login', { name, password }),
+  logout: (everywhere) => call('POST', '/auth/logout', undefined, everywhere ? { everywhere: true } : undefined),
+  changePassword: (current, next) => call('POST', '/auth/password', { current, new: next }),
+  // Admin: users and permissions
+  adminUsers: () => call('GET', '/admin/users'),
+  adminUserCreate: (b) => call('POST', '/admin/users', b),
+  adminUserUpdate: (name, b) => call('PATCH', '/admin/users/' + encodeURIComponent(name), b),
+  adminUserPassword: (name, password) => call('POST', '/admin/users/' + encodeURIComponent(name) + '/password', { password }),
   state: () => call('GET', '/state'),
   team: () => call('GET', '/team'),
   decisions: (sample) => call('GET', '/decisions', undefined, sample ? { sample } : undefined),
@@ -32,7 +44,7 @@ export const api = {
   cosign: (b) => call('POST', '/overrides/cosign', b),
   release: (b) => call('POST', '/release', b),
   summary: () => call('POST', '/report/summary'),
-  saveSummary: (text) => call('PUT', '/report/summary', { text }),
+  saveSummary: (text, role) => call('PUT', '/report/summary', { text, role: role || '' }),
   reports: () => call('GET', '/reports'),
   executions: (limit = 100, runId) => call('GET', '/executions', undefined,
     runId != null ? { limit, run_id: runId } : { limit }),
