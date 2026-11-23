@@ -13,6 +13,7 @@ from ..core.decisions import Outcome
 from ..core.geo import resolve_target
 from ..core.models import RULES
 from ..logutil import logged
+from ..tools.tbprofiler import drugs_named_in
 from .base import LLMAgent
 
 # The playbook's four required definitions, worded as the rules in this codebase actually apply them.
@@ -56,7 +57,9 @@ class ScopeGuardian(LLMAgent):
         "DST, public genomes as a convenience sample). Return no warnings rather than generic ones. "
         "If the question promises more than public genomes can answer (e.g. 'associated with', 'patterns', prevalence, "
         "comparisons the target can't support), give `revised_question`: one sentence the data can answer, keeping the "
-        "researcher's intent, target and drugs. Your wording must describe observed counts and agreement with DST, never "
+        "researcher's intent and target. `target_drugs` is the set of drugs selected for analysis, not a wording "
+        "instruction: name in `revised_question` exactly the drugs the question itself names, and none if it names none "
+        "(say 'drug resistance'). Never add, drop or narrow drugs. Your wording must describe observed counts and agreement with DST, never "
         "association or causation ('associated with', 'co-occur', 'linked to', 'patterns'). Leave it empty when the question "
         "is already answerable. If `revision_rounds` > 0 the question is a wording you proposed earlier: leave "
         "`revised_question` empty unless it is still clearly unanswerable; style or small improvements are not a reason. "
@@ -108,12 +111,21 @@ class ScopeGuardian(LLMAgent):
         if target["problem"]:
             blocking.append(target["problem"])
         warnings = [w for w in (sub.get("warnings") or []) if str(w).strip()][:MAX_WARNINGS]
-        for extra in (target.get("note"), target.get("notice")):  # rule notes lead the Guardian's own warnings
+        named = drugs_named_in(ctx.get("question", ""))
+        unselected = [d for d in named if d not in (ctx.get("target_drugs") or [])]
+        one = len(unselected) == 1
+        drug_note = (f"The question names {', '.join(unselected)}, which {'is' if one else 'are'} not among the selected "
+                     f"drugs. Add {'it' if one else 'them'} to the drug selection or edit the question." if unselected else "")
+        for extra in (drug_note, target.get("note"), target.get("notice")):  # rule notes lead the Guardian's own warnings
             if extra and extra not in warnings:
                 warnings.insert(0, extra)
         revised = " ".join(str(sub.get("revised_question") or "").split())
         if revised and revised.lower() == " ".join(str(ctx.get("question", "")).split()).lower():
             revised = ""  # identical to the current wording: nothing to propose
+        dropped = [d for d in named if d not in drugs_named_in(revised)] if revised else []
+        if dropped:
+            logging.getLogger("tbamr.agents.scope_guardian").info("revised question suppressed: it drops %s", ", ".join(dropped))
+            revised = ""  # backstop: a rewording never narrows the drugs the researcher asked about
         if revised and int(ctx.get("revision_rounds") or 0) >= MAX_REVISIONS:
             logging.getLogger("tbamr.agents.scope_guardian").info("revised question suppressed: %d rewording(s) already adopted", ctx["revision_rounds"])
             revised = ""  # backstop: the rewording loop always ends

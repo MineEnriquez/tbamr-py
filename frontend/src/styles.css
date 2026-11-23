@@ -438,3 +438,9 @@ td.mono{white-space:nowrap}
 .tag.unverified{color:var(--hold)}
 .users-admin table td{vertical-align:top}
 .users-admin .roles{display:flex;flex-wrap:wrap;gap:4px 12px}
+
+/* Scope: target-drug picker */
+.drug-picker{border:1px solid var(--line);border-radius:8px;padding:8px 12px 10px;margin:12px 0 0}
+.drug-picker legend{font-size:.72rem;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:0 4px}
+.drug-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:2px 12px;font-size:.86rem}
+.drug-grid label{display:flex;align-items:center;gap:6px;cursor:pointer}
