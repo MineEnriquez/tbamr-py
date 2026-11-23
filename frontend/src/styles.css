@@ -431,3 +431,10 @@ td.mono{white-space:nowrap}
 .rule-status.provisional{color:var(--hold);background:var(--hold-bg)}
 .rule-status.validated{color:var(--ok);background:var(--ok-bg)}
 .rule-history li{margin-bottom:6px;font-size:.86rem}
+
+/* Sign-in (TBAMR_AUTH=on) and the "sign-in off" warning tag */
+.signin{max-width:380px;margin:12vh auto 0}
+.signin input{width:100%}
+.tag.unverified{color:var(--hold)}
+.users-admin table td{vertical-align:top}
+.users-admin .roles{display:flex;flex-wrap:wrap;gap:4px 12px}

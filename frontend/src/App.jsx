@@ -33,6 +33,7 @@ export default function App() {
   const [rawReq, setRawReq] = useState(null)
   const [theme, setTheme] = useState(load('tbamr.theme') || 'light')
   const [liveTraces, setLiveTraces] = useState([])
+  const [auth, setAuth] = useState(null)  // { enabled, user } from /api/auth/status
   const timer = useRef(null)
   const traceTimer = useRef(null)
   const topRef = useRef(null)
@@ -53,9 +54,20 @@ export default function App() {
     } catch (e) { setError('Cannot reach the backend. Start it with: uvicorn tbamr.api:app --port 8000'); return null }
   }, [])
 
-  useEffect(() => { refresh() }, [refresh])
-  const loadReceipts = useCallback(() => api.receipts({ role, person })
-    .then(rs => setReceipts(Object.fromEntries(rs.map(r => [r.kind + '/' + r.key, r.ts])))).catch(() => {}), [role, person])
+  useEffect(() => { // sign-in status first: with TBAMR_AUTH=on nothing else loads until someone signs in
+    api.authStatus().then(setAuth).catch(() => setAuth({ enabled: false, user: null }))
+    const out = () => setAuth(a => a && { ...a, user: null })
+    window.addEventListener('tbamr:signin', out)
+    return () => window.removeEventListener('tbamr:signin', out)
+  }, [])
+  const signedIn = !!auth && (!auth.enabled || !!auth.user)
+  const myRoles = auth?.enabled ? (auth.user?.roles || []) : Object.keys(ROLE_LABEL)
+  useEffect(() => { // with sign-in on you can only act in roles an admin gave you
+    if (auth?.enabled && auth.user && !myRoles.includes(role)) setRole(myRoles[0] || '')
+  }, [auth, role]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (signedIn) refresh() }, [refresh, signedIn])
+  const loadReceipts = useCallback(() => !signedIn || !role ? Promise.resolve() : api.receipts({ role, person })
+    .then(rs => setReceipts(Object.fromEntries(rs.map(r => [r.kind + '/' + r.key, r.ts])))).catch(() => {}), [role, person, signedIn])
   useEffect(() => { loadReceipts() }, [loadReceipts, version])
   const raw = { seen: (kind, key) => receipts[kind + '/' + key] || null, open: (kind, key) => setRawReq({ kind, key: String(key) }) }
   useEffect(() => { // poll while the backend is busy (e.g. TB-Profiler running)
@@ -98,8 +110,11 @@ export default function App() {
       if (next && Number(next[0]) > view) setView(Number(next[0]))
     }
   }
-  const who = { role, person }
+  const who = { role, person: auth?.enabled ? (auth.user?.name || '') : person }
+  const signOut = () => api.logout().catch(() => {}).then(() => { setAuth(a => ({ ...a, user: null })); setSnap(null) })
 
+  if (!auth) return <div className="wrap"><p className="muted">Loading…</p></div>
+  if (!signedIn) return <SignIn onDone={user => setAuth({ enabled: true, user })} />
   if (error && !snap) return <div className="wrap"><h1>TB-AMR Agent Team</h1><div className="box esc"><p>{error}</p></div></div>
   if (!snap) return <div className="wrap"><p className="muted">Loading…</p></div>
   const st = snap.state
@@ -117,8 +132,13 @@ export default function App() {
             <a href="#about" onClick={e => { e.preventDefault(); setTab('about') }}>What is this?</a>
           </p></div>
         <div className="controls">
-          <div className="ctl"><label htmlFor="role">Acting as</label><select id="role" value={role} onChange={e => setRole(e.target.value)}>{Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
-          <div className="ctl"><label htmlFor="person">Your name</label><input id="person" value={person} onChange={e => setPerson(e.target.value)} placeholder="e.g. Minnie" /></div>
+          <div className="ctl"><label htmlFor="role">Acting as</label>
+            {myRoles.length
+              ? <select id="role" value={role} onChange={e => setRole(e.target.value)}>{myRoles.map(k => <option key={k} value={k}>{ROLE_LABEL[k]}</option>)}</select>
+              : <span className="muted" id="role" style={{ fontSize: '.85rem' }}>No roles yet: ask an admin</span>}</div>
+          {auth.enabled
+            ? <div className="ctl"><span className="lbl">Signed in</span><span className="row" style={{ gap: 6 }}><b>{auth.user.name}</b>{auth.user.admin && <span className="tag">admin</span>}<button className="btn small ghost" onClick={signOut}>Sign out</button></span></div>
+            : <div className="ctl"><label htmlFor="person">Your name</label><input id="person" value={person} onChange={e => setPerson(e.target.value)} placeholder="e.g. Minnie" /></div>}
           <div className="ctl"><span className="lbl" id="theme-l">Colors</span>
             <div className="seg theme" role="radiogroup" aria-labelledby="theme-l">{[['light', '☀ Light'], ['dark', '☾ Dark'], ['auto', 'Auto']].map(([k, l]) =>
               <button key={k} role="radio" aria-checked={theme === k} aria-selected={theme === k} title={k === 'auto' ? "Follow this computer's setting" : undefined} onClick={() => setTheme(k)}>{l}</button>)}</div></div>
@@ -131,6 +151,7 @@ export default function App() {
             act(() => api.reset(next), `Switched to ${next} mode`)
           }
         }} />
+        {!auth.enabled && <span className="tag unverified" title="Anyone can pick any role and type any name. Start the backend with TBAMR_AUTH=on to require sign-in.">Sign-in off · identities are not verified</span>}
         <span className={'tag ' + snap.mode.brain}>{snap.mode.brain === 'claude' ? 'Claude agents (live reasoning)' : 'Replay agents (scripted, no API key)'}</span>
       </div>
       <Flow snap={snap} team={team} view={tab === 'pipeline' ? view : null} pending={pending} onPick={n => { setView(n); setTab(n === 5 && pending ? 'review' : 'pipeline') }} onReport={() => setTab('report')} />
@@ -140,10 +161,10 @@ export default function App() {
         {tab === 'pipeline' && <Pipeline snap={snap} decisions={decisions} traces={liveTraces} view={view} setView={setView} act={act} who={who} busy={snap.busy} openSample={setSel} />}
         {tab === 'samples' && <Samples st={st} openSample={setSel} />}
         {tab === 'review' && <Review st={st} act={act} who={who} openSample={setSel} />}
-        {tab === 'report' && <Report st={st} act={act} brain={snap.mode.brain} />}
+        {tab === 'report' && <Report st={st} act={act} brain={snap.mode.brain} who={who} />}
         {tab === 'insights' && <Insights m={metrics} decisions={decisions} />}
         {tab === 'logs' && <Logs version={version} />}
-        {tab === 'admin' && <Admin who={who} />}
+        {tab === 'admin' && <Admin who={who} auth={auth} />}
         {tab === 'about' && <About />}
       </main>
       {sel && <Drawer run={sel} st={st} pending={snap.pending_overrides} act={act} who={who} close={() => setSel(null)} version={version} />}
@@ -152,6 +173,30 @@ export default function App() {
       <footer>{snap.mode.data === 'demo' ? 'Demo data: every accession starting DEMO/PRJDEMO is simulated.' : 'Live data from the ENA Portal API.'} <a href="#about" onClick={e => { e.preventDefault(); setTab('about') }}>About</a></footer>
     </div>
     </RawCtx.Provider>
+  )
+}
+
+/* Sign-in screen, shown only when the backend runs with TBAMR_AUTH=on and there is no session. */
+function SignIn({ onDone }) {
+  const [name, setName] = useState('')
+  const [pw, setPw] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async e => {
+    e.preventDefault(); setBusy(true); setErr('')
+    try { onDone((await api.login(name, pw)).user) } catch (x) { setErr(x.message); setPw('') }
+    setBusy(false)
+  }
+  return (
+    <div className="wrap"><form className="panel signin" onSubmit={submit} aria-labelledby="signin-h">
+      <h1 id="signin-h">TB-AMR Agent Team</h1>
+      <p className="muted">Sign in. Every decision you make is recorded under your name, in the roles an admin has assigned you.</p>
+      <div className="ctl"><label htmlFor="si-name">Name</label><input id="si-name" autoComplete="username" value={name} onChange={e => setName(e.target.value)} autoFocus required /></div>
+      <div className="ctl"><label htmlFor="si-pw">Password</label><input id="si-pw" type="password" autoComplete="current-password" value={pw} onChange={e => setPw(e.target.value)} required /></div>
+      {err && <div className="box esc" role="alert">{err}</div>}
+      <button className="btn primary" disabled={busy || !name || !pw}>{busy ? 'Signing in…' : 'Sign in'}</button>
+      <p className="muted" style={{ fontSize: '.8rem' }}>No account? An admin creates them on the Admin page, or from the server: <code>python -m tbamr.users create-admin &lt;name&gt;</code></p>
+    </form></div>
   )
 }
 

@@ -10,17 +10,18 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .article import render_article_html
+from .core import auth
 from .core.decisions import DecisionLog, GuardrailViolation
 from .core.executions import capture_execution
 from .core.geo import country_catalogue, regions_for, resolve_target
-from .core.models import DEFAULT_COHORT_TARGET
+from .core.models import DEFAULT_COHORT_TARGET, GATES
 from .core.orchestrator import Orchestrator, PermissionDenied, StageError
 from .llm.client import make_client
 from .stores import cache as cache_module, mongo as mongo_module, results as results_module
@@ -116,6 +117,38 @@ class RunProfiler(Who):
     runs: list[str]
 
 
+class SummaryEdit(BaseModel):
+    text: str
+    role: str = ""  # with sign-in on, the role you're acting in (PI or Deputy PI)
+
+
+class Login(BaseModel):
+    name: str
+    password: str
+
+
+class PasswordChange(BaseModel):
+    current: str
+    new: str
+
+
+class NewUser(BaseModel):
+    name: str
+    password: str
+    roles: list[str] = []
+    admin: bool = False
+
+
+class UserPatch(BaseModel):
+    roles: list[str] | None = None
+    admin: bool | None = None
+    disabled: bool | None = None
+
+
+class PasswordReset(BaseModel):
+    password: str
+
+
 def create_app(orch: Orchestrator | None = None) -> FastAPI:
     app = FastAPI(title="TB-AMR Agentic Pipeline", version="0.2.0")
     app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], allow_methods=["*"], allow_headers=["*"])
@@ -123,6 +156,110 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
 
     def O() -> Orchestrator:
         return app.state.orch
+
+    # ---- Sign-in (TBAMR_AUTH=on) ----------------------------------------------
+    # With auth on, every /api call except sign-in/status needs a valid session cookie, and the
+    # person on every decision is the signed-in user, acting only in a role an admin assigned them.
+    # With auth off (the demo default) requests are trusted as before and the UI says so.
+    OPEN = {"/api/auth/login", "/api/auth/status"}
+
+    @app.middleware("http")
+    async def require_session(request: Request, call_next):
+        request.state.user = None
+        if auth.enabled() and request.url.path.startswith("/api/"):
+            try:
+                request.state.user = auth.user_from_token(request.cookies.get(auth.COOKIE))
+            except auth.AuthError as e:
+                if request.url.path not in OPEN:
+                    return JSONResponse({"detail": str(e), "auth": "required"}, status_code=401)
+        return await call_next(request)
+
+    def W(request: Request, role: str, person: str = "") -> tuple[str, str]:
+        """(role, person) for this request: the signed-in user when auth is on, else what was sent."""
+        if not auth.enabled():
+            return role, person
+        try:
+            return auth.act_as(request.state.user, role)
+        except auth.Forbidden as e:
+            raise HTTPException(403, str(e))
+
+    def need(request: Request, *, admin: bool = False, roles: list[str] | None = None) -> None:
+        """With auth on, require the admin flag or one of `roles` (either is enough when both are given)."""
+        if not auth.enabled():
+            return
+        u = request.state.user
+        if (admin and u.get("admin")) or (roles and set(roles) & set(u.get("roles", []))):
+            return
+        what = " or ".join((["admin"] if admin else []) + [auth.ROLES[r] for r in roles or []])
+        raise HTTPException(403, f"This needs {what} permission.")
+
+    def user_api(fn, *a, **k):
+        try:
+            return fn(*a, **k)
+        except auth.UserError as e:
+            raise HTTPException(400, str(e))
+
+    def set_cookie(resp: Response, u: dict[str, Any]) -> None:
+        resp.set_cookie(auth.COOKIE, auth.issue_token(u), max_age=auth.SESSION_TTL, httponly=True, samesite="strict",
+                        secure=os.environ.get("TBAMR_COOKIE_SECURE", "").lower() in ("1", "on", "true"), path="/")
+
+    @app.get("/api/auth/status")
+    def auth_status(request: Request):
+        u = request.state.user
+        return {"enabled": auth.enabled(), "user": auth.public(u) if u else None}
+
+    @app.post("/api/auth/login")
+    def login(b: Login, response: Response):
+        if not auth.enabled():
+            raise HTTPException(409, "Sign-in is off (TBAMR_AUTH is not set).")
+        try:
+            u = auth.authenticate(b.name, b.password)
+        except auth.AuthError as e:
+            raise HTTPException(401, str(e))
+        set_cookie(response, u)
+        return {"user": auth.public(u)}
+
+    @app.post("/api/auth/logout")
+    def logout(request: Request, response: Response, everywhere: bool = False):
+        if everywhere and request.state.user:
+            auth.sign_out_everywhere(request.state.user["name"])
+        response.delete_cookie(auth.COOKIE, path="/")
+        return {"ok": True}
+
+    @app.post("/api/auth/password")
+    def change_password(b: PasswordChange, request: Request, response: Response):
+        u = request.state.user
+        if not u:
+            raise HTTPException(409, "Sign-in is off.")
+        try:
+            auth.authenticate(u["name"], b.current)
+        except auth.AuthError:
+            raise HTTPException(403, "Current password is wrong.")
+        user_api(auth.set_password, u["name"], b.new, by=u["name"])
+        set_cookie(response, auth.get_user(u["name"]))  # keep this browser signed in; others are signed out
+        return {"ok": True}
+
+    # ---- Admin: users and permissions (admin flag only) -------------------------
+    @app.get("/api/admin/users")
+    def users_list(request: Request):
+        need(request, admin=True)
+        return {"enabled": auth.enabled(), "users": auth.list_users(), "history": auth.history(), "roles": auth.ROLES}
+
+    @app.post("/api/admin/users")
+    def users_create(b: NewUser, request: Request):
+        need(request, admin=True)
+        return user_api(auth.create_user, b.name, b.password, b.roles, b.admin, by=(request.state.user or {}).get("name", "unauthenticated"))
+
+    @app.patch("/api/admin/users/{name}")
+    def users_update(name: str, b: UserPatch, request: Request):
+        need(request, admin=True)
+        return user_api(auth.update_user, name, (request.state.user or {}).get("name", "unauthenticated"), b.roles, b.admin, b.disabled)
+
+    @app.post("/api/admin/users/{name}/password")
+    def users_reset_password(name: str, b: PasswordReset, request: Request):
+        need(request, admin=True)
+        user_api(auth.set_password, name, b.password, by=(request.state.user or {}).get("name", "unauthenticated"))
+        return {"ok": True}
 
     def guard(fn, *a, **k):
         try:
@@ -153,7 +290,8 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         return O().metrics()
 
     @app.get("/api/raw/receipts")
-    def raw_receipts(role: str = "pi", person: str = ""):
+    def raw_receipts(request: Request, role: str = "pi", person: str = ""):
+        role, person = W(request, role, person)
         return O().log.receipts(O().ident(role, person))
 
     @app.get("/api/reports")
@@ -161,7 +299,8 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         return O().log.report_history()
 
     @app.get("/api/raw/{kind}/{key}")
-    def raw_view(kind: str, key: str, role: str = "pi", person: str = ""):
+    def raw_view(kind: str, key: str, request: Request, role: str = "pi", person: str = ""):
+        role, person = W(request, role, person)
         try:
             return O().raw_view(kind, key, role, person)
         except StageError as e:
@@ -194,13 +333,15 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         return resolve_target(question, country, region)
 
     @app.post("/api/scope/warnings/{idx}")
-    def respond_warning(idx: int, b: WarningResponse):
+    def respond_warning(idx: int, b: WarningResponse, request: Request):
+        b.role, b.person = W(request, b.role, b.person)
         with capture_execution(O().log, f"Respond to scope warning {idx + 1}"):
             guard(O().respond_warning, b.role, b.person, idx, b.decision, b.rationale)
         return {"ok": True}
 
     @app.post("/api/scope/revised-question")
-    def adopt_revised_question(b: Who):
+    def adopt_revised_question(b: Who, request: Request):
+        b.role, b.person = W(request, b.role, b.person)
         with capture_execution(O().log, "Adopt revised question"):
             return {"question": guard(O().adopt_revised_question, b.role, b.person)}
 
@@ -216,21 +357,24 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
             return ctx.record(guard(O().run_stage, n))
 
     @app.post("/api/gates/scope")
-    def g_scope(w: Who):
+    def g_scope(w: Who, request: Request):
+        w.role, w.person = W(request, w.role, w.person)
         with capture_execution(O().log, "Approve scope") as ctx:
             guard(O().approve_scope, w.role, w.person)
             ctx.record({"by": w.person, "role": w.role})
         return {"ok": True}
 
     @app.post("/api/gates/cohort")
-    def g_cohort(w: Who):
+    def g_cohort(w: Who, request: Request):
+        w.role, w.person = W(request, w.role, w.person)
         with capture_execution(O().log, "Approve cohort") as ctx:
             guard(O().approve_cohort, w.role, w.person)
             ctx.record({"by": w.person, "role": w.role, "cohort_size": sum(1 for s in O().state.samples if s.in_cohort)})
         return {"ok": True}
 
     @app.post("/api/gates/qc")
-    def g_qc(w: Who):
+    def g_qc(w: Who, request: Request):
+        w.role, w.person = W(request, w.role, w.person)
         with capture_execution(O().log, "Confirm QC") as ctx:
             guard(O().confirm_qc, w.role, w.person)
             samples = O().state.samples
@@ -241,7 +385,8 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         return {"ok": True}
 
     @app.post("/api/gates/profiling")
-    def g_prof(w: Who):
+    def g_prof(w: Who, request: Request):
+        w.role, w.person = W(request, w.role, w.person)
         with capture_execution(O().log, "Close profiling batch") as ctx:
             guard(O().close_profiling, w.role, w.person)
             ctx.record({"by": w.person, "role": w.role,
@@ -249,40 +394,46 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         return {"ok": True}
 
     @app.post("/api/holds/resolve")
-    def resolve(r: Resolve):
+    def resolve(r: Resolve, request: Request):
+        r.role, r.person = W(request, r.role, r.person)
         with capture_execution(O().log, f"Resolve hold · {r.run}") as ctx:
             guard(O().resolve_hold, r.role, r.person, r.run, r.decision, r.rationale)
             ctx.record({"run": r.run, "decision": r.decision, "rationale": r.rationale, "by": r.person, "role": r.role})
         return {"ok": True}
 
     @app.post("/api/qc/resolve")
-    def resolve_qc(r: Resolve):
+    def resolve_qc(r: Resolve, request: Request):
+        r.role, r.person = W(request, r.role, r.person)
         with capture_execution(O().log, f"Resolve QC · {r.run}") as ctx:
             guard(O().resolve_qc, r.role, r.person, r.run, r.decision, r.rationale)
             ctx.record({"run": r.run, "decision": r.decision, "rationale": r.rationale, "by": r.person, "role": r.role})
         return {"ok": True}
 
     @app.post("/api/review")
-    def review(r: Review):
+    def review(r: Review, request: Request):
+        r.role, r.person = W(request, r.role, r.person)
         with capture_execution(O().log, f"Finding review · {r.fid}") as ctx:
             guard(O().review, r.role, r.person, r.fid, r.decision, r.rationale)
             ctx.record({"fid": r.fid, "decision": r.decision, "rationale": r.rationale, "by": r.person, "role": r.role})
         return {"ok": True}
 
     @app.post("/api/overrides")
-    def override(o: Override):
+    def override(o: Override, request: Request):
+        o.role, o.person = W(request, o.role, o.person)
         with capture_execution(O().log, f"Override · {o.run}") as ctx:
             return ctx.record(guard(O().override, o.role, o.person, o.run, o.field, o.to, o.rationale))
 
     @app.post("/api/overrides/cosign")
-    def cosign(c: Cosign):
+    def cosign(c: Cosign, request: Request):
+        c.role, c.person = W(request, c.role, c.person)
         with capture_execution(O().log, f"Cosign override · {c.override_id}") as ctx:
             guard(O().cosign, c.role, c.person, c.override_id)
             ctx.record({"override_id": c.override_id, "by": c.person, "role": c.role})
         return {"ok": True}
 
     @app.post("/api/release")
-    def release(r: Release):
+    def release(r: Release, request: Request):
+        r.role, r.person = W(request, r.role, r.person)
         with capture_execution(O().log, f"Release report ({r.kind})") as ctx:
             guard(O().release, r.role, r.person, r.kind)
             rep = O().state.report or {}
@@ -296,11 +447,12 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
             ctx.record({"text": text})
             return {"text": text}
 
-    class SummaryEdit(BaseModel):
-        text: str
-
     @app.put("/api/report/summary")
-    def save_summary(s: SummaryEdit):
+    def save_summary(s: SummaryEdit, request: Request):
+        if auth.enabled():
+            role, _ = W(request, s.role)
+            if role not in GATES["release"]:
+                raise HTTPException(403, "Only the PI or Deputy PI can edit the report summary.")
         return {"text": guard(O().save_summary, s.text)}
 
     @app.get("/api/report/{version}/article.html")
@@ -321,7 +473,8 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         return HTMLResponse(html_doc, headers=headers)
 
     @app.post("/api/profiling/import")
-    async def import_results(role: str, person: str = "", files: list[UploadFile] = File(...)):
+    async def import_results(request: Request, role: str, person: str = "", files: list[UploadFile] = File(...)):
+        role, person = W(request, role, person)
         parsed = []
         for f in files:
             try:
@@ -332,12 +485,13 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
             return ctx.record(guard(O().import_results, role, person, parsed))
 
     @app.post("/api/profiling/run")
-    def run_profiler(r: RunProfiler):
+    def run_profiler(r: RunProfiler, request: Request):
+        r.role, r.person = W(request, r.role, r.person)
         # The pool runs asynchronously in a background thread; capture happens there, inside run_profiler().
         return guard(O().run_profiler, r.role, r.person, r.runs)
 
     @app.post("/api/reset")
-    def reset(data: str = "demo", brain: str | None = None):
+    def reset(request: Request, data: str = "demo", brain: str | None = None):
         """Reset the pipeline. Previously this unlinked the DB file, which raced against concurrent
         frontend polls (metrics/state/decisions) — their open SQLite connections auto-recreated the
         file without a schema, so the next SELECT hit `no such table: trace`. We now clear tables
@@ -348,6 +502,7 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         closed (ended_at + a label derived from the scope), a new run is opened, and the Logs tab
         can look back at previous runs. Decisions, agent traces, raw-data cache, view receipts and
         pipeline state are still cleared so the next cycle starts fresh."""
+        need(request, admin=True, roles=["pi"])
         path = Path(os.environ.get("TBAMR_DB", f"tbamr-{data}.db"))
         old = getattr(app.state, "orch", None)
         if old is not None:
@@ -399,37 +554,44 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
         return rulesettings.current()
 
     @app.post("/api/admin/rules")
-    def rules_change(b: RuleChange):
+    def rules_change(b: RuleChange, request: Request):
+        b.role, b.person = W(request, b.role, b.person)
         with capture_execution(O().log, "Change pipeline rules"):
             return guard(O().change_rules, b.role, b.person, b.changes, b.rationale, b.status, b.basis)
 
     @app.get("/api/admin/mongo")
-    def mongo_status():
+    def mongo_status(request: Request):
+        need(request, admin=True)
         return mongo_module.status()
 
     @app.post("/api/admin/mongo/reconnect")
-    def mongo_reconnect():
+    def mongo_reconnect(request: Request):
+        need(request, admin=True)
         return mongo_module.reconnect()
 
     @app.get("/api/admin/cache")
-    def cache_overview():
+    def cache_overview(request: Request):
+        need(request, admin=True)
         return {"mongo": mongo_module.status(), "caches": cache_module.cache.stats()}
 
     @app.post("/api/admin/cache/{ns}/toggle")
-    def cache_toggle(ns: str, t: CacheToggle):
+    def cache_toggle(ns: str, t: CacheToggle, request: Request):
+        need(request, admin=True)
         if ns not in CACHE_NAMESPACES:
             raise HTTPException(404, f"Unknown cache namespace: {ns!r}")
         cache_module.cache.set_enabled(ns, t.enabled)
         return {"ok": True, "namespace": ns, "enabled": t.enabled}
 
     @app.post("/api/admin/cache/{ns}/clear")
-    def cache_clear(ns: str):
+    def cache_clear(ns: str, request: Request):
+        need(request, admin=True)
         if ns not in CACHE_NAMESPACES:
             raise HTTPException(404, f"Unknown cache namespace: {ns!r}")
         return {"ok": True, "namespace": ns, "deleted": cache_module.cache.clear(ns)}
 
     @app.post("/api/admin/cache/clear-all")
-    def cache_clear_all():
+    def cache_clear_all(request: Request):
+        need(request, admin=True)
         return {"ok": True, "deleted": cache_module.cache.clear_all()}
 
     @app.get("/api/admin/results")

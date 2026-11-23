@@ -6,14 +6,14 @@ import { RawLink } from './Raw.jsx'
 
 marked.setOptions({ breaks: true, gfm: true })
 
-function Summary({ r, act }) {
+function Summary({ r, act, who }) {
   const [edit, setEdit] = useState(false)
   const [text, setText] = useState(r.summary_draft || '')
   const ta = useRef(null)
   useEffect(() => { if (!edit) setText(r.summary_draft || '') }, [r.summary_draft, edit])
   useEffect(() => { if (edit && ta.current) { ta.current.style.height = 'auto'; ta.current.style.height = ta.current.scrollHeight + 'px' } }, [edit, text])
   const draft = () => act(() => api.summary().then(res => { setText(res.text); setEdit(false) }), 'Summary drafted')
-  const save = () => act(() => api.saveSummary(text).then(() => setEdit(false)), 'Summary saved')
+  const save = () => act(() => api.saveSummary(text, who?.role).then(() => setEdit(false)), 'Summary saved')
   const cancel = () => { setText(r.summary_draft || ''); setEdit(false) }
   const label = r.summary_edited ? 'Edited by you' : 'AI draft · not a decision'
   return (
@@ -65,7 +65,7 @@ function History({ currentVersion }) {
   )
 }
 
-export default function Report({ st, act, brain }) {
+export default function Report({ st, act, brain, who }) {
   const r = st.report
   if (!r) return <div className="panel"><p className="muted">The report is assembled in Stage 6. Every number is computed by rule from the decision records.</p></div>
   const c = r.counts, max = Math.max(1, c.candidates)
@@ -87,7 +87,7 @@ export default function Report({ st, act, brain }) {
       {r.resistance_definition && <div className="box defs-report"><p><b>How resistance is called.</b> {r.resistance_definition}</p>
         <p className="muted" style={{ margin: 0 }}>Catalogue: <span className="mono">{r.provenance.databases.join(', ') || 'not recorded'}</span> · {r.provenance.tools.join(', ') || 'tool not recorded'}</p></div>}
       {r.catalogue_consistent === false && <div className="box esc" role="alert"><p><b>Mixed catalogue versions.</b> Runs in this report were called with different or unrecorded mutation-catalogue versions, so their calls are not comparable. Re-profile all runs with one version before release.</p></div>}
-      <Summary r={r} act={act} />
+      <Summary r={r} act={act} who={who} />
       <History currentVersion={r.version} />
       <div><h3>Sample counts</h3>{bar('Total candidates', c.candidates)}{bar('Verified eligible', c.verified)}{bar('Quality Control-passed', c.qc_passed)}{bar('Profiled & evaluated', c.analysed, true)}{c.planned_minimum ? <p className={c.analysed < c.planned_minimum ? 'below-min' : 'muted'} style={{ fontSize: '.84rem', margin: '4px 0 0' }}>Planned minimum cohort: {c.planned_minimum}{c.analysed < c.planned_minimum ? ` · ${c.analysed} analysed, below the minimum` : ' · reached'}</p> : null}</div>
       <div><h3>Resistance evidence by drug <span className="muted" style={{ fontWeight: 400 }}>(n = {c.analysed})</span></h3>
