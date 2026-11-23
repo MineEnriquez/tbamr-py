@@ -31,6 +31,14 @@ DRUG_NAMES = {
 }
 
 
+def drugs_named_in(text: str) -> list[str]:
+    """Display names of the drugs a piece of text mentions (e.g. a research question), in DRUG_NAMES order."""
+    t = (text or "").lower()
+    codes = {code for alias, code in DRUG_ALIAS.items()
+             if re.search(r"\b" + re.escape(alias).replace("_", "[\\s_-]") + r"\b", t)}
+    return [name for code, name in DRUG_NAMES.items() if code in codes]
+
+
 def drug_code(name: str) -> str:
     k = re.sub(r"\s+", "_", (name or "").strip().lower())
     return DRUG_ALIAS.get(k, (name or "?")[:3].upper())

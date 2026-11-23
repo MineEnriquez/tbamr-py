@@ -20,7 +20,7 @@ from .article import render_article_html
 from .core.decisions import DecisionLog, GuardrailViolation
 from .core.executions import capture_execution
 from .core.geo import country_catalogue, regions_for, resolve_target
-from .core.models import DEFAULT_COHORT_TARGET
+from .core.models import DEFAULT_COHORT_TARGET, DRUGS
 from .core.orchestrator import Orchestrator, PermissionDenied, StageError
 from .llm.client import make_client
 from .stores import cache as cache_module, mongo as mongo_module, results as results_module
@@ -108,7 +108,7 @@ class Scope(BaseModel):
     question: str
     country: str = ""  # INSDC country name or "Worldwide"; empty → must be named in the question, else Stage 1 blocks
     region: str = ""  # optional subnational target inside the country (free text, e.g. "West Java")
-    target_drugs: list[str] = ["Rifampicin", "Isoniazid"]
+    target_drugs: list[str] = list(DRUGS)  # chosen from models.DRUGS; default all
     cohort_target: int = DEFAULT_COHORT_TARGET
 
 
@@ -174,7 +174,13 @@ def create_app(orch: Orchestrator | None = None) -> FastAPI:
             raise HTTPException(409, "The scope can only be edited before the Guardian runs. Use /api/scope/reopen to go back.")
         if s.question.strip() != (st.question or "").strip():
             st.revision_rounds = 0  # the researcher wrote their own question: it is no longer the Guardian's wording
-        st.question, st.country, st.region, st.target_drugs, st.cohort_target = s.question, s.country, s.region, s.target_drugs, s.cohort_target
+        known = {d.lower(): d for d in DRUGS}
+        unknown = [d for d in s.target_drugs if d.strip().lower() not in known]
+        if unknown:
+            raise HTTPException(400, f"Unknown drug(s): {', '.join(unknown)}. Choose from: {', '.join(DRUGS)}.")
+        chosen = {known[d.strip().lower()] for d in s.target_drugs}
+        drugs = [d for d in DRUGS if d in chosen]  # canonical names, catalogue order, no duplicates
+        st.question, st.country, st.region, st.target_drugs, st.cohort_target = s.question, s.country, s.region, drugs, s.cohort_target
         O().save()
         return {"ok": True}
 
